@@ -1,0 +1,248 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #fcfbf7;
+  --bg-card: #ffffff;
+  --bg-sand: #f3ede2;
+  --bg-teal: #153d3b;
+  --color-charcoal: #111111;
+  --color-muted: #333333;
+  --color-crimson: #dc2626;
+  --color-ochre: #dc2626;
+  --color-red: #dc2626;
+}
+
+.dark {
+  --bg-primary: #020617;
+  --bg-card: #0f172a;
+  --bg-sand: #1e293b;
+  --bg-teal: #0d4d4d;
+  --color-charcoal: #f3f4f6;
+  --color-muted: #9ca3af;
+  --color-crimson: #ef4444;
+  --color-ochre: #f59e0b;
+  --color-red: #ef4444;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--color-charcoal);
+  font-family: var(--font-plus-jakarta-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', 'Noto Sans Tamil', 'Noto Sans Devanagari', 'Noto Sans Arabic', Roboto, sans-serif;
+  font-weight: 500;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Extended Multi-Language Line Height & Glyphs Protection */
+[lang="ta"], [lang="hi"], [lang="ar"], [lang="ml"], [lang="te"], [lang="kn"],
+.lang-ta, .lang-hi, .lang-ar, .lang-ml, .lang-te, .lang-kn {
+  line-height: 1.75 !important;
+}
+
+/* RTL Support */
+[dir="rtl"] {
+  text-align: right;
+}
+
+/* Universal Overlap Protection */
+.overlap-safe,
+article,
+.card-overlap-safe {
+  overflow-wrap: break-word;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+/* High-contrast bold headlines with tight tracking */
+h1, h2, h3, h4, h5, h6, .font-heading {
+  font-family: var(--font-plus-jakarta-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', sans-serif;
+  color: inherit;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+}
+
+/* Body & Metadata typography */
+p, span, li, button, input, time, label {
+  font-family: var(--font-plus-jakarta-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', sans-serif;
+  font-weight: 500;
+}
+
+p {
+  color: inherit;
+  line-height: 1.6;
+}
+
+/* Editorial thin divider lines */
+.border-editorial {
+  border-color: #e5e0d8;
+}
+
+.dark .border-editorial {
+  border-color: #334155;
+}
+
+/* Hide horizontal scrollbars for ticker/category bars */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Smooth Alert Marquee Animation for continuous readable live scroll */
+@keyframes ticker-marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-ticker {
+  display: inline-flex;
+  white-space: nowrap;
+  animation: ticker-marquee 50s linear infinite;
+}
+
+.animate-ticker:hover {
+  animation-play-state: paused;
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-100%);
+  }
+}
+
+.animate-marquee {
+  display: flex;
+  flex-shrink: 0;
+  white-space: nowrap;
+  animation: marquee 52s linear infinite;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Times of India Style Wallpaper & Gutter Ad Skins */
+.toi-gutter-skin {
+  width: 160px;
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* Ad aspect ratio containment */
+.ad-slot-mrec {
+  aspect-ratio: 300 / 250;
+  min-height: 250px;
+}
+
+.ad-slot-halfpage {
+  min-height: 600px;
+}
+
+.ad-slot-leaderboard {
+  min-height: 90px;
+}
+
+/* Force 100% normal rendering for all ad images, creatives, and iframes across dark mode */
+.ad-banner-media,
+[data-ad-slot] img,
+[data-ad-slot] picture,
+[data-ad-slot] iframe,
+[data-ad-slot] svg,
+.native-ad-wrapper img {
+  filter: none !important;
+  -webkit-filter: none !important;
+  mix-blend-mode: normal !important;
+  opacity: 1 !important;
+}
+
+/* Google Translate Widget & Banner Silencing */
+.goog-te-banner-frame.skiptranslate,
+.goog-te-banner-frame,
+iframe.goog-te-banner-frame {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+}
+
+body {
+  top: 0px !important;
+  position: static !important;
+}
+
+.skiptranslate {
+  display: none !important;
+}
+
+.goog-tooltip,
+.goog-tooltip:hover {
+  display: none !important;
+}
+
+.goog-text-highlight {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* FORCE ZERO GAP BELOW NAVBAR */
+main {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+header {
+  margin-bottom: 0 !important;
+  padding-bottom: 0 !important;
+}
+
+/* LIVE SHUTDOWN ALERT TICKER ANIMATION */
+@keyframes ticker {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.animate-ticker {
+  display: inline-flex;
+  width: max-content;
+  animation: ticker 65s linear infinite;
+  will-change: transform;
+}
+
+.animate-ticker:hover {
+  animation-play-state: paused;
+}
+

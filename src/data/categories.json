@@ -1,0 +1,122 @@
+[
+  {
+    "id": "cat-1",
+    "slug": "hospitals-clinics",
+    "name": "Hospitals & Clinics",
+    "icon": "🏥"
+  },
+  {
+    "id": "cat-2",
+    "slug": "textiles-garments",
+    "name": "Textiles & Garments",
+    "icon": "🧵"
+  },
+  {
+    "id": "cat-3",
+    "slug": "restaurants-cafes",
+    "name": "Restaurants & Cafes",
+    "icon": "🍽️"
+  },
+  {
+    "id": "cat-4",
+    "slug": "it-software",
+    "name": "IT & Software",
+    "icon": "💻"
+  },
+  {
+    "id": "cat-5",
+    "slug": "colleges-universities",
+    "name": "Colleges & Universities",
+    "icon": "🎓"
+  },
+  {
+    "id": "cat-6",
+    "slug": "real-estate",
+    "name": "Real Estate",
+    "icon": "🏢"
+  },
+  {
+    "id": "cat-7",
+    "slug": "jewellery",
+    "name": "Jewellery",
+    "icon": "💎"
+  },
+  {
+    "id": "cat-8",
+    "slug": "automobile",
+    "name": "Automobile",
+    "icon": "🚗"
+  },
+  {
+    "id": "cat-9",
+    "slug": "supermarkets",
+    "name": "Supermarkets",
+    "icon": "🛒"
+  },
+  {
+    "id": "cat-10",
+    "slug": "hotels",
+    "name": "Hotels",
+    "icon": "🏨"
+  },
+  {
+    "id": "cat-11",
+    "slug": "salons-spas",
+    "name": "Salons & Spas",
+    "icon": "✂️"
+  },
+  {
+    "id": "cat-12",
+    "slug": "gyms-fitness",
+    "name": "Gyms & Fitness",
+    "icon": "💪"
+  },
+  {
+    "id": "cat-13",
+    "slug": "electronics",
+    "name": "Electronics",
+    "icon": "📱"
+  },
+  {
+    "id": "cat-14",
+    "slug": "schools",
+    "name": "Schools",
+    "icon": "📚"
+  },
+  {
+    "id": "cat-15",
+    "slug": "event-planners",
+    "name": "Event Planners",
+    "icon": "🎉"
+  },
+  {
+    "id": "cat-16",
+    "slug": "logistics",
+    "name": "Logistics",
+    "icon": "🚚"
+  },
+  {
+    "id": "cat-17",
+    "slug": "pharmacies",
+    "name": "Pharmacies",
+    "icon": "💊"
+  },
+  {
+    "id": "cat-18",
+    "slug": "bakeries",
+    "name": "Bakeries",
+    "icon": "🥐"
+  },
+  {
+    "id": "cat-19",
+    "slug": "furniture",
+    "name": "Furniture",
+    "icon": "🛋️"
+  },
+  {
+    "id": "cat-20",
+    "slug": "travel-agencies",
+    "name": "Travel Agencies",
+    "icon": "✈️"
+  }
+]

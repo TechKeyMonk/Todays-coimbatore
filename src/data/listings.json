@@ -1,0 +1,99 @@
+[
+  {
+    "id": "dir-1",
+    "title": "PSG Hospitals & Institute of Medical Sciences",
+    "name": "PSG Hospitals & Institute of Medical Sciences",
+    "category": "Hospitals & Clinics",
+    "phone": "+91 422 257 0170",
+    "address": "Avinashi Road, Peelamedu",
+    "area": "Peelamedu",
+    "pincode": "641004",
+    "rating": 4.8,
+    "ownerName": "PSG & Sons' Charities Trust",
+    "featured": false
+  },
+  {
+    "id": "dir-2",
+    "title": "Ganga Medical Centre & Hospitals",
+    "name": "Ganga Medical Centre & Hospitals",
+    "category": "Hospitals & Clinics",
+    "phone": "+91 422 248 5000",
+    "address": "313, Mettupalayam Road, Saibaba Colony",
+    "area": "Saibaba Colony",
+    "pincode": "641043",
+    "rating": 4.9,
+    "ownerName": "Dr. S. Raja Sabapathy"
+  },
+  {
+    "id": "dir-3",
+    "title": "Brookefields Mall & Entertainment Hub",
+    "name": "Brookefields Mall & Entertainment Hub",
+    "category": "Supermarkets",
+    "phone": "+91 422 225 5555",
+    "address": "67-71, Dr Krishnasamy Mudaliar Rd, Brookefields",
+    "area": "RS Puram",
+    "pincode": "641001",
+    "rating": 4.6,
+    "ownerName": "Brookefields Management"
+  },
+  {
+    "id": "dir-4",
+    "title": "TIDEL Park Coimbatore IT Complex",
+    "name": "TIDEL Park Coimbatore IT Complex",
+    "category": "IT & Software",
+    "phone": "+91 422 251 3400",
+    "address": "ELCOT SEZ, Civil Aerodrome Post, Peelamedu",
+    "area": "Peelamedu",
+    "pincode": "641014",
+    "rating": 4.7,
+    "ownerName": "ELCOT & TIDEL Park Ltd."
+  },
+  {
+    "id": "dir-5",
+    "title": "Covai Pazhamudir Nilayam Mega Store",
+    "name": "Covai Pazhamudir Nilayam Mega Store",
+    "category": "Supermarkets",
+    "phone": "+91 422 254 3322",
+    "address": "DB Road, RS Puram, Coimbatore",
+    "area": "RS Puram",
+    "pincode": "641002",
+    "rating": 4.8,
+    "ownerName": "K. Chinnasamy & Sons"
+  },
+  {
+    "id": "dir-6",
+    "title": "Gopal Diamond & Gold Jewellery",
+    "name": "Gopal Diamond & Gold Jewellery",
+    "category": "Jewellery",
+    "phone": "8098422206",
+    "address": "Cross Cut Road, Gandhipuram",
+    "area": "Gandhipuram",
+    "pincode": "641012",
+    "rating": 5,
+    "ownerName": "Gopalakrishnan V."
+  },
+  {
+    "id": "dir-7",
+    "title": "The Residency Towers Hotel & Banquets",
+    "name": "The Residency Towers Hotel & Banquets",
+    "category": "Hotels",
+    "phone": "+91 422 224 1414",
+    "address": "1076, Avinashi Road, Near Stanes Anglo Indian School",
+    "area": "Race Course",
+    "pincode": "641018",
+    "rating": 4.7,
+    "ownerName": "Appaswamy Real Estates Group"
+  },
+  {
+    "id": "dir-8",
+    "title": "PSG College of Technology",
+    "name": "PSG College of Technology",
+    "category": "Colleges & Universities",
+    "phone": "+91 422 257 2177",
+    "address": "Post Box No. 1611, Peelamedu",
+    "area": "Peelamedu",
+    "pincode": "641004",
+    "rating": 4.9,
+    "ownerName": "L. Gopalakrishnan (Managing Trustee)"
+  }
+]

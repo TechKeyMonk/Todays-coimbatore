@@ -1,0 +1,53 @@
+import type { Metadata } from 'next';
+import CategoryPage from '../category/[slug]/page';
+
+export const metadata: Metadata = {
+  title: "Coimbatore Business News | Industry & Startup Headlines",
+  description: "Latest Coimbatore business headlines, industrial investments, textile updates, MSME developments, and startup news on Today's Coimbatore.",
+  keywords: [
+    "Coimbatore Business News",
+    "Kovai Industries",
+    "Coimbatore Startups",
+    "Coimbatore Economy",
+    "Coimbatore Manufacturing",
+  ],
+  alternates: {
+    canonical: 'https://todayscoimbatore.com/business',
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  openGraph: {
+    title: "Coimbatore Business News | Industry & Startup Headlines",
+    description: "Latest Coimbatore business headlines, industrial investments, textile updates, and startup news.",
+    url: 'https://todayscoimbatore.com/business',
+    siteName: "Today's Coimbatore",
+    type: 'website',
+    images: [
+      {
+        url: 'https://todayscoimbatore.com/images/logo.png',
+        width: 1200,
+        height: 630,
+        alt: "Coimbatore Business News",
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: "Coimbatore Business News | Industry & Startup Headlines",
+    description: "Latest Coimbatore business headlines, industrial investments, textile updates, and startup news.",
+    images: ['https://todayscoimbatore.com/images/logo.png'],
+  },
+};
+
+export default function BusinessRoutePage() {
+  return <CategoryPage params={Promise.resolve({ slug: 'business' })} />;
+}
