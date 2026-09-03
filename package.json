@@ -4,10 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev -H 0.0.0.0",
+    "safe-dev": "node safe-dev.js",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "seed": "node scripts/seedSupabase.js"
+    "seed": "node scripts/seedSupabase.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -26,12 +30,17 @@
     "ws": "^8.21.3"
   },
   "devDependencies": {
-    "@types/node": "^20.17.10",
+    "@types/node": "^20.19.43",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
+    "@vitest/coverage-v8": "^4.1.11",
     "autoprefixer": "^10.4.20",
+    "dotenv": "^17.4.2",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "^15.1.0",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5.7.2"
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.11"
   }
 }

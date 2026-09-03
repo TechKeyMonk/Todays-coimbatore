@@ -21,6 +21,7 @@ import dbService, {
 } from '@/services/db';
 import { getCategoryMeta, getCategoryFallbackImage, slugify } from '@/app/directory/components/DirectoryIcons';
 import { SupabaseTablesManager } from './components/SupabaseTablesManager';
+import { supabase } from '@/lib/supabaseClient';
 
 /* -------------------------------------------------------------------------- */
 /*                                Types & State                               */
@@ -42,22 +43,35 @@ interface OutageItem {
 interface AdSlotSetting {
   id: string;
   slotId?: string;
-  placementKey?: 'TOP_HEADER_LEADERBOARD' | 'HOME_IN_FEED_1' | 'HOME_IN_FEED_2' | 'RIGHT_SIDEBAR_TOP' | 'RIGHT_SIDEBAR_BOTTOM' | 'ARTICLE_DETAIL_BOTTOM' | string;
+  placementKey?:
+    | 'TOP_HEADER_LEADERBOARD'
+    | 'HOME_IN_FEED_1'
+    | 'HOME_IN_FEED_2'
+    | 'LEFT_SIDEBAR_BANNER'
+    | 'RIGHT_SIDEBAR_BANNER'
+    | 'RIGHT_SIDEBAR_TOP'
+    | 'RIGHT_SIDEBAR_BOTTOM'
+    | 'ARTICLE_DETAIL_BOTTOM'
+    | 'left_sidebar'
+    | 'right_sidebar'
+    | 'top_banner'
+    | 'in_article'
+    | string;
   format: string;
-  title: string;
-  description?: string;
-  advertiser: string;
-  imageUrl?: string;
-  bannerUrl?: string;
-  linkUrl?: string;
-  ctaUrl?: string;
-  ctaText?: string;
   impressions: string;
   ctr: string;
   active: boolean;
-  startDate: string; // YYYY-MM-DD
-  endDate: string;   // YYYY-MM-DD
-  fallbackAdSense: boolean;
+  startDate?: string;
+  endDate?: string;
+  fallbackAdSense?: boolean;
+  slides: {
+    id: string;
+    title: string;
+    advertiser: string;
+    description?: string;
+    imageUrl: string;
+    active: boolean;
+  }[];
 }
 
 const INITIAL_OUTAGES: OutageItem[] = [
@@ -105,114 +119,140 @@ const INITIAL_ADS: AdSlotSetting[] = [
     slotId: 'TOP_HEADER_LEADERBOARD',
     placementKey: 'TOP_HEADER_LEADERBOARD',
     format: 'Top Header Leaderboard (728x90)',
-    title: 'TIDEL Park Coimbatore Phase-2 Office Suites Open for Booking',
-    description: 'Grade-A tech park infrastructure along Avinashi Road with 100% power backup and direct metro access.',
-    advertiser: 'ELCOT / TIDEL Coimbatore',
-    imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
-    bannerUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
-    linkUrl: 'https://todayscoimbatore.com',
-    ctaText: 'Explore Floor Plans',
     impressions: '24,580',
     ctr: '3.8%',
     active: true,
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    slides: [
+      {
+        id: 'slide-1',
+        title: 'TIDEL Park Coimbatore Phase-2 Office Suites Open for Booking',
+        description: 'Grade-A tech park infrastructure along Avinashi Road with 100% power backup and direct metro access.',
+        advertiser: 'ELCOT / TIDEL Coimbatore',
+        imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
+        active: true,
+      },
+      {
+        id: 'slide-2',
+        title: 'Coimbatore Metro Phase 1 Corridors Approved',
+        description: 'Upcoming high-speed transit connecting major IT hubs and industrial zones.',
+        advertiser: 'Covai Transit',
+        imageUrl: 'https://images.unsplash.com/photo-1541888045610-18451121d5a7?auto=format&fit=crop&w=1400&q=80',
+        active: true,
+      }
+    ]
+  },
+  {
+    id: 'ad-slot-left',
+    slotId: 'LEFT_SIDEBAR_BANNER',
+    placementKey: 'LEFT_SIDEBAR_BANNER',
+    format: 'Left Sticky Sidebar Banner (210x400 Vertical)',
+    impressions: '28,140',
+    ctr: '4.6%',
+    active: true,
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+    fallbackAdSense: true,
+    slides: [
+      {
+        id: 'slide-left-1',
+        title: 'PSG College of Technology — Autonomous & NIRF Ranked Admissions 2026',
+        description: 'Admissions 2026',
+        advertiser: 'PSG Tech',
+        imageUrl: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=600&q=80',
+        active: true,
+      }
+    ]
+  },
+  {
+    id: 'ad-slot-right',
+    slotId: 'RIGHT_SIDEBAR_BANNER',
+    placementKey: 'RIGHT_SIDEBAR_BANNER',
+    format: 'Right Sticky Sidebar Banner (210x400 Vertical)',
+    impressions: '26,790',
+    ctr: '4.3%',
+    active: true,
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+    fallbackAdSense: true,
+    slides: [
+      {
+        id: 'slide-right-1',
+        title: 'Kongu Living Estates — Luxury Smart Villas in Saravanampatti',
+        description: 'Real Estate',
+        advertiser: 'Kongu Living',
+        imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80',
+        active: true,
+      }
+    ]
   },
   {
     id: 'ad-slot-2',
     slotId: 'HOME_IN_FEED_1',
     placementKey: 'HOME_IN_FEED_1',
     format: 'Home In-Feed 1 (Between Stories & Our City)',
-    title: 'ELGi Industrial Air Compressors & Smart Automation Solutions',
-    description: 'Upgrade factory floor efficiency with Industry 4.0 energy-saving rotary screw compressors manufactured in Coimbatore.',
-    advertiser: 'ELGi Equipments Global',
-    imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
-    bannerUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
-    linkUrl: 'https://todayscoimbatore.com',
-    ctaText: 'Book Free Plant Energy Audit',
     impressions: '18,950',
     ctr: '4.2%',
     active: true,
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    slides: [
+      {
+        id: 'slide-infeed1-1',
+        title: 'ELGi Industrial Air Compressors & Smart Automation Solutions',
+        description: 'Upgrade factory floor efficiency with Industry 4.0 energy-saving rotary screw compressors manufactured in Coimbatore.',
+        advertiser: 'ELGi Equipments Global',
+        imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
+        active: true,
+      }
+    ]
   },
   {
     id: 'ad-slot-3',
     slotId: 'HOME_IN_FEED_2',
     placementKey: 'HOME_IN_FEED_2',
     format: 'Home In-Feed 2 (Between Business & Tech)',
-    title: 'Kongu Living Gated Villa Community in Saravanampatti IT Corridor',
-    description: 'DTCP & RERA approved 3 & 4 BHK luxury smart villas with clubhouse, EV charging points, and 24/7 security.',
-    advertiser: 'Kongu Living Developers',
-    imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
-    bannerUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
-    linkUrl: 'https://todayscoimbatore.com',
-    ctaText: 'Schedule Site Visit & Brochure',
     impressions: '16,740',
     ctr: '3.9%',
     active: true,
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
-  },
-  {
-    id: 'ad-slot-4',
-    slotId: 'RIGHT_SIDEBAR_TOP',
-    placementKey: 'RIGHT_SIDEBAR_TOP',
-    format: 'Right Sidebar Top (300x250 Medium Rectangle)',
-    title: 'Invest in Premium Villa Plots in Saravanampatti',
-    description: 'DTCP & RERA approved gated layout with 40-ft roads and clubhouse amenities.',
-    advertiser: 'Kongu Living Estates',
-    imageUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80',
-    bannerUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80',
-    linkUrl: 'https://todayscoimbatore.com',
-    ctaText: 'View Layout Plan',
-    impressions: '22,410',
-    ctr: '3.8%',
-    active: true,
-    startDate: '2026-01-01',
-    endDate: '2026-12-31',
-    fallbackAdSense: true,
-  },
-  {
-    id: 'ad-slot-5',
-    slotId: 'RIGHT_SIDEBAR_BOTTOM',
-    placementKey: 'RIGHT_SIDEBAR_BOTTOM',
-    format: 'Right Sidebar Bottom (300x380 / Half Page)',
-    title: 'PSG Tech Executive Management & Industry 4.0 Programs',
-    description: 'Weekend executive certifications and advanced engineering leadership degrees for professionals.',
-    advertiser: 'PSG College of Technology',
-    imageUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=600&q=80',
-    bannerUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=600&q=80',
-    linkUrl: 'https://todayscoimbatore.com',
-    ctaText: 'Apply Online',
-    impressions: '15,120',
-    ctr: '3.5%',
-    active: true,
-    startDate: '2026-01-01',
-    endDate: '2026-12-31',
-    fallbackAdSense: true,
+    slides: [
+      {
+        id: 'slide-infeed2-1',
+        title: 'Kongu Living Gated Villa Community in Saravanampatti IT Corridor',
+        description: 'DTCP & RERA approved 3 & 4 BHK luxury smart villas with clubhouse, EV charging points, and 24/7 security.',
+        advertiser: 'Kongu Living Developers',
+        imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
+        active: true,
+      }
+    ]
   },
   {
     id: 'ad-slot-6',
     slotId: 'ARTICLE_DETAIL_BOTTOM',
     placementKey: 'ARTICLE_DETAIL_BOTTOM',
     format: 'Article Detail Bottom (In-Article Fluid)',
-    title: 'Coimbatore Airport Runway Expansion & Modern Logistics Terminal',
-    description: 'Direct air cargo handling facilities and multimodal connectivity across Kongu region.',
-    advertiser: 'Coimbatore Aviation Infrastructure Forum',
-    imageUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80',
-    bannerUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80',
-    linkUrl: 'https://todayscoimbatore.com',
-    ctaText: 'View Transit Report',
     impressions: '12,930',
     ctr: '4.5%',
     active: true,
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    slides: [
+      {
+        id: 'slide-article-1',
+        title: 'Coimbatore Airport Runway Expansion & Modern Logistics Terminal',
+        description: 'Direct air cargo handling facilities and multimodal connectivity across Kongu region.',
+        advertiser: 'Coimbatore Aviation Infrastructure Forum',
+        imageUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80',
+        active: true,
+      }
+    ]
   },
 ];
 
@@ -231,10 +271,10 @@ export default function AdminPage() {
   const [newCategory, setNewCategory] = useState('NEWS');
   const [newSubCategory, setNewSubCategory] = useState('');
   const [newAuthor, setNewAuthor] = useState('Editorial Bureau');
-  const [newReadTime, setNewReadTime] = useState('3 min');
   const [newContent, setNewContent] = useState('');
   const [isExclusive, setIsExclusive] = useState(false);
   const [articleSuccess, setArticleSuccess] = useState('');
+  const [articleError, setArticleError] = useState('');
   const [isPublishing, setIsPublishing] = useState(false);
 
   // Live real-time ticker to tick relative time every second (1 sec ago, 2 secs ago...)
@@ -633,36 +673,70 @@ export default function AdminPage() {
     }
   };
 
-  // TANGEDCO Live Auto-Sync Handler
+  // TANGEDCO Automated Gemini AI Ingestion & Sync Handler
   const handleAutoSyncTangedco = async (dateParam?: string) => {
     try {
       setIsAutoSyncing(true);
       const targetDate = dateParam || filterDate || getTomorrowDateStr();
-      const res = await fetch(`/api/tangedco?date=${encodeURIComponent(targetDate)}`);
+      const res = await fetch('/api/tangedco', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ date: targetDate }),
+      });
+
       if (res.ok) {
         const json = await res.json();
         if (json.outages && Array.isArray(json.outages)) {
-          const syncedItems: OutageItem[] = json.outages.map((o: any) => ({
-            id: o.id || `out-${Date.now()}-${Math.random()}`,
+          const fetchedItems: OutageItem[] = json.outages.map((o: any) => ({
+            id: o.id || `out-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
             area: o.area,
             substation: o.substation,
-            date: o.scheduledDate,
-            time: o.timeWindow,
+            date: o.scheduledDate || targetDate,
+            time: o.timeWindow || '09:00 AM – 04:00 PM',
             status: o.status || 'scheduled',
-            details: o.reason,
-            isTomorrow: o.isTomorrow,
-            affectedStreets: o.affectedStreets,
+            details: o.reason || o.details || 'Substation line maintenance',
+            isTomorrow: (o.scheduledDate || targetDate) === getTomorrowDateStr(),
+            affectedStreets: o.affectedStreets || [],
             isAutoSynced: true,
           }));
-          setOutages(syncedItems);
-          syncOutagesToDb(syncedItems);
-          setOutageSuccess(
-            `⚡ Live Auto-Sync Success: Synchronized ${syncedItems.length} feeder shutdown schedules for ${json.summary?.scheduledDate || targetDate} from TANGEDCO Central Bureau!`
+
+          // Strict Deduplication based on Date and Substation / Area
+          const existingMap = new Set(
+            outages.map(
+              (e) =>
+                `${e.date || targetDate}::${(e.substation || e.area).toLowerCase().trim()}`
+            )
           );
+
+          const newUniqueItems = fetchedItems.filter(
+            (item) =>
+              !existingMap.has(
+                `${item.date || targetDate}::${(item.substation || item.area).toLowerCase().trim()}`
+              )
+          );
+
+          const updatedList = [...newUniqueItems, ...outages];
+          setOutages(updatedList);
+          await syncOutagesToDb(updatedList);
+
+          if (newUniqueItems.length > 0) {
+            setOutageSuccess(
+              `⚡ Gemini AI Ingestion Success: Added ${newUniqueItems.length} new unique TNEB feeder shutdown schedules for ${json.summary?.scheduledDate || targetDate}!`
+            );
+          } else {
+            setOutageSuccess(
+              `⚡ TNEB Live Check Complete: All ${fetchedItems.length} feeder schedules for ${json.summary?.scheduledDate || targetDate} are already up to date (0 duplicates created).`
+            );
+          }
           setTimeout(() => setOutageSuccess(''), 5000);
         }
+      } else {
+        throw new Error('API sync error');
       }
-    } catch (err) {
+    } catch (err: any) {
+      console.error('TNEB auto-sync error:', err);
       setOutageSuccess('⚠️ Auto-sync fallback active. Loaded latest Coimbatore TNEB schedule.');
       setTimeout(() => setOutageSuccess(''), 5000);
     } finally {
@@ -1338,7 +1412,7 @@ export default function AdminPage() {
           : undefined;
 
       const wordCount = (newContent || newTitle).trim().split(/\s+/).filter(Boolean).length;
-      const computedReadTime = newReadTime.trim() || `${Math.max(1, Math.ceil(wordCount / 130))} min`;
+      const computedReadTime = `${Math.max(1, Math.ceil(wordCount / 130))} min`;
       const nowIso = new Date().toISOString();
       const articleId = Date.now().toString();
 
@@ -1405,37 +1479,49 @@ export default function AdminPage() {
   const handleDeleteArticle = async (id: string) => {
     if (!confirm('Are you sure you want to delete this story from the production database?')) return;
 
-    // 1. LocalStorage immediate update
-    const existing = JSON.parse(
-      localStorage.getItem('t_covai_articles') ||
-      localStorage.getItem('admin_published_articles') ||
-      localStorage.getItem('publishedArticles') ||
-      localStorage.getItem('news_articles') ||
-      '[]'
-    );
-    const updated = existing.filter((a: any) => a.id !== id);
-    localStorage.setItem('t_covai_articles', JSON.stringify(updated));
-    localStorage.setItem('admin_published_articles', JSON.stringify(updated));
-    localStorage.setItem('publishedArticles', JSON.stringify(updated));
-    localStorage.setItem('news_articles', JSON.stringify(updated));
-    localStorage.setItem('covai_db_articles', JSON.stringify(updated));
+    setArticleError('');
+    setArticleSuccess('');
 
-    // 2. Dispatch events
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('newsStorageUpdate'));
-      window.dispatchEvent(new CustomEvent('todayscoimbatore:db-updated', { detail: { table: 'articles' } }));
-      window.dispatchEvent(new StorageEvent('storage', { key: 't_covai_articles', newValue: JSON.stringify(updated) }));
-      window.dispatchEvent(new StorageEvent('storage', { key: 'admin_published_articles', newValue: JSON.stringify(updated) }));
-      window.dispatchEvent(new StorageEvent('storage', { key: 'publishedArticles', newValue: JSON.stringify(updated) }));
-      window.dispatchEvent(new StorageEvent('storage', { key: 'news_articles', newValue: JSON.stringify(updated) }));
+    try {
+      // 1. Perform hard delete on Supabase 'news' table via backend service
+      await dbService.deleteArticle(id);
+
+      // 2. Only upon successful database deletion, purge from local storage & state
+      const existing = JSON.parse(
+        localStorage.getItem('t_covai_articles') ||
+        localStorage.getItem('admin_published_articles') ||
+        localStorage.getItem('publishedArticles') ||
+        localStorage.getItem('news_articles') ||
+        '[]'
+      );
+      const updated = existing.filter((a: any) => a.id !== id && a.slug !== id);
+      localStorage.setItem('t_covai_articles', JSON.stringify(updated));
+      localStorage.setItem('admin_published_articles', JSON.stringify(updated));
+      localStorage.setItem('publishedArticles', JSON.stringify(updated));
+      localStorage.setItem('news_articles', JSON.stringify(updated));
+      localStorage.setItem('covai_db_articles', JSON.stringify(updated));
+
+      // 3. Dispatch sync events
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('newsStorageUpdate'));
+        window.dispatchEvent(new CustomEvent('todayscoimbatore:db-updated', { detail: { table: 'news' } }));
+        window.dispatchEvent(new StorageEvent('storage', { key: 't_covai_articles', newValue: JSON.stringify(updated) }));
+        window.dispatchEvent(new StorageEvent('storage', { key: 'admin_published_articles', newValue: JSON.stringify(updated) }));
+        window.dispatchEvent(new StorageEvent('storage', { key: 'publishedArticles', newValue: JSON.stringify(updated) }));
+        window.dispatchEvent(new StorageEvent('storage', { key: 'news_articles', newValue: JSON.stringify(updated) }));
+      }
+
+      setArticles((prev) => prev.filter((a) => a.id !== id && a.slug !== id));
+      setArticleSuccess('Article permanently deleted from Supabase database.');
+      setTimeout(() => setArticleSuccess(''), 4000);
+      refreshAllData();
+    } catch (err: any) {
+      console.error('Failed to delete article:', err);
+      const errMsg = err.message || 'Failed to delete article from database';
+      setArticleError(errMsg);
+      alert(`Deletion Failed: ${errMsg}`);
+      setTimeout(() => setArticleError(''), 6000);
     }
-
-    await dbService.deleteArticle(id);
-    setArticles((prev) => prev.filter((a) => a.id !== id));
-
-    setArticleSuccess('Article deleted from database.');
-    setTimeout(() => setArticleSuccess(''), 4000);
-    refreshAllData();
   };
 
   // Save Edited Article
@@ -1602,13 +1688,51 @@ export default function AdminPage() {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // HANDLE SLIDE IMAGE UPLOADS
+  // ---------------------------------------------------------------------------
+  const handleSlideImageUpload = async (file: File, slideIndex: number) => {
+    if (!file) return;
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `${fileName}`; // bucket is ad-creatives
+
+      // Upload to Supabase Storage
+      const { data, error } = await supabase.storage
+        .from('ad-creatives')
+        .upload(filePath, file);
+
+      if (error) {
+        alert('Error uploading image: ' + error.message);
+        return;
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('ad-creatives')
+        .getPublicUrl(filePath);
+
+      // Update slide
+      if (editingAdSlot) {
+        const newSlides = [...editingAdSlot.slides];
+        newSlides[slideIndex].imageUrl = publicUrl;
+        setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+      }
+
+    } catch (err: any) {
+      alert('Failed to upload image: ' + err.message);
+    }
+  };
+
   /* ------------------------------------------------------------------------ */
   /*                    2. Admin CMS Dashboard Workspace                      */
   /* ------------------------------------------------------------------------ */
   return (
     <div className="min-h-screen bg-[#fcfbf7] text-[#1a1a1a] font-sans antialiased">
       {/* Top Admin Navigation Header */}
-      <header className="bg-[#153d3b] text-white border-b border-[#0d4d4d] sticky top-0 z-40 shadow-sm">
+      <header className="bg-[#153d3b] text-white border-b border-[#0d4d4d] sticky top-0 z-40 shadow-md">
         <div className="max-w-[1440px] mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <Link href="/" className="inline-flex items-center">
@@ -1838,25 +1962,6 @@ export default function AdminPage() {
                 </span>
               </button>
 
-              <button
-                type="button"
-                onClick={() => setActiveTab('explorer')}
-                className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all cursor-pointer ${
-                  activeTab === 'explorer'
-                    ? 'bg-[#153d3b] text-white shadow-md font-bold'
-                    : 'text-stone-700 hover:bg-[#f3ede2] hover:text-[#153d3b]'
-                }`}
-              >
-                <span className="flex items-center gap-2 min-w-0 flex-1">
-                  <span className="shrink-0">🗄️</span>
-                  <span className="whitespace-nowrap truncate">DB Explorer</span>
-                </span>
-                <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
-                  activeTab === 'explorer' ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-600'
-                }`}>
-                  9 Tables
-                </span>
-              </button>
 
               <Link
                 href="/admin/widgets"
@@ -2042,6 +2147,12 @@ export default function AdminPage() {
                 </div>
               )}
 
+              {articleError && (
+                <div className="bg-red-50 border border-red-300 text-red-800 text-xs font-bold p-3 rounded-xl mb-4 animate-in fade-in">
+                  {articleError}
+                </div>
+              )}
+
               <form onSubmit={handleCreateArticle} className="space-y-4 text-xs">
                 <div>
                   <label className="block font-bold text-stone-700 mb-1 uppercase tracking-wider text-[11px]">
@@ -2094,32 +2205,17 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-stone-700 mb-1 uppercase tracking-wider text-[11px]">
-                      Author / Desk
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Editorial Bureau"
-                      value={newAuthor}
-                      onChange={(e) => setNewAuthor(e.target.value)}
-                      className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#153d3b]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-stone-700 mb-1 uppercase tracking-wider text-[11px]">
-                      Reading Time
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="3 min"
-                      value={newReadTime}
-                      onChange={(e) => setNewReadTime(e.target.value)}
-                      className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#153d3b]"
-                    />
-                  </div>
+                <div>
+                  <label className="block font-bold text-stone-700 mb-1 uppercase tracking-wider text-[11px]">
+                    Author / Desk
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Editorial Bureau"
+                    value={newAuthor}
+                    onChange={(e) => setNewAuthor(e.target.value)}
+                    className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#153d3b]"
+                  />
                 </div>
 
                 <div>
@@ -2325,6 +2421,16 @@ export default function AdminPage() {
 
               {/* Strict Dynamic List Filtering */}
               <div className="space-y-3 pt-1">
+                {articleSuccess && (
+                  <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold p-3 rounded-xl animate-in fade-in">
+                    {articleSuccess}
+                  </div>
+                )}
+                {articleError && (
+                  <div className="bg-red-50 border border-red-300 text-red-800 text-xs font-bold p-3 rounded-xl animate-in fade-in">
+                    {articleError}
+                  </div>
+                )}
                 {filteredArticles.length > 0 ? (
                   filteredArticles.map((item) => {
                     const hasVideo = Boolean(item.videoUrl && item.videoUrl.trim() !== '');
@@ -2375,7 +2481,7 @@ export default function AdminPage() {
                             {item.title} <span className="text-[10px] font-normal text-stone-400">↗</span>
                           </Link>
                           <div className="text-[11px] text-stone-500 mt-1">
-                            By {item.author} • {item.readTime}
+                            By {item.author || 'Editorial Bureau'}
                           </div>
                         </div>
 
@@ -2477,9 +2583,19 @@ export default function AdminPage() {
                   type="button"
                   onClick={() => handleAutoSyncTangedco()}
                   disabled={isAutoSyncing}
-                  className="px-4 py-2 rounded-xl bg-[#153d3b] hover:bg-[#0d4d4d] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-xs flex items-center gap-2 disabled:opacity-75 cursor-pointer active:scale-95"
+                  className="px-4 py-2 rounded-xl bg-[#153d3b] hover:bg-[#0d4d4d] text-white text-xs font-bold uppercase tracking-wider transition-all shadow-xs flex items-center gap-2 disabled:opacity-75 cursor-pointer active:scale-95 shrink-0"
                 >
-                  {isAutoSyncing ? 'Syncing TNEB...' : '🤖 Auto-Sync TNEB Outages (Live Fetch)'}
+                  {isAutoSyncing ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin inline-block" />
+                      <span>Extracting with Gemini AI...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>🤖</span>
+                      <span>Auto-Sync TNEB Outages (Gemini AI Extraction)</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -2604,11 +2720,12 @@ export default function AdminPage() {
           <div className="bg-white border border-stone-200 rounded-2xl p-5 sm:p-6 shadow-xs space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-stone-200 pb-4 gap-3">
               <div>
-                <h2 className="text-base font-black text-[#1a1a1a]">
-                  Native Advertisement Engine &amp; Campaign Scheduling
+                <h2 className="text-base font-black text-[#1a1a1a] flex items-center gap-2">
+                  <span>📢</span>
+                  <span>Native Advertisement Engine &amp; Banner Management</span>
                 </h2>
                 <p className="text-xs text-stone-500 mt-0.5">
-                  Manage flight dates, impression limits, and auto-fallback to Google AdSense.
+                  Manage live campaigns for <strong>Left &amp; Right Sticky Sidebars (210×400)</strong>, Top Header Leaderboard, and In-Feed slots. Upload creatives, assign click links, and toggle active status.
                 </p>
               </div>
 
@@ -2622,16 +2739,29 @@ export default function AdminPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {ads.map((ad) => {
                 const scheduleStatus = getAdScheduleStatus(ad);
-                const mediaPreview = ad.bannerUrl || ad.imageUrl;
+                const legacyAd = ad as any;
+                const mediaPreview = ad.slides?.[0]?.imageUrl || legacyAd.bannerUrl || legacyAd.imageUrl;
+                const isSidebarAd =
+                  ad.slotId === 'LEFT_SIDEBAR_BANNER' ||
+                  ad.slotId === 'RIGHT_SIDEBAR_BANNER' ||
+                  ad.placementKey === 'LEFT_SIDEBAR_BANNER' ||
+                  ad.placementKey === 'RIGHT_SIDEBAR_BANNER' ||
+                  ad.placementKey === 'left_sidebar' ||
+                  ad.placementKey === 'right_sidebar';
+
                 return (
                   <div
                     key={ad.id}
-                    className="p-4 sm:p-5 rounded-2xl border border-stone-200 bg-[#fcfbf7] flex flex-col justify-between space-y-4 shadow-2xs"
+                    className={`p-4 sm:p-5 rounded-2xl border flex flex-col justify-between space-y-4 shadow-2xs transition-all ${
+                      isSidebarAd
+                        ? 'border-red-200 bg-red-50/20 dark:bg-slate-900'
+                        : 'border-stone-200 bg-[#fcfbf7]'
+                    }`}
                   >
                     <div>
                       <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
-                        <span className="text-[#153d3b] uppercase tracking-wider text-[11px] font-extrabold flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-red-600"></span>
+                        <span className="text-[#153d3b] uppercase tracking-wider text-[11px] font-black flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-red-600" />
                           {ad.format}
                         </span>
                         <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase border ${scheduleStatus.badgeClass}`}>
@@ -2639,20 +2769,41 @@ export default function AdminPage() {
                         </span>
                       </div>
 
+                      {/* Dimension and Placement Tag */}
+                      <div className="mb-2 flex items-center gap-2 flex-wrap">
+                        {isSidebarAd ? (
+                          <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-800 text-[10px] font-black uppercase tracking-wider border border-red-200">
+                            📐 210 × 400 Vertical Canvas (Homepage Rail)
+                          </span>
+                        ) : ad.slotId === 'TOP_HEADER_LEADERBOARD' ? (
+                          <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-black uppercase tracking-wider border border-blue-200">
+                            📐 728 × 90 Horizontal Leaderboard
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 text-[10px] font-black uppercase tracking-wider border border-stone-200">
+                            📐 Fluid In-Feed Creative
+                          </span>
+                        )}
+                      </div>
+
                       {/* Creative Thumbnail Preview */}
                       {mediaPreview && (
-                        <div className="mb-3 w-full h-28 rounded-xl overflow-hidden border border-stone-300 bg-slate-900 relative group">
+                        <div
+                          className={`mb-3 w-full rounded-xl overflow-hidden border border-stone-300 bg-slate-900 relative group ${
+                            isSidebarAd ? 'h-36 sm:h-44' : 'h-28 sm:h-32'
+                          }`}
+                        >
                           <img
                             src={mediaPreview}
-                            alt={ad.title}
+                            alt={ad.slides?.[0]?.title || legacyAd.title}
                             className="w-full h-full object-cover"
                           />
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <span className="text-white text-xs font-bold px-2 py-1 bg-black/60 rounded backdrop-blur-xs">
+                            <span className="text-white text-xs font-bold px-2.5 py-1 bg-black/70 rounded-lg backdrop-blur-xs">
                               Live Ad Creative
                             </span>
                           </div>
-                          <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/70 text-white text-[9px] font-mono uppercase">
+                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/80 text-white text-[9px] font-mono uppercase font-bold">
                             {ad.slotId || ad.placementKey}
                           </span>
                         </div>
@@ -2661,31 +2812,42 @@ export default function AdminPage() {
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
                           <h4 className="text-sm font-bold text-[#1a1a1a] line-clamp-2 leading-snug">
-                            {ad.title}
+                            {ad.slides?.[0]?.title || legacyAd.title || 'No Slides Available'}
                           </h4>
-                          {ad.description && (
+                          {(ad.slides?.[0]?.description || legacyAd.description) && (
                             <p className="text-xs text-stone-600 line-clamp-2 mt-1 leading-relaxed">
-                              {ad.description}
+                              {ad.slides?.[0]?.description || legacyAd.description}
                             </p>
                           )}
                           <p className="text-xs text-stone-500 mt-1">
-                            Advertiser: <strong className="text-stone-800">{ad.advertiser}</strong>
+                            Sponsor / Advertiser: <strong className="text-stone-800">{ad.slides?.[0]?.advertiser || legacyAd.advertiser || 'N/A'}</strong>
                           </p>
-                          {ad.linkUrl && (
-                            <p className="text-[11px] text-emerald-700 font-mono truncate mt-0.5">
-                              🔗 {ad.linkUrl}
-                            </p>
-                          )}
+                          <p className="text-xs text-stone-500 mt-1 font-bold">
+                            Total Slides: {ad.slides?.length || 0} / 10
+                          </p>
                         </div>
 
                         <button
                           type="button"
-                          onClick={() => setEditingAdSlot({ ...ad })}
-                          className="px-2.5 py-1.5 rounded-lg bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold transition-colors cursor-pointer shrink-0 flex items-center gap-1 shadow-2xs"
+                          onClick={() => {
+                            const legacyAd = ad as any;
+                            const slides = ad.slides?.length ? ad.slides : [
+                              {
+                                id: `legacy-${Date.now()}`,
+                                title: legacyAd.title || '',
+                                advertiser: legacyAd.advertiser || '',
+                                description: legacyAd.description || '',
+                                imageUrl: legacyAd.imageUrl || legacyAd.bannerUrl || '',
+                                active: true,
+                              }
+                            ];
+                            setEditingAdSlot({ ...ad, slides });
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer shrink-0 flex items-center gap-1 shadow-2xs"
                           title="Edit Ad Creative, Image & Link"
                         >
                           <span>✏️</span>
-                          <span>Edit</span>
+                          <span>Edit Creative</span>
                         </button>
                       </div>
 
@@ -4800,137 +4962,171 @@ export default function AdminPage() {
                 <h3 className="text-base font-black text-stone-900">
                   {editingAdSlot.format}
                 </h3>
+                <p className="text-[11px] text-stone-500 font-bold mt-0.5">
+                  {editingAdSlot.slotId === 'LEFT_SIDEBAR_BANNER'
+                    ? '300 x 250 SQUARE CANVAS'
+                    : editingAdSlot.slotId?.includes('RIGHT_SIDEBAR') || editingAdSlot.slotId?.includes('RIGHT_STICKY')
+                    ? '210 x 400 VERTICAL CANVAS'
+                    : editingAdSlot.slotId === 'TOP_HEADER_LEADERBOARD'
+                    ? '970 x 90 HORIZONTAL CANVAS'
+                    : 'FLUID IN-FEED CREATIVE'}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingAdSlot(null)}
-                className="text-stone-400 hover:text-stone-700 text-xl font-bold p-1"
+                className="text-stone-400 hover:text-stone-700 text-xl font-bold p-1 cursor-pointer"
               >
                 ✕
               </button>
             </div>
 
             <form onSubmit={handleSaveAdCreative} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                  Ad Headline / Campaign Title *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editingAdSlot.title}
-                  onChange={(e) => setEditingAdSlot({ ...editingAdSlot, title: e.target.value })}
-                  className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold text-stone-900"
-                />
-              </div>
+              {editingAdSlot.slides?.map((slide, index) => (
+                <div key={slide.id} className="bg-stone-50 border border-stone-200 rounded-xl p-4 space-y-3">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-[11px] font-black text-stone-700 uppercase tracking-wider">
+                      Slide {index + 1}
+                    </h4>
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={slide.active}
+                          onChange={(e) => {
+                            const newSlides = [...editingAdSlot.slides];
+                            newSlides[index].active = e.target.checked;
+                            setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                          }}
+                          className="w-3.5 h-3.5 accent-red-600 rounded"
+                        />
+                        <span className="text-[10px] font-bold text-stone-600 uppercase">Active</span>
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const newSlides = editingAdSlot.slides.filter((_, i) => i !== index);
+                          setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                        }}
+                        className="text-red-600 hover:text-red-800 text-[10px] font-bold uppercase"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  </div>
 
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                  Advertiser / Brand Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editingAdSlot.advertiser}
-                  onChange={(e) => setEditingAdSlot({ ...editingAdSlot, advertiser: e.target.value })}
-                  className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs text-stone-900"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                  Supporting Marketing Copy / Description
-                </label>
-                <textarea
-                  rows={2}
-                  value={editingAdSlot.description || ''}
-                  onChange={(e) => setEditingAdSlot({ ...editingAdSlot, description: e.target.value })}
-                  className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl p-2.5 text-xs text-stone-900 leading-relaxed"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                    Destination URL (Landing Page)
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://..."
-                    value={editingAdSlot.linkUrl || ''}
-                    onChange={(e) => setEditingAdSlot({ ...editingAdSlot, linkUrl: e.target.value })}
-                    className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono text-stone-900"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                    Call To Action (CTA) Button
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Learn More"
-                    value={editingAdSlot.ctaText || ''}
-                    onChange={(e) => setEditingAdSlot({ ...editingAdSlot, ctaText: e.target.value })}
-                    className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs text-stone-900 font-bold"
-                  />
-                </div>
-              </div>
-
-              {/* IMAGE UPLOAD & PREVIEW */}
-              <div className="p-3 rounded-xl bg-[#f8f6f0] border border-stone-300 space-y-2">
-                <label className="block text-xs font-bold text-stone-700 uppercase">
-                  Ad Creative Media (Image / Banner)
-                </label>
-
-                <div className="relative border border-dashed rounded-xl p-3 text-center cursor-pointer bg-white border-stone-300 hover:border-stone-400">
-                  <input
-                    type="file"
-                    accept="image/*,.png,.jpg,.jpeg,.webp"
-                    onChange={async (e) => {
-                      if (e.target.files && e.target.files[0]) {
-                        const file = e.target.files[0];
-                        if (file.type.startsWith('image/')) {
-                          try {
-                            const compressed = await compressImage(file);
-                            setEditingAdSlot({ ...editingAdSlot, imageUrl: compressed, bannerUrl: compressed });
-                          } catch {
-                            const reader = new FileReader();
-                            reader.onload = (ev) => {
-                              if (ev.target?.result) {
-                                setEditingAdSlot({ ...editingAdSlot, imageUrl: ev.target.result as string, bannerUrl: ev.target.result as string });
-                              }
-                            };
-                            reader.readAsDataURL(file);
-                          }
-                        }
-                      }
-                    }}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                  />
-                  <p className="text-xs font-bold text-stone-700">
-                    Upload new ad banner photo (.jpg, .jpeg, .png, .webp)
-                  </p>
-                </div>
-
-                <label className="block font-bold text-stone-700 uppercase text-[10px]">Or Image URL / Data URL</label>
-                <input
-                  type="text"
-                  placeholder="https://images.unsplash.com/... or data:image/..."
-                  value={editingAdSlot.bannerUrl || editingAdSlot.imageUrl || ''}
-                  onChange={(e) => setEditingAdSlot({ ...editingAdSlot, bannerUrl: e.target.value, imageUrl: e.target.value })}
-                  className="w-full bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-mono"
-                />
-
-                {(editingAdSlot.bannerUrl || editingAdSlot.imageUrl) && (
-                  <div className="mt-2 relative rounded-lg overflow-hidden border border-stone-300 bg-stone-900 h-28">
-                    <img
-                      src={editingAdSlot.bannerUrl || editingAdSlot.imageUrl}
-                      alt="Ad Preview"
-                      className="w-full h-full object-cover"
+                  <div>
+                    <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                      Ad Headline / Campaign Title *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={slide.title}
+                      onChange={(e) => {
+                        const newSlides = [...editingAdSlot.slides];
+                        newSlides[index].title = e.target.value;
+                        setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                      }}
+                      className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold text-stone-900"
                     />
                   </div>
-                )}
-              </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                      Advertiser / Brand Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={slide.advertiser}
+                      onChange={(e) => {
+                        const newSlides = [...editingAdSlot.slides];
+                        newSlides[index].advertiser = e.target.value;
+                        setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                      }}
+                      className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs text-stone-900"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                      Supporting Marketing Copy / Description
+                    </label>
+                    <textarea
+                      rows={2}
+                      value={slide.description || ''}
+                      onChange={(e) => {
+                        const newSlides = [...editingAdSlot.slides];
+                        newSlides[index].description = e.target.value;
+                        setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                      }}
+                      className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl p-2.5 text-xs text-stone-900 leading-relaxed"
+                    />
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-[#f8f6f0] border border-stone-300 space-y-2">
+                    <label className="block text-xs font-bold text-stone-700 uppercase">
+                      Ad Creative Media (Image Upload or URL) *
+                    </label>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <input
+                        type="file"
+                        accept="image/jpeg, image/png, image/webp, image/gif, image/svg+xml"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleSlideImageUpload(file, index);
+                        }}
+                        className="w-full sm:w-1/2 bg-white border border-stone-300 rounded-xl px-2 py-1 text-[10px] file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-stone-100 file:text-stone-700 hover:file:bg-stone-200 cursor-pointer"
+                      />
+                      <input
+                        type="text"
+                        required
+                        placeholder="Or Paste https:// URL..."
+                        value={slide.imageUrl || ''}
+                        onChange={(e) => {
+                          const newSlides = [...editingAdSlot.slides];
+                          newSlides[index].imageUrl = e.target.value;
+                          setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                        }}
+                        className="w-full sm:w-1/2 bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-mono"
+                      />
+                    </div>
+                    {slide.imageUrl && (
+                      <div className="mt-2 relative rounded-lg overflow-hidden border border-stone-300 bg-stone-900 h-28">
+                        <img
+                          src={slide.imageUrl}
+                          alt="Ad Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+
+              {editingAdSlot.slides?.length < 10 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const newSlides = [
+                      ...(editingAdSlot.slides || []),
+                      {
+                        id: `slide-${Date.now()}`,
+                        title: '',
+                        advertiser: '',
+                        description: '',
+                        imageUrl: '',
+                        active: true,
+                      }
+                    ];
+                    setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                  }}
+                  className="w-full py-2.5 border-2 border-dashed border-stone-300 rounded-xl text-stone-500 font-bold text-[11px] uppercase tracking-wider hover:bg-stone-50 hover:border-stone-400 transition-colors"
+                >
+                  + Add Slide ({10 - (editingAdSlot.slides?.length || 0)} remaining)
+                </button>
+              )}
 
               <div className="pt-3 border-t border-stone-200 flex justify-end gap-2">
                 <button

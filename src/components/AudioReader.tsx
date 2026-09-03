@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React from 'react';
 import useTextToSpeech from '../hooks/useTextToSpeech';
@@ -87,7 +87,7 @@ export const AudioReader: React.FC<AudioReaderProps> = ({
               
               <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-stone-200 dark:bg-slate-800 text-stone-800 dark:text-gray-200 border border-stone-300 dark:border-slate-700 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                <span>Female Voice (English)</span>
+                <span>Natural Human Voice</span>
               </span>
 
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-stone-100 dark:bg-slate-800 text-stone-600 dark:text-gray-400">
@@ -97,7 +97,7 @@ export const AudioReader: React.FC<AudioReaderProps> = ({
 
             <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-gray-100 break-words mt-0.5 leading-snug">
               {isPlaying
-                ? 'AI voice reading story...'
+                ? 'Narrating story with Natural Human Voice...'
                 : isPaused
                 ? 'Audio Paused'
                 : 'Listen to Story'}

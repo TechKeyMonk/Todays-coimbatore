@@ -2,12 +2,49 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+/**
+ * Natural Speech Humanizer & Cleaner
+ * Expands journalistic acronyms, units, and adds natural breathing pauses
+ */
 export function cleanSpeechText(text: string): string {
-  return text
-    .replace(/<[^>]*>/g, '')
-    .replace(/[~@#$%^&*_+=\\<>|\[\]{}"«»“”–—]/g, ' ')
+  if (!text) return '';
+
+  let cleaned = text
+    .replace(/<[^>]*>/g, ' ') // Strip HTML tags
+    .replace(/https?:\/\/\S+/gi, '') // Strip URLs
+    .replace(/[\w.-]+@[\w.-]+\.\w+/gi, '') // Strip Emails
+    .replace(/[#*`_~|\\<>{}\[\]"«»“”]/g, ' ') // Strip Markdown/formatting
     .replace(/\s+/g, ' ')
     .trim();
+
+  // Natural Acronym & Unit Expansion for Fluent Human Cadence
+  cleaned = cleaned
+    .replace(/\bTNEB\b/g, 'T N E B')
+    .replace(/\bTANGEDCO\b/g, 'Tangedco')
+    .replace(/\bAQI\b/g, 'A Q I')
+    .replace(/\bCEO\b/g, 'C E O')
+    .replace(/\bCEOs\b/g, 'C E Os')
+    .replace(/\bIT\b(?=[ ,.])/g, 'I T')
+    .replace(/\bAI\b/g, 'A I')
+    .replace(/\bkm\/h\b/gi, ' kilometers per hour ')
+    .replace(/\bkm\b/gi, ' kilometers ')
+    .replace(/\bsq\.?\s?ft\b/gi, ' square feet ')
+    .replace(/\bcr\.?\b/gi, ' crores ')
+    .replace(/\blakhs?\b/gi, ' lakhs ')
+    .replace(/\bmins?\b/gi, ' minutes ')
+    .replace(/\bhrs?\b/gi, ' hours ')
+    .replace(/\bapprox\.?\b/gi, ' approximately ')
+    .replace(/\bgovt\.?\b/gi, ' government ')
+    .replace(/\bdept\.?\b/gi, ' department ')
+    .replace(/\bcorp\.?\b/gi, ' corporation ')
+    .replace(/\bvs\.?\b/gi, ' versus ')
+    .replace(/&/g, ' and ')
+    .replace(/\+/g, ' plus ')
+    .replace(/–|—/g, ', ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return cleaned;
 }
 
 /**
@@ -23,7 +60,7 @@ export function fetchDomTextToRead(fallbackText = ''): string {
     )
       .map((p) => (p as HTMLElement).innerText || '')
       .filter((text) => text.trim().length > 0)
-      .join(' ');
+      .join('. ');
 
     const textToRead = `${titleText}. ${bodyParagraphs}`.trim();
     if (textToRead.length > 5) {
@@ -64,10 +101,12 @@ export function isEnglishActive(): boolean {
 }
 
 /**
- * Splits text into small sentence chunks for uninterrupted browser speech synthesis
+ * Splits text into small sentence & phrase chunks for human-like breathing cadence
  */
 function splitIntoSpokenChunks(text: string): string[] {
   if (!text) return [];
+
+  // Split on sentence boundaries and major punctuation pauses
   const rawSentences = text.split(/(?<=[.!?\n\u0964\u0D79])\s+/);
   const chunks: string[] = [];
   let currentChunk = '';
@@ -76,11 +115,27 @@ function splitIntoSpokenChunks(text: string): string[] {
     const trimmed = sentence.trim();
     if (!trimmed) continue;
 
-    if ((currentChunk + ' ' + trimmed).length > 160) {
-      if (currentChunk) chunks.push(currentChunk.trim());
-      currentChunk = trimmed;
+    // Split overly long sentences at clause boundaries (commas, semicolons)
+    if (trimmed.length > 140) {
+      const clauses = trimmed.split(/(?<=[,;:])\s+/);
+      for (const clause of clauses) {
+        const cTrimmed = clause.trim();
+        if (!cTrimmed) continue;
+
+        if ((currentChunk + ' ' + cTrimmed).length > 130) {
+          if (currentChunk) chunks.push(currentChunk.trim());
+          currentChunk = cTrimmed;
+        } else {
+          currentChunk = currentChunk ? currentChunk + ' ' + cTrimmed : cTrimmed;
+        }
+      }
     } else {
-      currentChunk = currentChunk ? currentChunk + ' ' + trimmed : trimmed;
+      if ((currentChunk + ' ' + trimmed).length > 130) {
+        if (currentChunk) chunks.push(currentChunk.trim());
+        currentChunk = trimmed;
+      } else {
+        currentChunk = currentChunk ? currentChunk + ' ' + trimmed : trimmed;
+      }
     }
   }
 
@@ -210,30 +265,92 @@ export function useTextToSpeech(): UseTextToSpeechReturn {
     }
   }, []);
 
-  // 2. BEST FEMALE VOICE ENGINE SELECTION (ENGLISH ONLY)
-  const getBestFemaleVoice = useCallback((): SpeechSynthesisVoice | null => {
+  /**
+   * ADVANCED NEURAL & NATURAL VOICE SELECTION ENGINE
+   * Ranks voices to choose warm, lifelike human tones and strictly filters out robotic SAPI 5 legacy voices.
+   */
+  const getBestHumanVoice = useCallback((): SpeechSynthesisVoice | null => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return null;
 
     const voices = availableVoices.length > 0 ? availableVoices : window.speechSynthesis.getVoices();
     if (!voices || voices.length === 0) return null;
 
-    const femaleVoice =
-      voices.find(
-        (v) =>
-          v.lang.startsWith('en') &&
-          (v.name.includes('Female') ||
-            v.name.includes('Google US English') ||
-            v.name.includes('Samantha') ||
-            v.name.includes('Zira') ||
-            v.name.includes('Victoria') ||
-            v.name.includes('Natural') ||
-            v.name.includes('Jenny') ||
-            v.name.includes('Aria'))
-      ) ||
-      voices.find((v) => v.lang.startsWith('en')) ||
-      voices[0];
+    // Voice Quality Scoring Function
+    const scoreVoice = (v: SpeechSynthesisVoice): number => {
+      const name = v.name.toLowerCase();
+      const lang = (v.lang || '').toLowerCase();
+      let score = 0;
 
-    return femaleVoice || null;
+      // Must be English
+      if (!lang.startsWith('en')) {
+        return -1000;
+      }
+
+      // 1. Natural / Neural Tier (Highest Lifelike Quality)
+      if (
+        name.includes('natural') ||
+        name.includes('neural') ||
+        name.includes('online') ||
+        name.includes('enhanced') ||
+        name.includes('premium') ||
+        name.includes('multilingual')
+      ) {
+        score += 120;
+      }
+
+      // 2. Preferred Human Female Voice Models
+      if (
+        name.includes('jenny') ||
+        name.includes('aria') ||
+        name.includes('ava') ||
+        name.includes('sonia') ||
+        name.includes('neerja') ||
+        name.includes('samantha') ||
+        name.includes('siri') ||
+        name.includes('karen') ||
+        name.includes('serena') ||
+        name.includes('swara')
+      ) {
+        score += 80;
+      }
+
+      // 3. Google & Apple Neural Voices
+      if (
+        name.includes('google us english') ||
+        name.includes('google uk english female') ||
+        name.includes('google english')
+      ) {
+        score += 70;
+      }
+
+      // 4. Female preference
+      if (name.includes('female')) {
+        score += 20;
+      }
+
+      // 5. English dialect preference (US, UK, IN)
+      if (lang.includes('us') || lang.includes('gb') || lang.includes('in')) {
+        score += 15;
+      }
+
+      // 6. PENALIZE Old Robotic Legacy Desktop Voices (SAPI 5 / eSpeak / Zira / David)
+      if (
+        name.includes('desktop') ||
+        name.includes('espeak') ||
+        name.includes('zira') ||
+        name.includes('david') ||
+        name.includes('hazel') ||
+        name.includes('sam') ||
+        name.includes('mssdk')
+      ) {
+        score -= 100;
+      }
+
+      return score;
+    };
+
+    const sortedVoices = [...voices].sort((a, b) => scoreVoice(b) - scoreVoice(a));
+    return sortedVoices[0] || voices[0] || null;
   }, [availableVoices]);
 
   const speakChunk = useCallback(
@@ -260,15 +377,18 @@ export function useTextToSpeech(): UseTextToSpeechReturn {
         return;
       }
 
-      const femaleVoice = getBestFemaleVoice();
+      const humanVoice = getBestHumanVoice();
 
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = femaleVoice?.lang || 'en-US';
-      if (femaleVoice) {
-        utterance.voice = femaleVoice;
+      utterance.lang = humanVoice?.lang || 'en-US';
+      if (humanVoice) {
+        utterance.voice = humanVoice;
       }
-      utterance.pitch = 1.0; // Smooth natural pitch
-      utterance.rate = 0.95; // Clear natural reading speed
+
+      // Natural Human Journalist Acoustic Parameters
+      utterance.pitch = 1.03; // Warm, natural vocal inflection (avoids flat robotic drone)
+      utterance.rate = 0.93; // Calibrated human newsreader pace (avoids rushed machine delivery)
+      utterance.volume = 1.0;
 
       utterance.onstart = () => {
         if (!isCancelledRef.current) {
@@ -300,7 +420,7 @@ export function useTextToSpeech(): UseTextToSpeechReturn {
 
       window.speechSynthesis.speak(utterance);
     },
-    [getBestFemaleVoice]
+    [getBestHumanVoice]
   );
 
   const speak = useCallback(

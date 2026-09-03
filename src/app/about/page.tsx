@@ -8,15 +8,8 @@ export const metadata: Metadata = {
     canonical: 'https://todayscoimbatore.com/about-us',
   },
   robots: {
-    index: true,
+    index: false,
     follow: true,
-    googleBot: {
-      index: true,
-      follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
-    },
   },
   openGraph: {
     title: "About Us | Today's Coimbatore News Network",

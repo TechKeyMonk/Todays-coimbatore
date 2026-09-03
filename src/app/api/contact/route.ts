@@ -36,47 +36,47 @@ export async function POST(request: Request) {
       console.warn('[Contact API] Failed to save enquiry in Supabase:', dbErr);
     }
 
-    // 2. Asynchronously send specialized email notification to todayscoimbatore@gmail.com
+    // 2. Send specialized email notification to todayscoimbatore@gmail.com
+    let emailResult: any = { success: false };
     const sub = (subject || '').toLowerCase();
-    if (sub.includes('feedback') || sub.includes('correction')) {
-      sendFeedbackAlert({
-        data: {
-          readerName: name.trim(),
+    try {
+      if (sub.includes('feedback') || sub.includes('correction')) {
+        emailResult = await sendFeedbackAlert({
+          data: {
+            readerName: name.trim(),
+            email: email.trim(),
+            phone: phone?.trim(),
+            feedbackCategory: subject?.trim() || 'Correction / Editorial Feedback',
+            message: message.trim(),
+          },
+        });
+      } else if (sub.includes('advertis') || sub.includes('sponsor') || sub.includes('commercial')) {
+        emailResult = await sendAdInquiryNotification({
+          data: {
+            advertiserName: name.trim(),
+            companyName: name.trim(),
+            email: email.trim(),
+            phone: phone?.trim(),
+            adFormat: subject?.trim(),
+            message: message.trim(),
+          },
+        });
+      } else {
+        emailResult = await sendContactFormNotification({
+          name: name.trim(),
           email: email.trim(),
           phone: phone?.trim(),
-          feedbackCategory: subject?.trim() || 'Correction / Editorial Feedback',
+          subject: subject?.trim(),
           message: message.trim(),
-        },
-      }).catch((emailErr) => {
-        console.error('[Contact API] Background feedback alert failed:', emailErr);
-      });
-    } else if (sub.includes('advertis') || sub.includes('sponsor') || sub.includes('commercial')) {
-      sendAdInquiryNotification({
-        data: {
-          advertiserName: name.trim(),
-          companyName: name.trim(),
-          email: email.trim(),
-          phone: phone?.trim(),
-          adFormat: subject?.trim(),
-          message: message.trim(),
-        },
-      }).catch((emailErr) => {
-        console.error('[Contact API] Background ad alert failed:', emailErr);
-      });
-    } else {
-      sendContactFormNotification({
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone?.trim(),
-        subject: subject?.trim(),
-        message: message.trim(),
-      }).catch((emailErr) => {
-        console.error('[Contact API] Background email alert failed:', emailErr);
-      });
+        });
+      }
+    } catch (emailErr) {
+      console.error('[Contact API] Email notification error:', emailErr);
     }
 
     return NextResponse.json({
       success: true,
+      emailSent: !!emailResult?.success,
       message: 'Thank you! Your enquiry has been received by Today\'s Coimbatore editorial desk.',
     });
   } catch (err: any) {

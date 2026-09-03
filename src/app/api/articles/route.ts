@@ -110,6 +110,15 @@ export async function POST(request: Request) {
     db.articles = [newArticle, ...(db.articles || [])];
     await writeDb(db);
 
+    const { revalidatePath } = await import('next/cache');
+    try {
+      revalidatePath('/');
+      revalidatePath('/admin');
+      revalidatePath('/news');
+    } catch (e) {
+      console.warn('Revalidation error:', e);
+    }
+
     return NextResponse.json(newArticle, { status: 201 });
   } catch (error) {
     return NextResponse.json(
@@ -118,3 +127,51 @@ export async function POST(request: Request) {
     );
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    let body: any = {};
+    try {
+      body = await request.json();
+    } catch {}
+
+    const articleId = id || body?.id;
+    if (!articleId) {
+      return NextResponse.json({ error: 'Article ID required' }, { status: 400 });
+    }
+
+    const { supabaseAdmin } = await import('@/lib/supabaseServer');
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(articleId);
+    let query = supabaseAdmin.from('news').delete();
+    if (isUuid) {
+      query = query.or(`id.eq.${articleId},slug.eq.${articleId}`);
+    } else {
+      query = query.eq('slug', articleId);
+    }
+
+    const { error } = await query;
+    if (error) {
+      console.error('Error deleting article in Supabase news table:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const db = await readDb();
+    if (db.articles && db.articles.length > 0) {
+      db.articles = db.articles.filter((a) => a.id !== articleId && a.slug !== articleId);
+      await writeDb(db);
+    }
+
+    const { revalidatePath } = await import('next/cache');
+    try {
+      revalidatePath('/');
+      revalidatePath('/admin');
+    } catch {}
+
+    return NextResponse.json({ success: true, deletedId: articleId });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Failed to delete article' }, { status: 500 });
+  }
+}
+

@@ -1,6 +1,7 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { cleanSpeechText } from '@/hooks/useTextToSpeech';
 
 export interface AiVoiceReaderProps {
   text?: string;
@@ -74,39 +75,80 @@ export default function AiVoiceReader({
     };
   }, [checkIsEnglish]);
 
-  // Clean and prepare spoken text
+  // Clean and prepare spoken text with natural human expansions
   const getFullSpokenText = useCallback(() => {
     const raw = `${title ? title + '. ' : ''}${text || ''}`.trim();
-    return raw
-      .replace(/<[^>]*>/g, '')
-      .replace(/[~@#$%^&*_+=\\<>|\[\]{}"«»“”–—]/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim();
+    return cleanSpeechText(raw);
   }, [title, text]);
 
-  // Select optimal English Female Voice
-  const getFemaleVoice = useCallback(() => {
+  // Select optimal Human Neural English Voice
+  const getBestHumanVoice = useCallback(() => {
     if (!synthRef.current) return null;
     const voices = synthRef.current.getVoices();
     if (!voices || voices.length === 0) return null;
 
-    // Search specifically for high quality female voices
-    const femaleVoice = voices.find(
-      (v) =>
-        (v.lang.startsWith('en') || v.lang.includes('US') || v.lang.includes('GB') || v.lang.includes('IN')) &&
-        (v.name.toLowerCase().includes('female') ||
-          v.name.toLowerCase().includes('zira') ||
-          v.name.toLowerCase().includes('samantha') ||
-          v.name.toLowerCase().includes('google us english') ||
-          v.name.toLowerCase().includes('karen') ||
-          v.name.toLowerCase().includes('victoria') ||
-          v.name.toLowerCase().includes('ava') ||
-          v.name.toLowerCase().includes('jenny') ||
-          v.name.toLowerCase().includes('natural') ||
-          v.name.toLowerCase().includes('siri'))
-    );
+    const scoreVoice = (v: SpeechSynthesisVoice): number => {
+      const name = v.name.toLowerCase();
+      const lang = (v.lang || '').toLowerCase();
+      let score = 0;
 
-    return femaleVoice || voices.find((v) => v.lang.startsWith('en')) || voices[0];
+      if (!lang.startsWith('en')) return -1000;
+
+      // 1. Natural / Neural Tier
+      if (
+        name.includes('natural') ||
+        name.includes('neural') ||
+        name.includes('online') ||
+        name.includes('enhanced') ||
+        name.includes('premium')
+      ) {
+        score += 120;
+      }
+
+      // 2. High-Fidelity Female Newsreaders
+      if (
+        name.includes('jenny') ||
+        name.includes('aria') ||
+        name.includes('ava') ||
+        name.includes('sonia') ||
+        name.includes('neerja') ||
+        name.includes('samantha') ||
+        name.includes('siri') ||
+        name.includes('karen') ||
+        name.includes('serena') ||
+        name.includes('swara')
+      ) {
+        score += 80;
+      }
+
+      // 3. Google & Apple Neural Voices
+      if (
+        name.includes('google us english') ||
+        name.includes('google uk english female') ||
+        name.includes('google english')
+      ) {
+        score += 70;
+      }
+
+      if (name.includes('female')) score += 20;
+      if (lang.includes('us') || lang.includes('gb') || lang.includes('in')) score += 15;
+
+      // Penalize legacy robotic desktop SAPI 5
+      if (
+        name.includes('desktop') ||
+        name.includes('espeak') ||
+        name.includes('zira') ||
+        name.includes('david') ||
+        name.includes('hazel')
+      ) {
+        score -= 100;
+      }
+
+      return score;
+    };
+
+    const sorted = [...voices].sort((a, b) => scoreVoice(b) - scoreVoice(a));
+    return sorted[0] || voices[0] || null;
   }, []);
 
   const handlePlay = () => {
@@ -124,14 +166,16 @@ export default function AiVoiceReader({
     if (!spokenContent) return;
 
     const utterance = new SpeechSynthesisUtterance(spokenContent);
-    utterance.lang = 'en-US';
-    utterance.pitch = 1.0;
-    utterance.rate = 0.95;
-
-    const voice = getFemaleVoice();
+    const voice = getBestHumanVoice();
+    utterance.lang = voice?.lang || 'en-US';
     if (voice) {
       utterance.voice = voice;
     }
+
+    // Warm, natural human journalistic reading parameters
+    utterance.pitch = 1.03; // Warm natural inflection
+    utterance.rate = 0.93; // Calibrated human newsreader pace
+    utterance.volume = 1.0;
 
     utterance.onstart = () => {
       setIsPlaying(true);
@@ -204,7 +248,7 @@ export default function AiVoiceReader({
               </span>
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-stone-200 dark:bg-slate-800 text-stone-800 dark:text-gray-200 flex items-center gap-1 border border-stone-300 dark:border-slate-700">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                <span>Female Voice (EN)</span>
+                <span>Natural Human Voice</span>
               </span>
               <span className="text-[10px] font-bold text-stone-500 dark:text-gray-400">
                 {listenMinutes} min listen
@@ -212,7 +256,7 @@ export default function AiVoiceReader({
             </div>
             <p className="text-xs font-semibold text-gray-700 dark:text-gray-300 truncate mt-0.5">
               {isPlaying
-                ? 'Speaking article aloud...'
+                ? 'Narrating article with Natural Human Voice...'
                 : isPaused
                 ? 'Audio playback paused'
                 : 'Listen to this article with Natural AI Voice'}

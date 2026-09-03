@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import * as nodeCrypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { sendEventSubmissionAlert } from '@/lib/email';
@@ -199,26 +200,11 @@ export async function GET(request: Request) {
 
       if (error) {
         console.error('Supabase fetch news error:', error);
-        return NextResponse.json({ success: true, data: INITIAL_DATABASE_ARTICLES });
+        return NextResponse.json({ success: true, data: [] });
       }
 
       const liveArticles = (data || []).map(mapSupabaseNewsToArticle);
-      const seenSlugs = new Set(liveArticles.map((a: Article) => (a.slug || slugify(a.title))?.toLowerCase()));
-      const seenIds = new Set([
-        ...liveArticles.map((a: Article) => a.id),
-        ...liveArticles.map((a: Article) => toUuid(a.id)),
-      ]);
-
-      const combined = [
-        ...liveArticles,
-        ...INITIAL_DATABASE_ARTICLES.filter((a) => {
-          const s = (a.slug || slugify(a.title))?.toLowerCase();
-          const u = toUuid(a.id);
-          return !seenSlugs.has(s) && !seenIds.has(a.id) && !seenIds.has(u);
-        }),
-      ];
-
-      return NextResponse.json({ success: true, data: combined });
+      return NextResponse.json({ success: true, data: liveArticles });
     }
 
     // 2. Fetch Directory Listings
@@ -230,7 +216,7 @@ export async function GET(request: Request) {
 
       if (error) {
         console.error('Supabase fetch listings error:', error);
-        return NextResponse.json({ success: true, data: INITIAL_DIRECTORY_LISTINGS });
+        return NextResponse.json({ success: true, data: [] });
       }
 
       const mappedListings: DirectoryListing[] = (data || []).map((l: any) => ({
@@ -253,13 +239,7 @@ export async function GET(request: Request) {
         createdAt: l.created_at || new Date().toISOString(),
       }));
 
-      const seenIds = new Set(mappedListings.map((l) => l.id));
-      const combined = [
-        ...mappedListings,
-        ...INITIAL_DIRECTORY_LISTINGS.filter((l) => !seenIds.has(l.id)),
-      ];
-
-      return NextResponse.json({ success: true, data: combined });
+      return NextResponse.json({ success: true, data: mappedListings });
     }
 
     // 3. Fetch Blood Donors
@@ -271,7 +251,7 @@ export async function GET(request: Request) {
 
       if (error) {
         console.error('Supabase fetch blood donors error:', error);
-        return NextResponse.json({ success: true, data: INITIAL_BLOOD_DONORS_DB });
+        return NextResponse.json({ success: true, data: [] });
       }
 
       const mappedDonors: BloodDonorRecord[] = (data || []).map((d: any) => ({
@@ -286,13 +266,7 @@ export async function GET(request: Request) {
         registeredDate: 'Recently',
       }));
 
-      const seenIds = new Set(mappedDonors.map((d) => d.id));
-      const combined = [
-        ...mappedDonors,
-        ...INITIAL_BLOOD_DONORS_DB.filter((d) => !seenIds.has(d.id)),
-      ];
-
-      return NextResponse.json({ success: true, data: combined });
+      return NextResponse.json({ success: true, data: mappedDonors });
     }
 
     // 4. Fetch Events
@@ -304,7 +278,7 @@ export async function GET(request: Request) {
 
       if (error) {
         console.error('Supabase fetch events error:', error);
-        return NextResponse.json({ success: true, data: INITIAL_EVENTS_DB });
+        return NextResponse.json({ success: true, data: [] });
       }
 
       const mappedEvents: EventRecord[] = (data || []).map((e: any) => ({
@@ -321,13 +295,7 @@ export async function GET(request: Request) {
         status: 'upcoming',
       }));
 
-      const seenIds = new Set(mappedEvents.map((e) => e.id));
-      const combined = [
-        ...mappedEvents,
-        ...INITIAL_EVENTS_DB.filter((e) => !seenIds.has(e.id)),
-      ];
-
-      return NextResponse.json({ success: true, data: combined });
+      return NextResponse.json({ success: true, data: mappedEvents });
     }
 
     // 5. Fetch Enquiries
@@ -417,23 +385,10 @@ export async function GET(request: Request) {
       getSystemConfig('DONOR_ENQUIRIES', []),
     ]);
 
-    // Map and assemble final combined bundle
-    const liveNews = (newsRes.data || []).map(mapSupabaseNewsToArticle);
-    const seenSlugs = new Set(liveNews.map((a: Article) => (a.slug || slugify(a.title))?.toLowerCase()));
-    const seenIds = new Set([
-      ...liveNews.map((a: Article) => a.id),
-      ...liveNews.map((a: Article) => toUuid(a.id)),
-    ]);
-    const articles = [
-      ...liveNews,
-      ...INITIAL_DATABASE_ARTICLES.filter((a) => {
-        const s = (a.slug || slugify(a.title))?.toLowerCase();
-        const u = toUuid(a.id);
-        return !seenSlugs.has(s) && !seenIds.has(a.id) && !seenIds.has(u);
-      }),
-    ];
+    // Map and assemble final combined bundle directly from live database
+    const articles = (newsRes.data || []).map(mapSupabaseNewsToArticle);
 
-    const liveListings: DirectoryListing[] = (listingsRes.data || []).map((l: any) => ({
+    const listings: DirectoryListing[] = (listingsRes.data || []).map((l: any) => ({
       id: l.id,
       name: l.title || 'Business Listing',
       category: l.category || 'General Services',
@@ -452,13 +407,8 @@ export async function GET(request: Request) {
       description: `${l.title} in ${l.area || 'Coimbatore'}.`,
       createdAt: l.created_at || new Date().toISOString(),
     }));
-    const seenListingIds = new Set(liveListings.map((l) => l.id));
-    const listings = [
-      ...liveListings,
-      ...INITIAL_DIRECTORY_LISTINGS.filter((l) => !seenListingIds.has(l.id)),
-    ];
 
-    const liveDonors: BloodDonorRecord[] = (donorsRes.data || []).map((d: any) => ({
+    const bloodDonors: BloodDonorRecord[] = (donorsRes.data || []).map((d: any) => ({
       id: d.id,
       name: d.name || 'Anonymous Donor',
       bloodGroup: d.blood_group || 'O+',
@@ -469,13 +419,8 @@ export async function GET(request: Request) {
       status: (d.status?.toLowerCase() === 'available' ? 'approved' : d.status?.toLowerCase() || 'approved') as any,
       registeredDate: 'Recently',
     }));
-    const seenDonorIds = new Set(liveDonors.map((d) => d.id));
-    const bloodDonors = [
-      ...liveDonors,
-      ...INITIAL_BLOOD_DONORS_DB.filter((d) => !seenDonorIds.has(d.id)),
-    ];
 
-    const liveEvents: EventRecord[] = (eventsRes.data || []).map((e: any) => ({
+    const events: EventRecord[] = (eventsRes.data || []).map((e: any) => ({
       id: e.id,
       title: e.event_name || 'Coimbatore Event',
       date: e.event_date || new Date().toISOString().split('T')[0],
@@ -488,11 +433,6 @@ export async function GET(request: Request) {
       organizer: 'Coimbatore Event Network',
       status: 'upcoming',
     }));
-    const seenEventIds = new Set(liveEvents.map((e) => e.id));
-    const events = [
-      ...liveEvents,
-      ...INITIAL_EVENTS_DB.filter((e) => !seenEventIds.has(e.id)),
-    ];
 
     const resultData = {
       articles,
@@ -588,6 +528,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
+      try {
+        revalidatePath('/');
+        revalidatePath('/admin');
+        revalidatePath(`/news/${slug}`);
+        revalidatePath('/news');
+      } catch (e) {
+        console.warn('Revalidation error:', e);
+      }
+
       return NextResponse.json({ success: true, data: mapSupabaseNewsToArticle(inserted) });
     }
 
@@ -613,6 +562,16 @@ export async function POST(request: Request) {
       if (error) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
+
+      try {
+        revalidatePath('/');
+        revalidatePath('/admin');
+        revalidatePath(`/news/${articleId}`);
+        revalidatePath('/news');
+      } catch (e) {
+        console.warn('Revalidation error:', e);
+      }
+
       return NextResponse.json({
         success: true,
         data: approved ? mapSupabaseNewsToArticle(approved) : null,
@@ -679,11 +638,28 @@ export async function POST(request: Request) {
           .maybeSingle();
 
         if (upserted) {
+          try {
+            revalidatePath('/');
+            revalidatePath('/admin');
+            revalidatePath(`/news/${articleId}`);
+            revalidatePath('/news');
+          } catch (e) {
+            console.warn('Revalidation error:', e);
+          }
           return NextResponse.json({
             success: true,
             data: mapSupabaseNewsToArticle(upserted),
           });
         }
+      }
+
+      try {
+        revalidatePath('/');
+        revalidatePath('/admin');
+        revalidatePath(`/news/${articleId}`);
+        revalidatePath('/news');
+      } catch (e) {
+        console.warn('Revalidation error:', e);
       }
 
       return NextResponse.json({
@@ -692,21 +668,38 @@ export async function POST(request: Request) {
       });
     }
 
-    if (action === 'delete_article') {
-      const articleId = id || data?.id;
+    if (action === 'delete_article' || action === 'delete_news') {
+      const articleId = id || data?.id || body?.id;
       if (!articleId) {
         return NextResponse.json({ error: 'Article ID required' }, { status: 400 });
       }
 
-      const validUuid = toUuid(articleId);
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(articleId);
+      const validUuid = isUuid ? articleId : toUuid(articleId);
+
+      // Explicit hard DELETE on Supabase 'news' table bypassing RLS using supabaseAdmin
       const { error } = await supabaseAdmin
         .from('news')
         .delete()
         .or(`id.eq.${validUuid},slug.eq.${articleId}`);
 
       if (error) {
-        console.error('Error deleting article in Supabase:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('Error deleting article from news table in Supabase:', error);
+        return NextResponse.json({ error: error.message, success: false }, { status: 500 });
+      }
+
+      // Invalidate in-memory server cache
+      invalidateAllDataCache();
+
+      // Immediately purge Next.js cached pages
+      try {
+        revalidatePath('/');
+        revalidatePath('/admin');
+        revalidatePath('/admin/review');
+        revalidatePath(`/news/${articleId}`);
+        revalidatePath(`/article/${articleId}`);
+      } catch (revalErr) {
+        console.warn('Revalidation warning:', revalErr);
       }
 
       return NextResponse.json({ success: true, deletedId: articleId });
@@ -1030,7 +1023,24 @@ export async function POST(request: Request) {
 
       const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(enquiryId);
       if (isUuid) {
-        const { error } = await supabaseAdmin.from('enquiries').delete().eq('id', enquiryId);
+        // Safety: verify the target is a real user enquiry, not a system config row
+        const { data: target } = await supabaseAdmin
+          .from('enquiries')
+          .select('id, user_name')
+          .eq('id', enquiryId)
+          .maybeSingle();
+
+        if (target && String(target.user_name || '').startsWith('__SYSTEM_CONFIG_')) {
+          console.warn(`Blocked attempt to delete system config row: ${target.user_name}`);
+          return NextResponse.json({ error: 'Cannot delete system configuration records via enquiry API.' }, { status: 403 });
+        }
+
+        const { error } = await supabaseAdmin
+          .from('enquiries')
+          .delete()
+          .eq('id', enquiryId)
+          .not('user_name', 'like', '__SYSTEM_CONFIG_%');
+
         if (error) {
           console.warn('Supabase delete enquiry warning:', error.message);
         }
@@ -1061,3 +1071,89 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const id = searchParams.get('id');
+    const entity = searchParams.get('entity') || 'news';
+
+    let body: any = {};
+    try {
+      body = await request.json();
+    } catch {
+      // Body is optional if ID is provided via query param
+    }
+
+    const targetId = id || body.id;
+    if (!targetId) {
+      return NextResponse.json({ error: 'ID parameter required for deletion' }, { status: 400 });
+    }
+
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(targetId);
+    const validUuid = isUuid ? targetId : toUuid(targetId);
+
+    const targetEntity = (entity || body.entity || '').toLowerCase();
+    const table = targetEntity === 'listings' || targetEntity === 'directory'
+      ? 'listings'
+      : targetEntity === 'categories'
+      ? 'categories'
+      : targetEntity === 'blood_donors' || targetEntity === 'donors'
+      ? 'blood_donors'
+      : targetEntity === 'events'
+      ? 'events'
+      : targetEntity === 'enquiries'
+      ? 'enquiries'
+      : 'news'; // Defaults to 'news' table
+
+    // For enquiries, guard against accidentally deleting system config rows
+    if (table === 'enquiries') {
+      const { data: targetRow } = await supabaseAdmin
+        .from('enquiries')
+        .select('id, user_name')
+        .eq('id', validUuid)
+        .maybeSingle();
+
+      if (targetRow && String(targetRow.user_name || '').startsWith('__SYSTEM_CONFIG_')) {
+        console.warn(`Blocked DELETE of system config row: ${targetRow.user_name}`);
+        return NextResponse.json({ error: 'Cannot delete system configuration records.' }, { status: 403 });
+      }
+    }
+
+    let query = supabaseAdmin.from(table).delete();
+    if (table === 'news') {
+      query = query.or(`id.eq.${validUuid},slug.eq.${targetId}`);
+    } else if (table === 'enquiries') {
+      // Extra safety: only delete real user enquiries, never system config rows
+      query = query.eq('id', validUuid).not('user_name', 'like', '__SYSTEM_CONFIG_%');
+    } else {
+      query = query.eq('id', validUuid);
+    }
+
+    const { error } = await query;
+    if (error) {
+      console.error(`Error deleting from ${table} in Supabase:`, error);
+      return NextResponse.json({ error: error.message, success: false }, { status: 500 });
+    }
+
+    invalidateAllDataCache();
+
+    try {
+      revalidatePath('/');
+      revalidatePath('/admin');
+      if (table === 'news') {
+        revalidatePath('/admin/review');
+        revalidatePath(`/news/${targetId}`);
+        revalidatePath(`/article/${targetId}`);
+      }
+    } catch (revalErr) {
+      console.warn('Revalidation warning:', revalErr);
+    }
+
+    return NextResponse.json({ success: true, deletedId: targetId, table });
+  } catch (err: any) {
+    console.error('API /api/content DELETE Exception:', err);
+    return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });
+  }
+}
+

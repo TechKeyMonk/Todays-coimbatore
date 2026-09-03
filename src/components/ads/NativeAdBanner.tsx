@@ -200,12 +200,15 @@ export const NativeAdBanner: React.FC<NativeAdBannerProps> = ({
       ? 'Targeted advertising solutions designed for growing enterprises and local businesses.'
       : 'Explore curated business updates, innovative ventures, and exclusive community events happening this week.');
 
+  const validImageUrl = (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== '') ? imageUrl.trim() : null;
+  const validBannerUrl = (bannerUrl && typeof bannerUrl === 'string' && bannerUrl.trim() !== '') ? bannerUrl.trim() : null;
+  const activeBanner = validBannerUrl || validImageUrl;
+
   /* ------------------------------------------------------------------------ */
   /*                            Format: Leaderboard                           */
   /*             (Fixed 728x90 Banner Container to Prevent CLS)               */
   /* ------------------------------------------------------------------------ */
   if (activeFormat === 'leaderboard') {
-    const activeBanner = bannerUrl || imageUrl;
     return (
       <div className={`w-full max-w-[728px] h-[90px] min-h-[90px] max-h-[90px] mx-auto overflow-hidden rounded-md bg-stone-900 shrink-0 isolation-isolate ${className}`}>
         <aside
@@ -295,9 +298,9 @@ export const NativeAdBanner: React.FC<NativeAdBannerProps> = ({
 
           {/* Media Placeholder or Image */}
           <div className="relative mb-3 overflow-hidden rounded-lg border border-stone-300 dark:border-slate-700 bg-white dark:bg-slate-800 aspect-[16/9] flex items-center justify-center">
-            {imageUrl ? (
+            {validImageUrl ? (
               <img
-                src={imageUrl}
+                src={validImageUrl}
                 alt={displayTitle}
                 style={{ filter: 'none', mixBlendMode: 'normal', opacity: 1 }}
                 className="!filter-none !mix-blend-normal !opacity-100 dark:!filter-none object-contain mx-auto block ad-banner-media h-full w-full"
@@ -368,9 +371,9 @@ export const NativeAdBanner: React.FC<NativeAdBannerProps> = ({
 
             {/* Hero Banner Visual */}
             <div className="relative mb-4 overflow-hidden rounded-xl border border-stone-300 dark:border-slate-700 bg-white dark:bg-slate-800 aspect-[4/3] flex items-center justify-center shadow-inner">
-              {imageUrl ? (
+              {validImageUrl ? (
                 <img
-                  src={imageUrl}
+                  src={validImageUrl}
                   alt={displayTitle}
                   style={{ filter: 'none', mixBlendMode: 'normal', opacity: 1 }}
                   className="!filter-none !mix-blend-normal !opacity-100 dark:!filter-none object-contain mx-auto block ad-banner-media h-full w-full"
@@ -454,9 +457,9 @@ export const NativeAdBanner: React.FC<NativeAdBannerProps> = ({
         <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
           {/* Left / Top Image Thumbnail */}
           <div className="relative sm:w-48 sm:h-32 w-full h-44 flex-shrink-0 overflow-hidden rounded-lg border border-stone-300 dark:border-slate-700 bg-[#f8f6f0] dark:bg-slate-800 flex items-center justify-center">
-            {imageUrl ? (
+            {validImageUrl ? (
               <img
-                src={imageUrl}
+                src={validImageUrl}
                 alt={displayTitle}
                 style={{ filter: 'none', mixBlendMode: 'normal', opacity: 1 }}
                 className="!filter-none !mix-blend-normal !opacity-100 dark:!filter-none object-contain mx-auto block ad-banner-media h-full w-full transition-transform duration-300 group-hover:scale-105"

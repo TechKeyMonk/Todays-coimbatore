@@ -1,10 +1,12 @@
 'use client';
 
+export const dynamic = 'force-dynamic';
+
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import Footer from '../components/Footer';
-import NativeAdBanner from '../components/ads/NativeAdBanner';
+import AdSlider from '../components/AdSlider';
 import AdBanner from './components/AdBanner';
 import ELI5SummaryPlugin from '../components/news/ELI5SummaryPlugin';
 import MobileBottomBanner from '../components/MobileBottomBanner';
@@ -554,7 +556,7 @@ export default function HomePage() {
           localStorage.getItem('covai_db_articles');
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0 && isMounted) {
+          if (Array.isArray(parsed) && isMounted) {
             setDbArticles(parsed);
           }
         }
@@ -586,7 +588,7 @@ export default function HomePage() {
           dbService.getDirectoryListings(),
         ]);
         if (isMounted) {
-          if (articles && articles.length > 0) setDbArticles(articles);
+          if (articles !== undefined && articles !== null) setDbArticles(articles);
           if (ads && ads.length > 0) setAdSlots(ads);
           if (dirs && dirs.length > 0) setDirectoryListings(dirs);
         }
@@ -763,7 +765,21 @@ export default function HomePage() {
   const allExclusiveStories = sortedDbArticles.filter((a) => a.isExclusive);
   const remainingExclusives = allExclusiveStories.filter((a) => a.id !== latestHeroArticle?.id);
   const nonExclusives = sortedDbArticles.filter((a) => !a.isExclusive && a.id !== latestHeroArticle?.id);
-  const dynamicChronicleStories = [...remainingExclusives, ...nonExclusives].slice(0, 3);
+  
+  // Dynamic Sub Hero Articles (Top featured secondary stories from Supabase)
+  const remainingStories = [...remainingExclusives, ...nonExclusives];
+  const subHeroArticle = remainingStories[0] || null;
+  const subHeroSecondary = remainingStories[1] || null;
+  const dynamicChronicleStories = remainingStories.slice(2, 5);
+
+  const DEFAULT_SUB_HERO_IMAGE = 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=800&q=80';
+  const subHeroImageUrl = (subHeroArticle?.imageUrl && typeof subHeroArticle.imageUrl === 'string' && subHeroArticle.imageUrl.trim() !== '' && subHeroArticle.imageUrl.trim() !== 'null' && subHeroArticle.imageUrl.trim() !== 'undefined')
+    ? subHeroArticle.imageUrl.trim()
+    : ((subHeroArticle as any)?.image && typeof (subHeroArticle as any).image === 'string' && (subHeroArticle as any).image.trim() !== '' && (subHeroArticle as any).image.trim() !== 'null' && (subHeroArticle as any).image.trim() !== 'undefined')
+    ? (subHeroArticle as any).image.trim()
+    : ((subHeroArticle as any)?.mediaUrl && typeof (subHeroArticle as any).mediaUrl === 'string' && (subHeroArticle as any).mediaUrl.trim() !== '' && !(subHeroArticle as any).mediaUrl.includes('youtube'))
+    ? (subHeroArticle as any).mediaUrl.trim()
+    : DEFAULT_SUB_HERO_IMAGE;
 
   const isHeroVideo = Boolean(
     latestHeroArticle?.mediaType === 'video' &&
@@ -776,13 +792,15 @@ export default function HomePage() {
      latestHeroArticle.videoUrl.includes('youtu.be'))
   );
 
-  const heroImageUrl = (latestHeroArticle?.imageUrl && typeof latestHeroArticle.imageUrl === 'string' && latestHeroArticle.imageUrl.trim() !== '')
+  const DEFAULT_HERO_IMAGE = 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=1200&q=80';
+
+  const heroImageUrl = (latestHeroArticle?.imageUrl && typeof latestHeroArticle.imageUrl === 'string' && latestHeroArticle.imageUrl.trim() !== '' && latestHeroArticle.imageUrl.trim() !== 'null' && latestHeroArticle.imageUrl.trim() !== 'undefined')
     ? latestHeroArticle.imageUrl.trim()
-    : ((latestHeroArticle as any)?.image && typeof (latestHeroArticle as any).image === 'string' && (latestHeroArticle as any).image.trim() !== '')
+    : ((latestHeroArticle as any)?.image && typeof (latestHeroArticle as any).image === 'string' && (latestHeroArticle as any).image.trim() !== '' && (latestHeroArticle as any).image.trim() !== 'null' && (latestHeroArticle as any).image.trim() !== 'undefined')
     ? (latestHeroArticle as any).image.trim()
-    : ((latestHeroArticle as any)?.mediaUrl && typeof (latestHeroArticle as any).mediaUrl === 'string' && (latestHeroArticle as any).mediaUrl.trim() !== '' && !(latestHeroArticle as any).mediaUrl.includes('youtube'))
+    : ((latestHeroArticle as any)?.mediaUrl && typeof (latestHeroArticle as any).mediaUrl === 'string' && (latestHeroArticle as any).mediaUrl.trim() !== '' && (latestHeroArticle as any).mediaUrl.trim() !== 'null' && (latestHeroArticle as any).mediaUrl.trim() !== 'undefined' && !(latestHeroArticle as any).mediaUrl.includes('youtube'))
     ? (latestHeroArticle as any).mediaUrl.trim()
-    : '';
+    : DEFAULT_HERO_IMAGE;
 
   const [visibleStoriesCount, setVisibleStoriesCount] = useState(6);
 
@@ -806,6 +824,8 @@ export default function HomePage() {
     videoUrl: a.videoUrl,
   }));
 
+  const DEFAULT_INFRA_IMAGE = 'https://images.unsplash.com/photo-1545459720-aac8509eb02c?auto=format&fit=crop&w=800&q=80';
+
   const infraArticles = getArticlesByCategory('infrastructure');
   const infraData: NewsCardItem[] = infraArticles.map((a) => ({
     id: a.id,
@@ -817,13 +837,20 @@ export default function HomePage() {
     author: a.author || 'Infra Bureau',
     excerpt: a.excerpt || a.content?.slice(0, 180) || '',
     mediaType: a.mediaType || 'image',
-    imageUrl: a.imageUrl || (a as any).image || (a as any).mediaUrl,
+    imageUrl: (a.imageUrl && typeof a.imageUrl === 'string' && a.imageUrl.trim() !== '')
+      ? a.imageUrl.trim()
+      : ((a as any).image && typeof (a as any).image === 'string' && (a as any).image.trim() !== '')
+      ? (a as any).image.trim()
+      : DEFAULT_INFRA_IMAGE,
     videoTitle: a.videoTitle || a.title,
     videoDuration: a.videoDuration || '02:30',
     videoUrl: a.videoUrl,
     articleHref: `/article/${a.id}`,
     highlightStat: a.highlightStat,
   }));
+
+  const DEFAULT_BUSINESS_IMAGE = 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&q=80';
+  const DEFAULT_CEO_IMAGE = 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=800&q=80';
 
   const businessArticles = getArticlesByCategory('business');
   const businessData: NewsCardItem[] = businessArticles.map((a) => ({
@@ -836,7 +863,11 @@ export default function HomePage() {
     author: a.author || 'Industrial Bureau',
     excerpt: a.excerpt || a.content?.slice(0, 180) || '',
     mediaType: a.mediaType || 'image',
-    imageUrl: a.imageUrl || (a as any).image || (a as any).mediaUrl,
+    imageUrl: (a.imageUrl && typeof a.imageUrl === 'string' && a.imageUrl.trim() !== '')
+      ? a.imageUrl.trim()
+      : ((a as any).image && typeof (a as any).image === 'string' && (a as any).image.trim() !== '')
+      ? (a as any).image.trim()
+      : DEFAULT_BUSINESS_IMAGE,
     videoTitle: a.videoTitle || a.title,
     videoDuration: a.videoDuration || '03:00',
     videoUrl: a.videoUrl,
@@ -852,7 +883,11 @@ export default function HomePage() {
     company: 'Enterprise Leader',
     quote: a.excerpt || a.title,
     mediaType: a.mediaType || 'image',
-    imageUrl: a.imageUrl || (a as any).image || (a as any).mediaUrl,
+    imageUrl: (a.imageUrl && typeof a.imageUrl === 'string' && a.imageUrl.trim() !== '')
+      ? a.imageUrl.trim()
+      : ((a as any).image && typeof (a as any).image === 'string' && (a as any).image.trim() !== '')
+      ? (a as any).image.trim()
+      : DEFAULT_CEO_IMAGE,
     videoDuration: a.videoDuration || '03:00',
     videoUrl: a.videoUrl,
     articleHref: `/article/${a.id}`,
@@ -915,359 +950,406 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* MAIN HERO FEATURED STORY */}
-              <article
-                id="climate-tech"
-                className="group rounded-2xl border border-stone-300 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs hover:border-stone-400 dark:hover:border-slate-700 transition-all duration-300 w-full max-w-full box-border"
-              >
-                {/* Full Image Banner / Embedded Video Player */}
-                <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden bg-[#0d4d4d]">
-                  {isHeroVideo ? (
-                    heroVideoPlaying ? (
-                      <div className="relative w-full h-full bg-slate-950 flex flex-col justify-between animate-in fade-in duration-200">
-                        <div className="flex items-center justify-between p-2.5 bg-black/80 z-20">
-                          <span className="inline-flex items-center gap-1.5 text-white font-black text-xs px-2.5 py-1 rounded-full border border-white/20">
-                            <span className="h-2 w-2 rounded-full bg-red-500 animate-ping inline-block" />
-                            <span>4K YOUTUBE / STREAM</span>
-                          </span>
-                          <button
-                            onClick={() => setHeroVideoPlaying(false)}
-                            className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded cursor-pointer"
-                          >
-                            ✕ Close Video
-                          </button>
-                        </div>
+              {/* MAIN HERO FEATURED STORY (ONLY WHEN ARTICLES EXIST) */}
+              {latestHeroArticle ? (
+                <article
+                  id="climate-tech"
+                  className="group rounded-2xl border border-stone-300 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs hover:border-stone-400 dark:hover:border-slate-700 transition-all duration-300 w-full max-w-full box-border"
+                >
+                  {/* Full Image Banner / Embedded Video Player */}
+                  <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden bg-[#0d4d4d]">
+                    {isHeroVideo ? (
+                      heroVideoPlaying ? (
+                        <div className="relative w-full h-full bg-slate-950 flex flex-col justify-between animate-in fade-in duration-200">
+                          <div className="flex items-center justify-between p-2.5 bg-black/80 z-20">
+                            <span className="inline-flex items-center gap-1.5 text-white font-black text-xs px-2.5 py-1 rounded-full border border-white/20">
+                              <span className="h-2 w-2 rounded-full bg-red-500 animate-ping inline-block" />
+                              <span>4K YOUTUBE / STREAM</span>
+                            </span>
+                            <button
+                              onClick={() => setHeroVideoPlaying(false)}
+                              className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded cursor-pointer"
+                            >
+                              ✕ Close Video
+                            </button>
+                          </div>
 
-                        <div className="flex-1 w-full h-full min-h-0">
-                          <VideoPlayer
-                            url={latestHeroArticle.videoUrl!}
-                            title={latestHeroArticle.title || 'Coimbatore Video Stream'}
-                            autoplay={true}
-                            className="w-full h-full"
-                          />
+                          <div className="flex-1 w-full h-full min-h-0">
+                            <VideoPlayer
+                              url={latestHeroArticle.videoUrl!}
+                              title={latestHeroArticle.title || 'Coimbatore Video Stream'}
+                              autoplay={true}
+                              className="w-full h-full"
+                            />
+                          </div>
                         </div>
-                      </div>
+                      ) : (
+                        <>
+                          <img
+                            src={heroImageUrl || DEFAULT_HERO_IMAGE}
+                            alt={latestHeroArticle.title}
+                            loading="eager"
+                            decoding="async"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent z-10" />
+
+                          {/* Top Badges */}
+                          <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
+                            <span className="bg-red-600 text-white font-black text-xs px-3 py-1 rounded-md shadow-sm tracking-wider uppercase">
+                              {latestHeroArticle.isExclusive ? 'COVAI SPOTLIGHTS' : 'TOP STORY'}
+                            </span>
+                            <span className="bg-red-700 text-white font-black text-xs px-2.5 py-1 rounded shadow-sm uppercase">
+                              {latestHeroArticle.subCategory || latestHeroArticle.category || 'SPECIAL REPORT'}
+                            </span>
+                          </div>
+
+                          {/* Play Button Overlay (ONLY FOR VIDEO STORIES) */}
+                          <button
+                            onClick={() => setHeroVideoPlaying(true)}
+                            aria-label="Play Hero Video"
+                            className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-2xl flex items-center justify-center z-20 hover:scale-110 transition-transform cursor-pointer"
+                          >
+                            <svg className="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M8 5v14l11-7z" />
+                            </svg>
+                          </button>
+
+                          {/* Headline Overlay */}
+                          <div className="absolute bottom-3 left-3 right-3 sm:bottom-6 sm:left-6 sm:right-6 z-20">
+                            <Link href={`/article/${latestHeroArticle.id}`}>
+                              <h1 className="text-lg sm:text-2xl md:text-4xl font-black tracking-tight leading-snug sm:leading-[1.15] text-white drop-shadow-md group-hover:text-emerald-200 transition-colors cursor-pointer break-words line-clamp-3 sm:line-clamp-none">
+                                {latestHeroArticle.title}
+                              </h1>
+                            </Link>
+                          </div>
+                        </>
+                      )
                     ) : (
-                      <>
+                      /* PURE IMAGE HERO STORY (NO RED PLAY BUTTON) */
+                      <Link href={`/article/${latestHeroArticle.id}`} className="block w-full h-full relative">
                         <img
-                          src={heroImageUrl}
-                          alt={latestHeroArticle?.title || 'Hero Video'}
+                          src={heroImageUrl || DEFAULT_HERO_IMAGE}
+                          alt={latestHeroArticle.title}
                           loading="eager"
                           decoding="async"
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 rounded-xl"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent z-10" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent z-10" />
 
                         {/* Top Badges */}
-                        <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
-                          <span className="bg-red-600 text-white font-black text-xs px-3 py-1 rounded-md shadow-sm tracking-wider uppercase">
-                            {latestHeroArticle?.isExclusive ? 'COVAI SPOTLIGHTS' : 'TOP STORY'}
+                        <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 flex items-center gap-1.5 sm:gap-2">
+                          <span className="bg-red-600 text-white font-black text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 rounded-md shadow-sm tracking-wider uppercase">
+                            {latestHeroArticle.isExclusive ? 'COVAI SPOTLIGHTS' : 'TOP STORY'}
                           </span>
-                          <span className="bg-red-700 text-white font-black text-xs px-2.5 py-1 rounded shadow-sm uppercase">
-                            {latestHeroArticle?.subCategory || latestHeroArticle?.category || 'SPECIAL REPORT'}
+                          <span className="bg-red-700 text-white font-black text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded shadow-sm uppercase">
+                            {latestHeroArticle.subCategory || latestHeroArticle.category || 'SPECIAL REPORT'}
                           </span>
                         </div>
-
-                        {/* Play Button Overlay (ONLY FOR VIDEO STORIES) */}
-                        <button
-                          onClick={() => setHeroVideoPlaying(true)}
-                          aria-label="Play Hero Video"
-                          className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-2xl flex items-center justify-center z-20 hover:scale-110 transition-transform cursor-pointer"
-                        >
-                          <svg className="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M8 5v14l11-7z" />
-                          </svg>
-                        </button>
 
                         {/* Headline Overlay */}
                         <div className="absolute bottom-3 left-3 right-3 sm:bottom-6 sm:left-6 sm:right-6 z-20">
-                          <Link href={`/article/${latestHeroArticle?.id || 'art-hero-1'}`}>
-                            <h1 className="text-lg sm:text-2xl md:text-4xl font-black tracking-tight leading-snug sm:leading-[1.15] text-white drop-shadow-md group-hover:text-emerald-200 transition-colors cursor-pointer break-words line-clamp-3 sm:line-clamp-none">
-                              {latestHeroArticle?.title || 'Coimbatore Headline Story'}
-                            </h1>
-                          </Link>
+                          <h1 className="text-lg sm:text-2xl md:text-4xl font-black tracking-tight leading-snug sm:leading-[1.15] text-white drop-shadow-md group-hover:text-emerald-200 transition-colors break-words line-clamp-3 sm:line-clamp-none">
+                            {latestHeroArticle.title}
+                          </h1>
                         </div>
-                      </>
-                    )
-                  ) : (
-                    /* PURE IMAGE HERO STORY (NO RED PLAY BUTTON) */
-                    <Link href={`/article/${latestHeroArticle?.id || 'art-hero-1'}`} className="block w-full h-full relative">
-                      <img
-                        src={heroImageUrl}
-                        alt={latestHeroArticle?.title || 'Coimbatore Spotlight'}
-                        loading="eager"
-                        decoding="async"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 rounded-xl"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent z-10" />
-
-                      {/* Top Badges */}
-                      <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 flex items-center gap-1.5 sm:gap-2">
-                        <span className="bg-red-600 text-white font-black text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 rounded-md shadow-sm tracking-wider uppercase">
-                          {latestHeroArticle?.isExclusive ? 'COVAI SPOTLIGHTS' : 'TOP STORY'}
-                        </span>
-                        <span className="bg-red-700 text-white font-black text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded shadow-sm uppercase">
-                          {latestHeroArticle?.subCategory || latestHeroArticle?.category || 'SPECIAL REPORT'}
-                        </span>
-                      </div>
-
-                      {/* Headline Overlay */}
-                      <div className="absolute bottom-3 left-3 right-3 sm:bottom-6 sm:left-6 sm:right-6 z-20">
-                        <h1 className="text-lg sm:text-2xl md:text-4xl font-black tracking-tight leading-snug sm:leading-[1.15] text-white drop-shadow-md group-hover:text-emerald-200 transition-colors break-words line-clamp-3 sm:line-clamp-none">
-                          {latestHeroArticle?.title || 'Coimbatore Headline Story'}
-                        </h1>
-                      </div>
-                    </Link>
-                  )}
-                </div>
-
-                {/* Excerpt, On-Demand AI & Audio */}
-                <div className="p-3 sm:p-6 w-full max-w-full box-border break-words">
-                  <div className="flex items-center gap-2.5 text-xs sm:text-sm text-[#444444] dark:text-gray-400 mb-3 font-bold uppercase">
-                    <span className="font-black text-[#111111] dark:text-gray-100">By {latestHeroArticle?.author || 'Covai Urban Bureau'}</span>
-                    <span>•</span>
-                    <span>{formatRelativeTime(latestHeroArticle?.updatedAt || latestHeroArticle?.createdAt || latestHeroArticle?.publishedAt)}</span>
-                    <span>•</span>
-                    <span className="text-red-600 dark:text-red-400 font-black">{latestHeroArticle?.readTime || '4 min read'}</span>
-                  </div>
-
-                  <p className="text-sm sm:text-base text-[#222222] dark:text-gray-300 leading-relaxed font-medium break-words">
-                    {latestHeroArticle?.excerpt || 'From precision motor stator windings in Peelamedu to smart battery thermal management modules in Sulur, Coimbatore’s deep-rooted precision engineering heritage is quietly positioning the city as India’s premier electric mobility hub.'}
-                  </p>
-
-                  {/* Female Voice AI Audio Reader */}
-                  <AudioReader
-                    title={latestHeroArticle?.title || 'The Quiet Revolution in Covai’s EV Corridor'}
-                    textToRead={latestHeroArticle?.content || latestHeroArticle?.excerpt || 'From precision motor stator windings in Peelamedu to smart battery thermal management modules in Sulur, Coimbatore’s deep-rooted precision engineering heritage is quietly positioning the city as India’s premier electric mobility hub.'}
-                  />
-
-                  {/* Universal On-Demand AI Summarizer */}
-                  <AiSummary
-                    title={latestHeroArticle?.title || 'The Quiet Revolution in Covai’s EV Corridor'}
-                    excerpt={latestHeroArticle?.excerpt}
-                    content={latestHeroArticle?.content}
-                  />
-
-                  {/* Trending Visual Highlights Grid (Fills Hero space with live visual context) */}
-                  <div className="my-3 p-3 rounded-xl bg-[#f8f6f0] dark:bg-slate-800/60 border border-stone-200 dark:border-slate-700 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-red-600 dark:text-red-400 flex items-center gap-1">
-                        <span>⚡</span>
-                        <span>Trending Visual Highlights</span>
-                      </span>
-                      <span className="text-[9px] font-bold text-stone-500 dark:text-gray-400 font-mono">
-                        Coimbatore Live
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
-                      <div className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 shadow-2xs">
-                        <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 bg-slate-900">
-                          <img
-                            src="https://images.unsplash.com/photo-1558441719-8b489c634a10?auto=format&fit=crop&w=120&q=80"
-                            alt="EV Tech"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[9px] font-black text-emerald-700 dark:text-emerald-400 block uppercase">CleanTech</span>
-                          <p className="text-[10px] font-bold text-[#111111] dark:text-gray-100 truncate">400+ Stator MSMEs</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 shadow-2xs">
-                        <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 bg-slate-900">
-                          <img
-                            src="https://images.unsplash.com/photo-1545459720-aac8509eb02c?auto=format&fit=crop&w=120&q=80"
-                            alt="Flyover"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[9px] font-black text-red-600 dark:text-red-400 block uppercase">Avinashi Rd</span>
-                          <p className="text-[10px] font-bold text-[#111111] dark:text-gray-100 truncate">10.1 km Deck 80%</p>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2 p-2 rounded-lg bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 shadow-2xs">
-                        <div className="w-10 h-10 rounded-md overflow-hidden shrink-0 bg-slate-900">
-                          <img
-                            src="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=120&q=80"
-                            alt="Robotics"
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <span className="text-[9px] font-black text-amber-600 dark:text-amber-400 block uppercase">CODISSIA</span>
-                          <p className="text-[10px] font-bold text-[#111111] dark:text-gray-100 truncate">450+ Global Arenas</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Dual Action Buttons */}
-                  <div className="mt-4 pt-3.5 border-t border-stone-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm font-bold">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Link
-                        href={`/article/${latestHeroArticle?.id || 'art-hero-1'}`}
-                        className="inline-flex items-center justify-center min-h-[44px] px-4 py-2.5 rounded-lg bg-[#0d4d4d] hover:bg-[#153d3b] dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white font-black shadow-xs transition-colors touch-manipulation"
-                      >
-                        <span>📖 Read Article</span>
                       </Link>
-                      {isHeroVideo && (
-                        <button
-                          onClick={() => setHeroVideoPlaying(!heroVideoPlaying)}
-                          className="inline-flex items-center justify-center min-h-[44px] px-3.5 py-2.5 rounded-lg bg-[#f3ede2] hover:bg-stone-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#111111] dark:text-gray-200 border border-stone-300 dark:border-slate-700 font-black transition-colors touch-manipulation cursor-pointer"
+                    )}
+                  </div>
+
+                  {/* Excerpt, On-Demand AI & Audio */}
+                  <div className="p-3 sm:p-6 w-full max-w-full box-border break-words">
+                    <div className="flex items-center gap-2.5 text-xs sm:text-sm text-[#444444] dark:text-gray-400 mb-3 font-bold uppercase">
+                      <span className="font-black text-[#111111] dark:text-gray-100">By {latestHeroArticle.author || 'Editorial Bureau'}</span>
+                      <span>•</span>
+                      <span>{formatRelativeTime(latestHeroArticle.updatedAt || latestHeroArticle.createdAt || latestHeroArticle.publishedAt)}</span>
+                    </div>
+
+                    {latestHeroArticle.excerpt && (
+                      <p className="text-sm sm:text-base text-[#222222] dark:text-gray-300 leading-relaxed font-medium break-words">
+                        {latestHeroArticle.excerpt}
+                      </p>
+                    )}
+
+                    {/* Female Voice AI Audio Reader */}
+                    <AudioReader
+                      title={latestHeroArticle.title}
+                      textToRead={latestHeroArticle.content || latestHeroArticle.excerpt || latestHeroArticle.title}
+                    />
+
+                    {/* Universal On-Demand AI Summarizer */}
+                    <AiSummary
+                      title={latestHeroArticle.title}
+                      excerpt={latestHeroArticle.excerpt}
+                      content={latestHeroArticle.content}
+                    />
+
+                    {/* Dual Action Buttons */}
+                    <div className="mt-4 pt-3.5 border-t border-stone-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm font-bold">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                          href={`/article/${latestHeroArticle.id}`}
+                          className="inline-flex items-center justify-center min-h-[44px] px-4 py-2.5 rounded-lg bg-[#0d4d4d] hover:bg-[#153d3b] dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white font-black shadow-xs transition-colors touch-manipulation"
                         >
-                          <span>🎥 {heroVideoPlaying ? 'Stop Video' : `Watch Video (${latestHeroArticle?.videoDuration || '03:00'})`}</span>
+                          <span>📖 Read Article</span>
+                        </Link>
+                        {isHeroVideo && (
+                          <button
+                            onClick={() => setHeroVideoPlaying(!heroVideoPlaying)}
+                            className="inline-flex items-center justify-center min-h-[44px] px-3.5 py-2.5 rounded-lg bg-[#f3ede2] hover:bg-stone-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#111111] dark:text-gray-200 border border-stone-300 dark:border-slate-700 font-black transition-colors touch-manipulation cursor-pointer"
+                          >
+                            <span>🎥 {heroVideoPlaying ? 'Stop Video' : `Watch Video (${latestHeroArticle.videoDuration || '03:00'})`}</span>
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const heroUrl = typeof window !== 'undefined' ? `${window.location.origin}/article/${latestHeroArticle.id}` : `https://todayscoimbatore.com/article/${latestHeroArticle.id}`;
+                            if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+                              navigator.share({
+                                title: latestHeroArticle.title || "Today's Coimbatore",
+                                url: heroUrl,
+                              }).catch(() => {
+                                setIsHeroShareOpen(true);
+                              });
+                            } else {
+                              setIsHeroShareOpen(true);
+                            }
+                          }}
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-black transition-transform active:scale-95 shadow-xs cursor-pointer min-h-[44px] touch-manipulation"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                          </svg>
+                          <span>Share Story</span>
                         </button>
+                      </div>
+                    </div>
+
+                    {/* Dynamic Content Fill: LOCAL CHRONICLE FEED • QUICK NEWS DIGEST */}
+                    {dynamicChronicleStories.length > 0 && (
+                      <div className="mt-5 pt-4 border-t border-stone-200 dark:border-slate-800 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-red-600 animate-ping inline-block" />
+                            <h3 className="text-xs font-black uppercase tracking-wider text-[#111111] dark:text-gray-100">
+                              LOCAL CHRONICLE FEED • QUICK NEWS DIGEST
+                            </h3>
+                          </div>
+                          <span className="text-[10px] font-bold text-stone-500 dark:text-gray-400 font-mono">
+                            Updated Live
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {dynamicChronicleStories.map((item) => {
+                            const rawImg = item.imageUrl || (item as any).image || (item as any).mediaUrl;
+                            const hasImg = Boolean(rawImg && typeof rawImg === 'string' && rawImg.trim() !== '' && rawImg.trim() !== 'null' && rawImg.trim() !== 'undefined');
+                            return (
+                              <Link
+                                key={item.id}
+                                href={`/article/${item.id}`}
+                                className="flex items-start gap-3 p-2.5 rounded-xl bg-[#f8f6f0] dark:bg-slate-800/60 hover:bg-stone-200/70 dark:hover:bg-slate-800 border border-stone-200 dark:border-slate-700 transition-all duration-200 group/item"
+                              >
+                                {hasImg ? (
+                                  <div className="w-[60px] h-[60px] rounded-lg overflow-hidden shrink-0 bg-slate-900 border border-stone-300 dark:border-slate-700">
+                                    <img
+                                      src={rawImg}
+                                      alt={item.title}
+                                      className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-200"
+                                    />
+                                  </div>
+                                ) : null}
+                                <div className="min-w-0 flex-1 flex flex-col justify-between h-[60px]">
+                                  <div className="flex items-center justify-between text-[10px] font-bold uppercase">
+                                    <span className={item.isExclusive ? 'text-red-700 font-black' : 'text-red-600 dark:text-red-400 font-black'}>
+                                      {item.isExclusive ? '★ SPOTLIGHT' : item.category}
+                                    </span>
+                                    <span className="text-stone-500 dark:text-gray-400 font-mono text-[9px]">
+                                      {formatRelativeTime(item.updatedAt || item.createdAt || item.publishedAt)}
+                                    </span>
+                                  </div>
+                                  <h4 className="text-xs font-bold text-[#111111] dark:text-gray-100 line-clamp-2 leading-tight group-hover/item:text-red-600 dark:group-hover/item:text-red-400 transition-colors">
+                                    {item.title}
+                                  </h4>
+                                </div>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </article>
+              ) : (
+                /* CLEAN USER-FACING STANDBY MESSAGE (NO ADMIN LINKS) */
+                <div className="rounded-2xl border border-stone-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-3 shadow-xs">
+                  <div className="w-14 h-14 rounded-2xl bg-stone-100 dark:bg-slate-800 text-stone-500 dark:text-stone-400 flex items-center justify-center text-2xl shadow-inner border border-stone-200 dark:border-slate-700">
+                    📰
+                  </div>
+                  <div className="space-y-1 max-w-md">
+                    <h3 className="text-base sm:text-lg font-black text-[#111111] dark:text-gray-100">
+                      No articles posted yet!
+                    </h3>
+                    <p className="text-xs font-medium text-[#555555] dark:text-gray-400 leading-relaxed">
+                      Today&apos;s Coimbatore live news updates, breaking reports, and city bulletins will appear here as soon as they are published.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* EDITORIAL TIMELINE & DYNAMIC SUB HERO SECTION GRID */}
+            <div className={`grid grid-cols-1 ${subHeroArticle ? 'lg:grid-cols-2' : 'max-w-3xl'} gap-4 w-full max-w-full my-4 items-stretch`}>
+              {/* PALE SAND CONTAINER ("THE TIMELINE") */}
+              <div className="rounded-2xl border border-[#dcd5c7] dark:border-slate-800 bg-[#f3ede2] dark:bg-slate-900 p-4 sm:p-5 shadow-xs w-full max-w-full box-border break-words flex flex-col justify-between">
+                <div>
+                  <div className="border-b border-[#dcd5c7] dark:border-slate-800 pb-2.5 mb-3">
+                    <span className="text-xs font-black uppercase tracking-wider text-red-600 dark:text-red-400 block mb-0.5">
+                      THE TIMELINE
+                    </span>
+                    <h3 className="text-lg font-extrabold leading-tight text-[#111111] dark:text-gray-100 break-words">
+                      How Covai became a maker city
+                    </h3>
+                  </div>
+
+                  <div className="space-y-3 text-xs">
+                    <div className="border-b border-[#dcd5c7] dark:border-slate-800 pb-2.5">
+                      <span className="text-xs font-black uppercase tracking-wider text-[#333333] dark:text-gray-300 block mb-0.5">1930s • TEXTILE REVOLUTION</span>
+                      <p className="text-xs font-medium text-[#222222] dark:text-gray-400 leading-relaxed break-words">
+                        Stanes & G.D. Naidu pioneer indigenous textile machinery and motor manufacturing in Peelamedu.
+                      </p>
+                    </div>
+
+                    <div className="border-b border-[#dcd5c7] dark:border-slate-800 pb-2.5">
+                      <span className="text-xs font-black uppercase tracking-wider text-[#333333] dark:text-gray-300 block mb-0.5">1970s • PUMP & FOUNDRY CAPITAL</span>
+                      <p className="text-xs font-medium text-[#222222] dark:text-gray-400 leading-relaxed break-words">
+                        Coimbatore supplies over 60% of India’s agricultural pumpsets and cast-iron subassemblies.
+                      </p>
+                    </div>
+
+                    <div>
+                      <span className="text-xs font-black uppercase tracking-wider text-[#333333] dark:text-gray-300 block mb-0.5">2026 • SAAS & EV HUB</span>
+                      <p className="text-xs font-medium text-[#222222] dark:text-gray-400 leading-relaxed break-words">
+                        Over 140 DeepTech & EV startups scale globally from Coimbatore without shifting to metros.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* DYNAMIC SUB HERO SECTION (FETCHED DIRECTLY FROM SUPABASE DATABASE) */}
+              {subHeroArticle && (
+                <div className="rounded-2xl border border-stone-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-xs w-full max-w-full box-border break-words flex flex-col justify-between hover:border-stone-400 dark:hover:border-slate-700 transition-all duration-300 group">
+                  <div className="space-y-3">
+                    <div className="border-b border-stone-200 dark:border-slate-800 pb-2.5 flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-red-600 animate-ping inline-block" />
+                        <h3 className="text-xs font-black uppercase tracking-wider text-[#111111] dark:text-gray-100 flex items-center gap-1.5">
+                          <span className="text-red-600 dark:text-red-500 font-black">⚡</span>
+                          SUB HERO SPOTLIGHT
+                        </h3>
+                      </div>
+                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900">
+                        {subHeroArticle.isExclusive ? '★ SPOTLIGHT' : (subHeroArticle.category || 'FEATURED')}
+                      </span>
+                    </div>
+
+                    {/* Image / Media Container */}
+                    <div className="relative aspect-[16/9] w-full rounded-xl overflow-hidden bg-slate-900 border border-stone-200 dark:border-slate-800">
+                      <Link href={`/article/${subHeroArticle.id}`} className="block w-full h-full">
+                        <img
+                          src={subHeroImageUrl}
+                          alt={subHeroArticle.title}
+                          loading="lazy"
+                          decoding="async"
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        />
+                      </Link>
+                      {subHeroArticle.subCategory && (
+                        <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-black/80 text-white text-[10px] font-black uppercase tracking-wider border border-white/20">
+                          {subHeroArticle.subCategory}
+                        </span>
+                      )}
+                      {subHeroArticle.highlightStat && (
+                        <span className="absolute bottom-2.5 right-2.5 px-2.5 py-0.5 rounded-md bg-emerald-700 text-white text-[10px] font-black uppercase tracking-wide shadow-md">
+                          {subHeroArticle.highlightStat}
+                        </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const heroUrl = typeof window !== 'undefined' ? `${window.location.origin}/article/${latestHeroArticle?.id || 'art-hero-1'}` : `https://todayscoimbatore.com/article/${latestHeroArticle?.id || 'art-hero-1'}`;
-                          if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-                            navigator.share({
-                              title: latestHeroArticle?.title || "Today's Coimbatore",
-                              url: heroUrl,
-                            }).catch(() => {
-                              setIsHeroShareOpen(true);
-                            });
-                          } else {
-                            setIsHeroShareOpen(true);
-                          }
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-black transition-transform active:scale-95 shadow-xs cursor-pointer min-h-[44px] touch-manipulation"
-                      >
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                        </svg>
-                        <span>Share Story</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Dynamic Content Fill: LOCAL CHRONICLE FEED • QUICK NEWS DIGEST */}
-                  <div className="mt-5 pt-4 border-t border-stone-200 dark:border-slate-800 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-red-600 animate-ping inline-block" />
-                        <h3 className="text-xs font-black uppercase tracking-wider text-[#111111] dark:text-gray-100">
-                          LOCAL CHRONICLE FEED • QUICK NEWS DIGEST
-                        </h3>
-                      </div>
-                      <span className="text-[10px] font-bold text-stone-500 dark:text-gray-400 font-mono">
-                        Updated Live
+                    {/* Metadata line */}
+                    <div className="flex items-center justify-between text-xs text-[#444444] dark:text-gray-400 font-bold">
+                      <span className="font-black text-[#111111] dark:text-gray-100">
+                        By {subHeroArticle.author || 'Editorial Bureau'}
                       </span>
+                      <span>{formatRelativeTime(subHeroArticle.updatedAt || subHeroArticle.createdAt || subHeroArticle.publishedAt)}</span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {(dynamicChronicleStories.length > 0 ? dynamicChronicleStories : dbArticles.slice(0, 3)).map((item) => {
-                        const rawImg = item.imageUrl || (item as any).image || (item as any).mediaUrl;
-                        const hasImg = Boolean(rawImg && typeof rawImg === 'string' && rawImg.trim() !== '' && rawImg.trim() !== 'null' && rawImg.trim() !== 'undefined');
-                        return (
-                          <Link
-                            key={item.id}
-                            href={`/article/${item.id}`}
-                            className="flex items-start gap-3 p-2.5 rounded-xl bg-[#f8f6f0] dark:bg-slate-800/60 hover:bg-stone-200/70 dark:hover:bg-slate-800 border border-stone-200 dark:border-slate-700 transition-all duration-200 group/item"
-                          >
-                            {hasImg ? (
-                              <div className="w-[60px] h-[60px] rounded-lg overflow-hidden shrink-0 bg-slate-900 border border-stone-300 dark:border-slate-700">
-                                <img
-                                  src={rawImg}
-                                  alt={item.title}
-                                  className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-200"
-                                />
-                              </div>
-                            ) : null}
-                            <div className="min-w-0 flex-1 flex flex-col justify-between h-[60px]">
-                              <div className="flex items-center justify-between text-[10px] font-bold uppercase">
-                                <span className={item.isExclusive ? 'text-red-700 font-black' : 'text-red-600 dark:text-red-400 font-black'}>
-                                  {item.isExclusive ? '★ SPOTLIGHT' : item.category}
-                                </span>
-                                <span className="text-stone-500 dark:text-gray-400 font-mono text-[9px]">
-                                  {formatRelativeTime(item.updatedAt || item.createdAt || item.publishedAt)}
-                                </span>
-                              </div>
-                              <h4 className="text-xs font-bold text-[#111111] dark:text-gray-100 line-clamp-2 leading-tight group-hover/item:text-red-600 dark:group-hover/item:text-red-400 transition-colors">
-                                {item.title}
-                              </h4>
-                            </div>
-                          </Link>
-                        );
-                      })}
-                    </div>
+                    {/* Headline */}
+                    <Link href={`/article/${subHeroArticle.id}`} className="block">
+                      <h4 className="text-base sm:text-lg font-bold text-[#111111] dark:text-white leading-snug group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors line-clamp-2">
+                        {subHeroArticle.title}
+                      </h4>
+                    </Link>
+
+                    {/* Excerpt */}
+                    {subHeroArticle.excerpt && (
+                      <p className="text-xs text-[#333333] dark:text-gray-300 line-clamp-2 leading-relaxed font-medium">
+                        {subHeroArticle.excerpt}
+                      </p>
+                    )}
+
+                    {/* Secondary Sub Hero Mini Link (if available) */}
+                    {subHeroSecondary && (
+                      <div className="mt-2 pt-2.5 border-t border-stone-200 dark:border-slate-800">
+                        <Link
+                          href={`/article/${subHeroSecondary.id}`}
+                          className="flex items-center justify-between gap-2 text-xs font-bold text-[#222222] dark:text-gray-200 hover:text-red-600 dark:hover:text-red-400 transition-colors group/sec"
+                        >
+                          <span className="line-clamp-1 flex-1">
+                            <span className="text-red-600 font-black mr-1.5">▸ Also Trending:</span>
+                            {subHeroSecondary.title}
+                          </span>
+                          <span className="text-[10px] font-bold text-stone-500 shrink-0 font-mono">
+                            {formatRelativeTime(subHeroSecondary.updatedAt || subHeroSecondary.createdAt || subHeroSecondary.publishedAt)}
+                          </span>
+                        </Link>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer Action */}
+                  <div className="mt-3.5 pt-3 border-t border-stone-200 dark:border-slate-800 flex items-center justify-between text-xs font-bold gap-2">
+                    <Link
+                      href={`/article/${subHeroArticle.id}`}
+                      className="min-h-[44px] inline-flex items-center text-[#0d4d4d] dark:text-emerald-400 hover:underline font-black touch-manipulation"
+                    >
+                      <span>📖 Read Full Story &rarr;</span>
+                    </Link>
+                    {subHeroArticle.mediaType === 'video' || subHeroArticle.videoUrl ? (
+                      <button
+                        onClick={() =>
+                          openVideoModal({
+                            title: subHeroArticle.title,
+                            category: subHeroArticle.category,
+                            duration: subHeroArticle.videoDuration || '02:30',
+                            quality: '1080p HD',
+                            location: 'Coimbatore, Tamil Nadu',
+                            caption: subHeroArticle.excerpt || subHeroArticle.title,
+                          })
+                        }
+                        className="min-h-[44px] inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-[#f3ede2] dark:bg-slate-800 text-[#111111] dark:text-gray-200 hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white font-black transition-colors touch-manipulation cursor-pointer"
+                      >
+                        🎥 Watch Video
+                      </button>
+                    ) : null}
                   </div>
                 </div>
-              </article>
-            </div>
-
-            {/* EDITORIAL TIMELINE & COVAI MARKET PULSE GRID */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-full my-4">
-              {/* PALE SAND CONTAINER ("THE TIMELINE") */}
-              <div className="rounded-2xl border border-[#dcd5c7] dark:border-slate-800 bg-[#f3ede2] dark:bg-slate-900 p-4 sm:p-5 shadow-xs w-full max-w-full box-border break-words">
-                <div className="border-b border-[#dcd5c7] dark:border-slate-800 pb-2.5 mb-3">
-                  <span className="text-xs font-black uppercase tracking-wider text-red-600 dark:text-red-400 block mb-0.5">
-                    THE TIMELINE
-                  </span>
-                  <h3 className="text-lg font-extrabold leading-tight text-[#111111] dark:text-gray-100 break-words">
-                    How Covai became a maker city
-                  </h3>
-                </div>
-
-                <div className="space-y-3 text-xs">
-                  <div className="border-b border-[#dcd5c7] dark:border-slate-800 pb-2.5">
-                    <span className="text-xs font-black uppercase tracking-wider text-[#333333] dark:text-gray-300 block mb-0.5">1930s • TEXTILE REVOLUTION</span>
-                    <p className="text-xs font-medium text-[#222222] dark:text-gray-400 leading-relaxed break-words">
-                      Stanes & G.D. Naidu pioneer indigenous textile machinery and motor manufacturing in Peelamedu.
-                    </p>
-                  </div>
-
-                  <div className="border-b border-[#dcd5c7] dark:border-slate-800 pb-2.5">
-                    <span className="text-xs font-black uppercase tracking-wider text-[#333333] dark:text-gray-300 block mb-0.5">1970s • PUMP & FOUNDRY CAPITAL</span>
-                    <p className="text-xs font-medium text-[#222222] dark:text-gray-400 leading-relaxed break-words">
-                      Coimbatore supplies over 60% of India’s agricultural pumpsets and cast-iron subassemblies.
-                    </p>
-                  </div>
-
-                  <div>
-                    <span className="text-xs font-black uppercase tracking-wider text-[#333333] dark:text-gray-300 block mb-0.5">2026 • SAAS & EV HUB</span>
-                    <p className="text-xs font-medium text-[#222222] dark:text-gray-400 leading-relaxed break-words">
-                      Over 140 DeepTech & EV startups scale globally from Coimbatore without shifting to metros.
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* MARKET & CITY PULSE WIDGET */}
-              <div className="rounded-2xl border border-stone-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-xs space-y-2.5 w-full max-w-full box-border">
-                <div className="border-b border-stone-200 dark:border-slate-800 pb-2 flex items-center justify-between">
-                  <span className="text-xs font-black uppercase tracking-wider text-[#111111] dark:text-gray-100">
-                    📊 Covai Market Pulse
-                  </span>
-                  <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800">
-                    Live Feed
-                  </span>
-                </div>
-
-                <div className="space-y-1.5 text-xs">
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-[#f8f6f0] dark:bg-slate-800">
-                    <span className="font-bold text-[#333333] dark:text-gray-300">Cotton 29mm Shankar-6</span>
-                    <span className="font-mono font-black text-emerald-700 dark:text-emerald-400">₹58,400 / Candy ▲</span>
-                  </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-[#f8f6f0] dark:bg-slate-800">
-                    <span className="font-bold text-[#333333] dark:text-gray-300">22K Gold Rate (Coimbatore)</span>
-                    <span className="font-mono font-black text-red-700 dark:text-red-400">₹6,840 / g ▲</span>
-                  </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-[#f8f6f0] dark:bg-slate-800">
-                    <span className="font-bold text-[#333333] dark:text-gray-300">Air Quality Index (Peelamedu)</span>
-                    <span className="font-mono font-black text-emerald-700 dark:text-emerald-400">AQI 42 (Good)</span>
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
 
         {/* ============================================================== */}
@@ -1275,19 +1357,9 @@ export default function HomePage() {
         {/* ============================================================== */}
         <div className="w-full max-w-full h-auto flex flex-col justify-start align-top mb-2 pb-0 box-border">
           <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#555555] dark:text-gray-400 mb-1">
-            Advertisement • {homeInFeed1?.advertiser || 'Sponsored Feature'}
+            Advertisement • {homeInFeed1?.slides?.[0]?.advertiser || 'Sponsored Feature'}
           </div>
-          <NativeAdBanner
-            format="in-feed"
-            slotId={homeInFeed1?.slotId || 'HOME_IN_FEED_1'}
-            title={homeInFeed1?.title || 'ELGi Industrial Air Compressors & Smart Automation Solutions'}
-            description={homeInFeed1?.description || 'Upgrade factory floor efficiency with Industry 4.0 energy-saving rotary screw compressors manufactured in Coimbatore.'}
-            advertiserName={homeInFeed1?.advertiser || 'ELGi Equipments Global'}
-            ctaText={homeInFeed1?.ctaText || 'Book Free Plant Energy Audit'}
-            ctaUrl={homeInFeed1?.linkUrl || homeInFeed1?.ctaUrl || 'https://todayscoimbatore.com'}
-            imageUrl={homeInFeed1?.imageUrl}
-            bannerUrl={homeInFeed1?.bannerUrl || homeInFeed1?.imageUrl}
-          />
+          <AdSlider ad={homeInFeed1} variant="infeed" label="SPONSORED FEATURE" />
         </div>
 
         {/* ================================================================== */}
@@ -1509,19 +1581,9 @@ export default function HomePage() {
         {/* ============================================================== */}
         <div className="w-full max-w-full py-1 box-border">
           <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#555555] dark:text-gray-400 mb-1">
-            Advertisement • {homeInFeed2?.advertiser || 'Property Showcase'}
+            Advertisement • {homeInFeed2?.slides?.[0]?.advertiser || 'Property Showcase'}
           </div>
-          <NativeAdBanner
-            format="in-feed"
-            slotId={homeInFeed2?.slotId || 'HOME_IN_FEED_2'}
-            title={homeInFeed2?.title || 'Kongu Living Gated Villa Community in Saravanampatti IT Corridor'}
-            description={homeInFeed2?.description || 'DTCP & RERA approved 3 & 4 BHK luxury smart villas with clubhouse, EV charging points, and 24/7 security.'}
-            advertiserName={homeInFeed2?.advertiser || 'Kongu Living Developers'}
-            ctaText={homeInFeed2?.ctaText || 'Schedule Site Visit & Brochure'}
-            ctaUrl={homeInFeed2?.linkUrl || homeInFeed2?.ctaUrl || 'https://todayscoimbatore.com'}
-            imageUrl={homeInFeed2?.imageUrl}
-            bannerUrl={homeInFeed2?.bannerUrl || homeInFeed2?.imageUrl}
-          />
+          <AdSlider ad={homeInFeed2} variant="infeed" label="PROPERTY SHOWCASE" />
         </div>
 
         {/* SECTION 3: "INFRASTRUCTURE & CIVIC" (6 CARDS IN FULL-WIDTH 3-COLUMN GRID) */}
@@ -1560,8 +1622,10 @@ export default function HomePage() {
                     <div className="relative w-full h-48 rounded-lg overflow-hidden bg-slate-900 mb-3 border border-stone-200 dark:border-slate-800">
                       <Link href={cardTargetHref} onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })} className="block w-full h-full">
                         <img
-                          src={card.imageUrl}
+                          src={card.imageUrl || DEFAULT_INFRA_IMAGE}
                           alt={card.title}
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
                         />
                       </Link>
@@ -1699,7 +1763,7 @@ export default function HomePage() {
                     <div className="relative w-full h-48 rounded-lg overflow-hidden bg-slate-900 mb-3 border border-stone-200 dark:border-slate-800">
                       <Link href={cardTargetHref} onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })} className="block w-full h-full">
                         <img
-                          src={card.imageUrl}
+                          src={card.imageUrl || DEFAULT_BUSINESS_IMAGE}
                           alt={card.title}
                           loading="lazy"
                           decoding="async"
@@ -1829,7 +1893,7 @@ export default function HomePage() {
                     <div className="relative w-full h-48 rounded-xl overflow-hidden border border-stone-300 dark:border-slate-700 bg-slate-900 mb-3">
                       <Link href={profileTargetHref} onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })} className="block w-full h-full">
                         <img
-                          src={profile.imageUrl}
+                          src={profile.imageUrl || DEFAULT_CEO_IMAGE}
                           alt={profile.name}
                           loading="lazy"
                           decoding="async"
@@ -1969,7 +2033,7 @@ export default function HomePage() {
         isOpen={isHeroShareOpen}
         onClose={() => setIsHeroShareOpen(false)}
         title={latestHeroArticle?.title || "Today's Coimbatore"}
-        url={typeof window !== 'undefined' ? `${window.location.origin}/article/${latestHeroArticle?.id || 'art-hero-1'}` : `https://todayscoimbatore.com/article/${latestHeroArticle?.id || 'art-hero-1'}`}
+        url={typeof window !== 'undefined' ? `${window.location.origin}${latestHeroArticle ? `/article/${latestHeroArticle.id}` : ''}` : `https://todayscoimbatore.com${latestHeroArticle ? `/article/${latestHeroArticle.id}` : ''}`}
       />
 
     </div>

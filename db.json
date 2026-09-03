@@ -355,21 +355,112 @@
     }
   ],
   "categories": [
-    { "id": "cat-1", "name": "NEWS", "slug": "news", "description": "Hyper-local city and district headlines", "totalArticles": 48, "status": "active" },
-    { "id": "cat-2", "name": "OUR CITY", "slug": "our-city", "description": "Corporation, water, sanitation, and citizen alerts", "totalArticles": 32, "status": "active" },
-    { "id": "cat-3", "name": "BUSINESS", "slug": "business", "description": "MSME, textile, engineering, and commerce", "totalArticles": 41, "status": "active" },
-    { "id": "cat-4", "name": "TECH", "slug": "tech", "description": "IT corridor, EV startups, and SaaS hubs", "totalArticles": 29, "status": "active" },
-    { "id": "cat-5", "name": "EVENTS", "slug": "events", "description": "Cultural fests, exhibitions, and weekend events", "totalArticles": 18, "status": "active" },
-    { "id": "cat-6", "name": "SPORTS", "slug": "sports", "description": "Local tournaments, athletics, and marathons", "totalArticles": 14, "status": "active" },
-    { "id": "cat-7", "name": "CEOS OF COIMBATORE", "slug": "ceos", "description": "Founder interviews and enterprise spotlights", "totalArticles": 22, "status": "active" },
-    { "id": "cat-8", "name": "EDUCATION", "slug": "education", "description": "Colleges, research universities, and schools", "totalArticles": 19, "status": "active" },
-    { "id": "cat-9", "name": "E-PAPER", "slug": "e-paper", "description": "Daily print newspaper digital replica edition", "totalArticles": 365, "status": "active" }
+    {
+      "id": "cat-1",
+      "name": "NEWS",
+      "slug": "news",
+      "description": "Hyper-local city and district headlines",
+      "totalArticles": 48,
+      "status": "active"
+    },
+    {
+      "id": "cat-2",
+      "name": "OUR CITY",
+      "slug": "our-city",
+      "description": "Corporation, water, sanitation, and citizen alerts",
+      "totalArticles": 32,
+      "status": "active"
+    },
+    {
+      "id": "cat-3",
+      "name": "BUSINESS",
+      "slug": "business",
+      "description": "MSME, textile, engineering, and commerce",
+      "totalArticles": 41,
+      "status": "active"
+    },
+    {
+      "id": "cat-4",
+      "name": "TECH",
+      "slug": "tech",
+      "description": "IT corridor, EV startups, and SaaS hubs",
+      "totalArticles": 29,
+      "status": "active"
+    },
+    {
+      "id": "cat-5",
+      "name": "EVENTS",
+      "slug": "events",
+      "description": "Cultural fests, exhibitions, and weekend events",
+      "totalArticles": 18,
+      "status": "active"
+    },
+    {
+      "id": "cat-6",
+      "name": "SPORTS",
+      "slug": "sports",
+      "description": "Local tournaments, athletics, and marathons",
+      "totalArticles": 14,
+      "status": "active"
+    },
+    {
+      "id": "cat-7",
+      "name": "CEOS OF COIMBATORE",
+      "slug": "ceos",
+      "description": "Founder interviews and enterprise spotlights",
+      "totalArticles": 22,
+      "status": "active"
+    },
+    {
+      "id": "cat-8",
+      "name": "EDUCATION",
+      "slug": "education",
+      "description": "Colleges, research universities, and schools",
+      "totalArticles": 19,
+      "status": "active"
+    },
+    {
+      "id": "cat-9",
+      "name": "E-PAPER",
+      "slug": "e-paper",
+      "description": "Daily print newspaper digital replica edition",
+      "totalArticles": 365,
+      "status": "active"
+    }
   ],
   "users": [
-    { "id": "usr-1", "name": "Althaf Chief Editor", "email": "admin@todayscoimbatore.com", "role": "superadmin", "joinedDate": "2025-01-10", "status": "active" },
-    { "id": "usr-2", "name": "Kovai Urban Bureau", "email": "editor@todayscoimbatore.com", "role": "editor", "joinedDate": "2025-02-15", "status": "active" },
-    { "id": "usr-3", "name": "Civic Reporter Desk", "email": "civic@todayscoimbatore.com", "role": "reporter", "joinedDate": "2025-04-01", "status": "active" },
-    { "id": "usr-4", "name": "Commercial Desk", "email": "ads@todayscoimbatore.com", "role": "editor", "joinedDate": "2025-06-20", "status": "active" }
+    {
+      "id": "usr-1",
+      "name": "Althaf Chief Editor",
+      "email": "admin@todayscoimbatore.com",
+      "role": "superadmin",
+      "joinedDate": "2025-01-10",
+      "status": "active"
+    },
+    {
+      "id": "usr-2",
+      "name": "Kovai Urban Bureau",
+      "email": "editor@todayscoimbatore.com",
+      "role": "editor",
+      "joinedDate": "2025-02-15",
+      "status": "active"
+    },
+    {
+      "id": "usr-3",
+      "name": "Civic Reporter Desk",
+      "email": "civic@todayscoimbatore.com",
+      "role": "reporter",
+      "joinedDate": "2025-04-01",
+      "status": "active"
+    },
+    {
+      "id": "usr-4",
+      "name": "Commercial Desk",
+      "email": "ads@todayscoimbatore.com",
+      "role": "editor",
+      "joinedDate": "2025-06-20",
+      "status": "active"
+    }
   ],
   "outages": [
     {
@@ -380,7 +471,12 @@
       "timeWindow": "09:00 AM – 04:00 PM",
       "status": "scheduled",
       "reason": "110kV Substation Line Clearing & Feeder Upgrades",
-      "affectedStreets": ["Avinashi Rd", "Hope College", "PSG Tech Campus", "SITRA Junction"]
+      "affectedStreets": [
+        "Avinashi Rd",
+        "Hope College",
+        "PSG Tech Campus",
+        "SITRA Junction"
+      ]
     },
     {
       "id": "out-2",
@@ -390,7 +486,11 @@
       "timeWindow": "10:00 AM – 03:00 PM",
       "status": "scheduled",
       "reason": "Substation Transformer Servicing & HT Cable Work",
-      "affectedStreets": ["Sathy Road", "Keeranatham IT Park", "KGISL Campus"]
+      "affectedStreets": [
+        "Sathy Road",
+        "Keeranatham IT Park",
+        "KGISL Campus"
+      ]
     },
     {
       "id": "out-3",
@@ -400,7 +500,11 @@
       "timeWindow": "09:30 AM – 02:30 PM",
       "status": "scheduled",
       "reason": "Feeder RMU Replacement & Underground Cable Network Maintenance",
-      "affectedStreets": ["Cross Cut Road", "100 Feet Road", "Ram Nagar East"]
+      "affectedStreets": [
+        "Cross Cut Road",
+        "100 Feet Road",
+        "Ram Nagar East"
+      ]
     }
   ],
   "ads": [

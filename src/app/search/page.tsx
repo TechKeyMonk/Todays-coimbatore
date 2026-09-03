@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -77,7 +77,6 @@ function SearchResults() {
               category={article.category}
               timeAgo={article.publishedAt || 'Recently'}
               author={article.author}
-              readTime={article.readTime}
               excerpt={article.excerpt}
               imageUrl={article.imageUrl || (article as any).image}
               videoUrl={article.videoUrl}
@@ -92,7 +91,7 @@ function SearchResults() {
             No matching stories found
           </h3>
           <p className="text-xs text-stone-500 dark:text-gray-400 max-w-md mx-auto">
-            Try checking for spelling errors or searching for different topics like "Metro", "TANGEDCO", or "Avinashi Road".
+            Try checking for spelling errors or searching for different topics like &quot;Metro&quot;, &quot;TANGEDCO&quot;, or &quot;Avinashi Road&quot;.
           </p>
           <Link
             href="/"

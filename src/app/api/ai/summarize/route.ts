@@ -16,51 +16,55 @@ export async function POST(request: Request) {
     // Check if GEMINI_API_KEY or interacting Gemini environment is present
     const apiKey = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY;
     if (apiKey) {
-      try {
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [
-                {
-                  parts: [
-                    {
-                      text: `You are an elite hyper-local news editor for Coimbatore, Tamil Nadu. Summarize the following news report into strictly 3 concise, highly readable bullet points with appropriate emoji prefixes (e.g. ⚡, 📍, 💰, 🚀, 🚅). Keep each bullet point under 20 words.\n\nNews Content:\n${textToSummarize}`,
-                    },
-                  ],
+      const activeModels = ['gemini-3.1-flash-lite', 'gemini-3.5-flash', 'gemini-flash-latest'];
+      for (const modelName of activeModels) {
+        try {
+          const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    parts: [
+                      {
+                        text: `You are an elite hyper-local news editor for Coimbatore, Tamil Nadu. Summarize the following news report into strictly 3 concise, highly readable bullet points with appropriate emoji prefixes (e.g. ⚡, 📍, 💰, 🚀, 🚅). Keep each bullet point under 20 words.\n\nNews Content:\n${textToSummarize}`,
+                      },
+                    ],
+                  },
+                ],
+                generationConfig: {
+                  maxOutputTokens: 250,
+                  temperature: 0.2,
                 },
-              ],
-              generationConfig: {
-                maxOutputTokens: 250,
-                temperature: 0.2,
-              },
-            }),
-          }
-        );
+              }),
+            }
+          );
 
-        if (response.ok) {
-          const data = await response.json();
-          const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (rawText) {
-            const points = rawText
-              .split('\n')
-              .map((line: string) => line.replace(/^[-*•\d.]\s*/, '').trim())
-              .filter((line: string) => line.length > 5)
-              .slice(0, 4);
+          if (response.ok) {
+            const data = await response.json();
+            const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+            if (rawText) {
+              const points = rawText
+                .split('\n')
+                .map((line: string) => line.replace(/^[-*•\d.]\s*/, '').trim())
+                .filter((line: string) => line.length > 5)
+                .slice(0, 4);
 
-            if (points.length >= 2) {
-              return NextResponse.json({
-                success: true,
-                points,
-                source: 'gemini-api',
-              });
+              if (points.length >= 2) {
+                return NextResponse.json({
+                  success: true,
+                  points,
+                  source: 'gemini-api',
+                  model: modelName,
+                });
+              }
             }
           }
+        } catch (geminiError) {
+          console.warn(`Gemini API call failed for model ${modelName}:`, geminiError);
         }
-      } catch (geminiError) {
-        console.warn('Gemini API call failed, generating on-demand summary', geminiError);
       }
     }
 

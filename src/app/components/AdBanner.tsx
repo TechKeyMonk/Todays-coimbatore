@@ -101,7 +101,8 @@ export const AdBanner: React.FC<AdBannerProps> = ({
   const displayAdvertiser = adData?.advertiserName || advertiserName || 'Kongu Living Developers';
   const displayCta = adData?.ctaText || ctaText || 'Schedule Site Visit';
   const displayUrl = adData?.ctaUrl || ctaUrl || 'https://todayscoimbatore.com';
-  const displayImage = adData?.imageUrl || imageUrl || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80';
+  const rawImage = adData?.imageUrl || imageUrl;
+  const displayImage = (rawImage && typeof rawImage === 'string' && rawImage.trim() !== '') ? rawImage.trim() : 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80';
   const displayBadge = adData?.badgeText || badgeText || (isProgrammatic ? 'Google AdSense' : 'Advertisement');
 
   /* ------------------------------------------------------------------------ */

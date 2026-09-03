@@ -36,6 +36,15 @@ const nextConfig = {
   experimental: {
     optimizePackageImports: ['lucide-react'],
   },
+  async redirects() {
+    return [
+      // Canonical alias redirects — consolidate duplicate routes for SEO
+      { source: '/about',       destination: '/about-us',     permanent: true },
+      { source: '/contact',     destination: '/contact-us',   permanent: true },
+      { source: '/blood-donor', destination: '/blood-donors', permanent: true },
+      { source: '/epaper',      destination: '/e-paper',      permanent: true },
+    ];
+  },
   async headers() {
     return [
       {

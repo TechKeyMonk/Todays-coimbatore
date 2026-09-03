@@ -1,0 +1,168 @@
+﻿
+> todayscoimbatore@0.1.0 test
+> vitest run
+
+npm : [33m(!) Your Vite config uses features that are unsupported by `configLoader: 'native'`, which is planned to 
+become the default in a future major version of Vite:
+At line:1 char:1
++ npm test 2>&1 | Out-File -FilePath "test-output.txt" -Encoding utf8;  ...
++ ~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([33m(!) Your V...ersion of Vite::String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  - ESM syntax in a file loaded as CommonJS (vitest.config.ts:1:1). Use a `.mjs` extension or set `"type": "module"` 
+in the closest package.json
+Set `VITE_CONFIG_NATIVE_IGNORE_WARNING=true` to suppress this warning.[39m
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.11 [39m[90mD:/todayscoimbatore[39m
+
+[90mstdout[2m | __tests__/admin-api.test.ts
+[22m[39mΓùç injected env (7) from .env.local // tip: Γîÿ suppress logs { quiet: true }
+
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m0 ┬╖ Environment & Supabase client sanity[2m > [22mNEXT_PUBLIC_SUPABASE_URL is defined and is https[32m 2[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m0 ┬╖ Environment & Supabase client sanity[2m > [22mSUPABASE_SERVICE_ROLE_KEY is defined and longer than 20 chars[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m0 ┬╖ Environment & Supabase client sanity[2m > [22mservice-role key differs from anon key[32m 1[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m0 ┬╖ Environment & Supabase client sanity[2m > [22mcreateClient does not throw with service-role key[32m 31[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m0 ┬╖ Environment & Supabase client sanity[2m > [22mcan connect to Supabase and execute a lightweight query[32m 198[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m0 ┬╖ Environment & Supabase client sanity[2m > [22mCRON_SECRET env var is set[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m1 ┬╖ news table ΓÇö slug-based hard delete[2m > [22mhard-deletes a news row by slug[32m 107[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m1 ┬╖ news table ΓÇö slug-based hard delete[2m > [22mrow is completely absent after deletion (no soft-delete)[32m 78[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m2 ┬╖ news table ΓÇö UUID + compound .or() filter[2m > [22mhard-deletes a news row by UUID[32m 116[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m2 ┬╖ news table ΓÇö UUID + compound .or() filter[2m > [22m.or(id,slug) compound filter works (mirrors /api/articles DELETE logic)[32m 202[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m3 ┬╖ enquiries table ΓÇö CRUD operations[2m > [22mcan read back the seeded enquiry[32m 63[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m3 ┬╖ enquiries table ΓÇö CRUD operations[2m > [22mcan update the status field[32m 134[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m3 ┬╖ enquiries table ΓÇö CRUD operations[2m > [22mhard-deletes the enquiry by id[32m 118[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m3 ┬╖ enquiries table ΓÇö CRUD operations[2m > [22mbulk-deletes multiple enquiries via .like()[32m 193[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m4 ┬╖ _SYSTEM_CONFIG_% records must survive normal deletes[2m > [22mdeleting a normal row does not affect _SYSTEM_CONFIG_ rows[32m 175[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m4 ┬╖ _SYSTEM_CONFIG_% records must survive normal deletes[2m > [22mgetEnquiries() filters out _SYSTEM_CONFIG_ rows via .not() filter (mirrors supabaseAdminService)[32m 58[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m4 ┬╖ _SYSTEM_CONFIG_% records must survive normal deletes[2m > [22ma targeted _SYSTEM_CONFIG_ delete works when explicitly intended[32m 62[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m5 ┬╖ Authorization ΓÇö service-role bypasses RLS[2m > [22mservice-role can SELECT the seeded row[32m 56[2mms[22m[39m
+[90mstdout[2m | __tests__/admin-api.test.ts[2m > [22m[2m5 ┬╖ Authorization ΓÇö service-role bypasses RLS[2m > [22m[2m[AUDIT] anon SELECT: logs current RLS policy state on enquiries table
+[22m[39m[RLS Audit] enquiries ΓåÆ DISABLED / open policy | rows: 3
+
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m5 ┬╖ Authorization ΓÇö service-role bypasses RLS[2m > [22mservice-role can DELETE the seeded row[32m 113[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m5 ┬╖ Authorization ΓÇö service-role bypasses RLS[2m > [22m[AUDIT] anon SELECT: logs current RLS policy state on enquiries table[32m 76[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m6 ┬╖ Idempotency ΓÇö deleting non-existent rows is a no-op[2m > [22mdeleting a non-existent news slug returns no error[32m 66[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m6 ┬╖ Idempotency ΓÇö deleting non-existent rows is a no-op[2m > [22mdeleting a non-existent enquiry UUID returns no error[32m 53[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m6 ┬╖ Idempotency ΓÇö deleting non-existent rows is a no-op[2m > [22mdouble-delete of the same news row is safe[32m 173[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m7 ┬╖ Bulk deletion ΓÇö multiple news rows in one pass[2m > [22mbulk-deletes all seeded rows via .like() in one query[32m 120[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m8 ┬╖ Supabase admin ΓÇö row-count verification[2m > [22mcan count rows in news table[32m 59[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m8 ┬╖ Supabase admin ΓÇö row-count verification[2m > [22mcan count rows in enquiries table[32m 54[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m8 ┬╖ Supabase admin ΓÇö row-count verification[2m > [22mno orphaned __VITEST__ rows remain from this suite[32m 202[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mslugify: lowercases and hyphenates[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mslugify: strips special characters[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mslugify: collapses multiple spaces/hyphens[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mslugify: trims leading/trailing hyphens[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mslugify: empty string returns empty string[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mnormalizeUrl: strips trailing slash[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mnormalizeUrl: strips query params and hash[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mnormalizeUrl: lowercases origin+path[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mnormalizeUrl: handles empty/undefined gracefully[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mnormalizeUrl: handles non-URL strings gracefully[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mcleanTokens: filters stop words[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mcleanTokens: filters short tokens (Γëñ2 chars)[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mcalculateTitleSimilarity: identical titles score 1.0[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mcalculateTitleSimilarity: completely different titles score 0[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mcalculateTitleSimilarity: similar titles score ΓëÑ 0.5 (duplicate threshold)[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m9 ┬╖ Pure-function logic ΓÇö slugify, normalizeUrl, deduplication[2m > [22mcalculateTitleSimilarity: returns 0 when one title is empty[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m10 ┬╖ safeParseJson ΓÇö robust JSON parser from cron/fetch-news[2m > [22mparses standard JSON[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m10 ┬╖ safeParseJson ΓÇö robust JSON parser from cron/fetch-news[2m > [22mstrips markdown code fences before parsing[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m10 ┬╖ safeParseJson ΓÇö robust JSON parser from cron/fetch-news[2m > [22mhandles JSON embedded in extra text[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m10 ┬╖ safeParseJson ΓÇö robust JSON parser from cron/fetch-news[2m > [22mfalls back to regex extraction when JSON is malformed[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m10 ┬╖ safeParseJson ΓÇö robust JSON parser from cron/fetch-news[2m > [22mreturns null for empty input[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m10 ┬╖ safeParseJson ΓÇö robust JSON parser from cron/fetch-news[2m > [22mthrows for truly unparseable input[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m11 ┬╖ AI summarize ΓÇö generateFactualBullets fallback logic[2m > [22malways returns exactly 3 bullets[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m11 ┬╖ AI summarize ΓÇö generateFactualBullets fallback logic[2m > [22muses infrastructure bullet when title contains "road"[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m11 ┬╖ AI summarize ΓÇö generateFactualBullets fallback logic[2m > [22muses metro bullet when title contains "metro"[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m11 ┬╖ AI summarize ΓÇö generateFactualBullets fallback logic[2m > [22muses tech/ev bullet when title contains "tech"[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m11 ┬╖ AI summarize ΓÇö generateFactualBullets fallback logic[2m > [22muses water bullet when title contains "siruvani"[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m11 ┬╖ AI summarize ΓÇö generateFactualBullets fallback logic[2m > [22muses power/tangedco bullet when title contains "outage"[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m11 ┬╖ AI summarize ΓÇö generateFactualBullets fallback logic[2m > [22muses generic highlight when title matches nothing specific[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m11 ┬╖ AI summarize ΓÇö generateFactualBullets fallback logic[2m > [22mtruncates long titles in generic bullet to Γëñ70 chars display[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m11 ┬╖ AI summarize ΓÇö generateFactualBullets fallback logic[2m > [22msecond bullet uses excerpt when provided[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m11 ┬╖ AI summarize ΓÇö generateFactualBullets fallback logic[2m > [22msecond bullet falls back to city development text when no excerpt[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m11 ┬╖ AI summarize ΓÇö generateFactualBullets fallback logic[2m > [22mthird bullet is always progress timeline[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m12 ┬╖ Bullion price computation logic[2m > [22m22K gold is always less than 24K gold (purity ratio)[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m12 ┬╖ Bullion price computation logic[2m > [22m22K = 24K ├ù (22/24) ratio is correct[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m12 ┬╖ Bullion price computation logic[2m > [22msilver 1kg = 1000 ├ù silver per gram[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m12 ┬╖ Bullion price computation logic[2m > [22mtroy ounce constant: 1 troy oz = 31.1034768g[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m12 ┬╖ Bullion price computation logic[2m > [22mAQI categorization logic[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m12 ┬╖ Bullion price computation logic[2m > [22mweather code mapping logic[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m13 ┬╖ Poll widget ΓÇö vote accumulation & percentage logic[2m > [22m0 votes ΓåÆ 0% for both sides[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m13 ┬╖ Poll widget ΓÇö vote accumulation & percentage logic[2m > [22m100% yes votes[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m13 ┬╖ Poll widget ΓÇö vote accumulation & percentage logic[2m > [22m50/50 split[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m13 ┬╖ Poll widget ΓÇö vote accumulation & percentage logic[2m > [22myesPercent + noPercent always = 100 (when total > 0)[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m13 ┬╖ Poll widget ΓÇö vote accumulation & percentage logic[2m > [22mtotal is correct[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m14 ┬╖ Cron secret authentication logic[2m > [22mvalid bearer token grants access[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m14 ┬╖ Cron secret authentication logic[2m > [22mvalid query secret grants access[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m14 ┬╖ Cron secret authentication logic[2m > [22mwrong bearer token is rejected[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m14 ┬╖ Cron secret authentication logic[2m > [22mempty authorization is rejected[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m14 ┬╖ Cron secret authentication logic[2m > [22mcase-insensitive "Bearer " prefix stripping[32m 0[2mms[22m[39m
+ [31m├ù[39m __tests__/admin-api.test.ts[2m > [22m14 ┬╖ Cron secret authentication logic[2m > [22mbearer token with extra whitespace is handled[32m 8[2mms[22m[39m
+[31m   ΓåÆ expected true to be false // Object.is equality[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m15 ┬╖ Article read-time computation logic[2m > [22mshort content ΓåÆ 1 min[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m15 ┬╖ Article read-time computation logic[2m > [22m130 words ΓåÆ 1 min (boundary)[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m15 ┬╖ Article read-time computation logic[2m > [22m260 words ΓåÆ 2 min[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m15 ┬╖ Article read-time computation logic[2m > [22mempty content never returns 0 min (minimum is 1)[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m15 ┬╖ Article read-time computation logic[2m > [22mtitle words count toward reading time[32m 0[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m16 ┬╖ GET /api/widgets/weather ΓÇö live weather data[2m > [22mreturns success:true with Coimbatore data shape[33m 1130[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m17 ┬╖ GET /api/widgets/bullion ΓÇö metal prices[2m > [22mreturns success:true with metal prices[32m 29[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m17 ┬╖ GET /api/widgets/bullion ΓÇö metal prices[2m > [22mPOST /api/widgets/bullion updates in-memory state[32m 24[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m17 ┬╖ GET /api/widgets/bullion ΓÇö metal prices[2m > [22mPOST /api/widgets/bullion with invalid body returns 400[32m 21[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m18 ┬╖ GET+POST /api/widgets/poll ΓÇö voting mechanism[2m > [22mGET returns poll shape with percentages[32m 29[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m18 ┬╖ GET+POST /api/widgets/poll ΓÇö voting mechanism[2m > [22mPOST vote=yes increments yesVotes[32m 64[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m18 ┬╖ GET+POST /api/widgets/poll ΓÇö voting mechanism[2m > [22mPOST vote=no increments noVotes[32m 63[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m19 ┬╖ GET+POST /api/widgets/traffic ΓÇö alerts mechanism[2m > [22mGET returns success with alerts array[32m 24[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m19 ┬╖ GET+POST /api/widgets/traffic ΓÇö alerts mechanism[2m > [22mPOST with alerts array updates state[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m19 ┬╖ GET+POST /api/widgets/traffic ΓÇö alerts mechanism[2m > [22mPOST with invalid body returns 400[32m 24[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m20 ┬╖ GET /api/ads ΓÇö ad delivery engine[2m > [22mGET returns a valid ad response shape[32m 35[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m20 ┬╖ GET /api/ads ΓÇö ad delivery engine[2m > [22mGET with ?all=true returns campaigns list[32m 21[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m20 ┬╖ GET /api/ads ΓÇö ad delivery engine[2m > [22mPOST /api/ads returns 400 when advertiserName is missing[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m21 ┬╖ POST /api/contact ΓÇö contact form[2m > [22mreturns 200 + success:true for valid payload[33m 3449[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m21 ┬╖ POST /api/contact ΓÇö contact form[2m > [22mroutes feedback subject to sendFeedbackAlert (correct service_requested prefix)[33m 3643[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m21 ┬╖ POST /api/contact ΓÇö contact form[2m > [22mreturns 400 when name/email/message missing[32m 22[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m22 ┬╖ POST /api/feedback ΓÇö reader feedback[2m > [22mreturns 200 + success:true for valid payload[33m 669[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m22 ┬╖ POST /api/feedback ΓÇö reader feedback[2m > [22mreturns 400 for missing required fields[32m 22[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m23 ┬╖ DELETE /api/articles ΓÇö news deletion via HTTP API[2m > [22mDELETE ?id=<slug> returns { success: true, deletedId }[32m 96[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m23 ┬╖ DELETE /api/articles ΓÇö news deletion via HTTP API[2m > [22mnews row is absent in Supabase after DELETE[32m 61[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m23 ┬╖ DELETE /api/articles ΓÇö news deletion via HTTP API[2m > [22mDELETE without id returns 400[32m 27[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m24 ┬╖ GET /api/articles ΓÇö article listing[2m > [22mreturns a JSON array[32m 21[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m24 ┬╖ GET /api/articles ΓÇö article listing[2m > [22maccepts ?category=NEWS filter without error[32m 22[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m25 ┬╖ POST /api/ads ΓÇö ad inquiry end-to-end[2m > [22mreturns 200 + success:true with valid payload[33m 651[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m25 ┬╖ POST /api/ads ΓÇö ad inquiry end-to-end[2m > [22mreturns 400 when advertiserName or email is missing[32m 20[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m26 ┬╖ POST /api/ai/summarize ΓÇö AI summary fallback[2m > [22mreturns success:true with ΓëÑ 2 bullet points[33m 3091[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m26 ┬╖ POST /api/ai/summarize ΓÇö AI summary fallback[2m > [22mreturns 400 when all three fields are missing[32m 26[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m27 ┬╖ GET /api/cron/fetch-news ΓÇö authorization gate[2m > [22mreturns 401 without authorization[32m 23[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m27 ┬╖ GET /api/cron/fetch-news ΓÇö authorization gate[2m > [22mreturns 401 with wrong bearer token[32m 20[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m27 ┬╖ GET /api/cron/fetch-news ΓÇö authorization gate[2m > [22maccepts valid bearer token and returns 200 or 502 (network-dependent)[33m 781[2mms[22m[39m
+ [32mΓ£ô[39m __tests__/admin-api.test.ts[2m > [22m27 ┬╖ GET /api/cron/fetch-news ΓÇö authorization gate[2m > [22maccepts valid ?secret= query param[33m 598[2mms[22m[39m
+
+[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m[1m[41m Failed Tests 1 [49m[22m[31mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[39m
+
+[41m[1m FAIL [22m[49m __tests__/admin-api.test.ts[2m > [22m14 ┬╖ Cron secret authentication logic[2m > 
+[22mbearer token with extra whitespace is handled
+[31m[1mAssertionError[22m: expected true to be false // Object.is equality[39m
+
+[32m- Expected[39m
+[31m+ Received[39m
+
+[32m- false[39m
+[31m+ true[39m
+
+[36m [2mΓ¥»[22m __tests__/admin-api.test.ts:[2m886:61[22m[39m
+    [90m884|[39m
+    [90m885|[39m   [34mit[39m([32m'bearer token with extra whitespace is handled'[39m[33m,[39m () [33m=>[39m 
+{
+    [90m886|[39m     expect(isAuthorized(`Bearer   ${CRON_SECRET_VAL}`, '')).toBe(falseΓÇª
+    [90m   |[39m                                                             [31m^[39m
+    [90m887|[39m   })[33m;[39m
+    [90m888|[39m })[33m;[39m
+
+[31m[2mΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/1]ΓÄ»[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m112 passed[39m[22m[90m (113)[39m
+[2m   Start at [22m 11:54:01
+[2m   Duration [22m 18.98s[2m (transform 101ms, setup 50ms, import 184ms, tests 18.55s, environment 0ms)[22m
+

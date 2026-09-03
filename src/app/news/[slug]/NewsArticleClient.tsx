@@ -232,12 +232,6 @@ export default function NewsArticleClient({ slug }: NewsArticleClientProps) {
               <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-stone-900 dark:text-white leading-tight">
                 {article.title}
               </h1>
-
-              {article.excerpt && (
-                <p className="text-sm sm:text-base text-stone-600 dark:text-gray-300 font-medium leading-relaxed">
-                  {article.excerpt}
-                </p>
-              )}
             </div>
 
             {/* Audio Voice Reader & AI Summarizer */}
@@ -304,7 +298,7 @@ export default function NewsArticleClient({ slug }: NewsArticleClientProps) {
                       <div className="space-y-2">
                         <div className="h-28 rounded-lg overflow-hidden bg-stone-900">
                           <img
-                            src={rel.imageUrl || articleImageUrl}
+                            src={rel.imageUrl || articleImageUrl || 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=600&q=80'}
                             alt={rel.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                           />

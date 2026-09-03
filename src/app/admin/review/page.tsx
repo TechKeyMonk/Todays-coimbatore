@@ -2,22 +2,22 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import {
   ArrowLeft,
   RefreshCw,
   CheckCircle2,
   Trash2,
-  Edit3,
   ExternalLink,
   Clock,
   Sparkles,
   AlertCircle,
   X,
   FileText,
-  Tag,
-  Check,
   Search,
+  Copy,
+  Check,
+  Eye,
+  Send,
 } from 'lucide-react';
 import dbService, { Article, formatRelativeTime } from '../../../services/db';
 
@@ -29,6 +29,8 @@ const VALID_CATEGORIES = [
   'Education',
   'Tech',
   'Business',
+  'Infrastructure',
+  'TNEB',
 ] as const;
 
 interface ToastMessage {
@@ -43,23 +45,17 @@ export default function AdminReviewPage() {
   const [isFetchingRss, setIsFetchingRss] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
-  const [editingDraft, setEditingDraft] = useState<Article | null>(null);
+  const [viewingDraft, setViewingDraft] = useState<Article | null>(null);
   const [isProcessingId, setIsProcessingId] = useState<string | null>(null);
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
-
-  // Form state for editing modal
-  const [editTitle, setEditTitle] = useState('');
-  const [editCategory, setEditCategory] = useState('News');
-  const [editAuthor, setEditAuthor] = useState('Editorial Bureau');
-  const [editContent, setEditContent] = useState('');
-  const [editExcerpt, setEditExcerpt] = useState('');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const addToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     setToasts((prev) => [...prev, { id, type, text }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 4500);
+    }, 4000);
   };
 
   const removeToast = (id: string) => {
@@ -71,7 +67,7 @@ export default function AdminReviewPage() {
     setIsLoading(true);
     try {
       const items = await dbService.getDraftArticles();
-      setDrafts(items);
+      setDrafts(items || []);
     } catch (err) {
       console.error('Failed to load drafts:', err);
       addToast('Failed to fetch pending drafts from database.', 'error');
@@ -124,31 +120,9 @@ export default function AdminReviewPage() {
     }
   };
 
-  // 3. Approve and Publish Draft
-  const handleApprove = async (draft: Article) => {
-    setIsProcessingId(draft.id);
-    try {
-      const ok = await dbService.approveArticle(draft.id);
-      if (ok) {
-        setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
-        addToast(`✓ Published "${draft.title.slice(0, 45)}..." live to website!`, 'success');
-        if (editingDraft?.id === draft.id) {
-          setEditingDraft(null);
-        }
-      } else {
-        throw new Error('Approval request failed');
-      }
-    } catch (err: any) {
-      console.error('Approval error:', err);
-      addToast(`Failed to approve article: ${err.message}`, 'error');
-    } finally {
-      setIsProcessingId(null);
-    }
-  };
-
-  // 4. Reject and Delete Draft
-  const handleReject = async (draft: Article) => {
-    if (!window.confirm(`Are you sure you want to reject and permanently delete:\n"${draft.title}"?`)) {
+  // 3. Reject / Dismiss and Delete Draft
+  const handleDismissDraft = async (draft: Article) => {
+    if (!window.confirm(`Are you sure you want to dismiss and delete this draft:\n"${draft.title}"?`)) {
       return;
     }
 
@@ -157,56 +131,85 @@ export default function AdminReviewPage() {
       const ok = await dbService.deleteArticle(draft.id);
       if (ok) {
         setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
-        addToast(`Draft deleted successfully.`, 'info');
-        if (editingDraft?.id === draft.id) {
-          setEditingDraft(null);
+        addToast(`Draft dismissed successfully.`, 'info');
+        if (viewingDraft?.id === draft.id) {
+          setViewingDraft(null);
         }
       } else {
         throw new Error('Deletion failed');
       }
     } catch (err: any) {
       console.error('Delete error:', err);
-      addToast(`Failed to delete draft: ${err.message}`, 'error');
+      addToast(`Failed to dismiss draft: ${err.message}`, 'error');
     } finally {
       setIsProcessingId(null);
     }
   };
 
-  // 5. Open Edit Modal
-  const openEditModal = (draft: Article) => {
-    setEditingDraft(draft);
-    setEditTitle(draft.title);
-    setEditCategory(draft.category || 'News');
-    setEditAuthor(draft.author || 'Editorial Bureau');
-    setEditContent(draft.content || '');
-    setEditExcerpt(draft.excerpt || '');
+  // Robust Cross-Browser Clipboard Helper
+  const copyToClipboardSafe = async (text: string): Promise<boolean> => {
+    try {
+      if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch (e) {}
+
+    try {
+      if (typeof document !== 'undefined') {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        textarea.style.top = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        const success = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        return success;
+      }
+    } catch (e) {}
+    return false;
   };
 
-  // 6. Save Edits (stays in draft)
-  const handleSaveDraftEdits = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingDraft) return;
+  // 4. Copy Draft Text to Clipboard
+  const handleCopyDraft = async (draft: Article, e?: React.MouseEvent) => {
+    if (e) {
+      e.stopPropagation();
+    }
+    const formattedText = `TITLE:
+${draft.title}
 
-    setIsProcessingId(editingDraft.id);
-    try {
-      const updated = await dbService.updateArticle(editingDraft.id, {
-        title: editTitle.trim(),
-        category: editCategory,
-        author: editAuthor.trim(),
-        content: editContent.trim(),
-        excerpt: editExcerpt.trim() || editContent.slice(0, 180).trim(),
-      });
+CATEGORY:
+${draft.category || 'NEWS'}
 
-      setDrafts((prev) =>
-        prev.map((d) => (d.id === editingDraft.id ? { ...d, ...updated } : d))
-      );
-      addToast('✓ Draft changes saved.', 'success');
-      setEditingDraft(null);
-    } catch (err: any) {
-      console.error('Save error:', err);
-      addToast(`Failed to save edits: ${err.message}`, 'error');
-    } finally {
-      setIsProcessingId(null);
+EXCERPT:
+${draft.excerpt || draft.content?.slice(0, 180) || ''}
+
+FULL CONTENT:
+${draft.content || ''}
+
+SOURCE:
+${draft.sourceUrl || 'External RSS'}`;
+
+    const ok = await copyToClipboardSafe(formattedText);
+    if (ok) {
+      setCopiedId(draft.id);
+      addToast(`✓ Copied full draft for "${draft.title.slice(0, 35)}..." to clipboard!`, 'success');
+      setTimeout(() => setCopiedId(null), 2500);
+    } else {
+      addToast('Failed to copy to clipboard. Please select and copy manually.', 'error');
+    }
+  };
+
+  // 5. Copy Single Field
+  const handleCopyField = async (text: string, label: string) => {
+    const ok = await copyToClipboardSafe(text);
+    if (ok) {
+      addToast(`✓ Copied ${label} to clipboard!`, 'success');
+    } else {
+      addToast(`Failed to copy ${label}.`, 'error');
     }
   };
 
@@ -273,12 +276,12 @@ export default function AdminReviewPage() {
             </Link>
             <span className="text-stone-300 dark:text-slate-700">/</span>
             <div className="flex items-center gap-2 min-w-0">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
               <h1 className="text-sm sm:text-base font-black text-stone-900 dark:text-white truncate">
-                AI Draft Review Portal
+                AI Draft Review &amp; Copy Assistant
               </h1>
               <span className="bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-300 dark:border-amber-800">
-                {drafts.length} PENDING
+                {drafts.length} DRAFTS READY
               </span>
             </div>
           </div>
@@ -292,7 +295,7 @@ export default function AdminReviewPage() {
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isFetchingRss ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">
-                {isFetchingRss ? 'Ingesting RSS...' : 'Fetch Latest RSS Now'}
+                {isFetchingRss ? 'Ingesting RSS...' : 'Fetch Latest RSS'}
               </span>
               <span className="sm:hidden">{isFetchingRss ? 'Ingesting...' : 'Fetch RSS'}</span>
             </button>
@@ -302,24 +305,23 @@ export default function AdminReviewPage() {
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Banner Explaining Policy */}
+        {/* Banner Explaining Copy-to-Publish Workflow */}
         <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2.5">
             <Sparkles className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
             <div>
               <span className="font-black uppercase tracking-wider block sm:inline mr-2">
-                Strict Draft-First Safeguard Active:
+                Copy &amp; Manual Verification Workflow:
               </span>
               <span className="text-stone-700 dark:text-stone-300">
-                Incoming AI-rewritten articles are isolated in <strong>draft mode</strong>. They will
-                never appear on public feeds until you review and click <strong>Approve & Publish</strong>.
+                AI extracts and translates Coimbatore reports into structured English text. Review drafts below, click <strong>&quot;Copy Draft&quot;</strong>, and paste into the respective manual creation forms in <Link href="/admin" className="underline font-bold text-red-600">Admin CMS</Link> with your custom image attachments.
               </span>
             </div>
           </div>
           <button
             type="button"
             onClick={loadDrafts}
-            className="text-[11px] font-black uppercase text-amber-700 dark:text-amber-300 hover:underline shrink-0"
+            className="text-[11px] font-black uppercase text-amber-700 dark:text-amber-300 hover:underline shrink-0 cursor-pointer"
           >
             ↻ Refresh Queue
           </button>
@@ -347,13 +349,13 @@ export default function AdminReviewPage() {
 
           {/* Search Input */}
           <div className="relative w-full md:w-72">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search headline or content..."
-              className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 text-xs text-stone-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-600"
+              className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 text-xs text-stone-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-600 font-bold"
             />
           </div>
         </div>
@@ -376,8 +378,8 @@ export default function AdminReviewPage() {
                 Queue is Clear! Zero Pending Drafts
               </h3>
               <p className="text-xs text-stone-500 dark:text-gray-400 max-w-md mx-auto leading-relaxed">
-                No articles are currently awaiting review. Click &quot;Fetch Latest RSS Now&quot; to ingest the
-                latest Coimbatore stories from Google News in real time.
+                No articles are currently awaiting review. Click &quot;Fetch Latest RSS&quot; to ingest the
+                latest Coimbatore stories from verified feeds.
               </p>
             </div>
             <button
@@ -394,6 +396,7 @@ export default function AdminReviewPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredDrafts.map((draft) => {
               const isProcessing = isProcessingId === draft.id;
+              const isCopied = copiedId === draft.id;
               const sourceDomain = draft.sourceUrl
                 ? (() => {
                     try {
@@ -450,36 +453,39 @@ export default function AdminReviewPage() {
                     )}
                   </div>
 
-                  {/* Actions Bar */}
+                  {/* Actions Bar: View Content, Copy Draft, Dismiss */}
                   <div className="p-3 bg-stone-50 dark:bg-slate-800/50 border-t border-stone-100 dark:border-slate-800 flex items-center justify-between gap-2">
                     <button
                       type="button"
-                      onClick={() => openEditModal(draft)}
-                      disabled={isProcessing}
+                      onClick={() => setViewingDraft(draft)}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-stone-700 dark:text-gray-300 hover:bg-stone-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                     >
-                      <Edit3 className="w-3.5 h-3.5" />
-                      <span>Review</span>
+                      <Eye className="w-3.5 h-3.5" />
+                      <span>View Content</span>
                     </button>
 
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => handleReject(draft)}
+                        onClick={() => handleDismissDraft(draft)}
                         disabled={isProcessing}
-                        title="Reject & Delete draft"
+                        title="Dismiss & Delete draft"
                         className="p-1.5 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
+
                       <button
                         type="button"
-                        onClick={() => handleApprove(draft)}
-                        disabled={isProcessing}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black uppercase tracking-wider shadow-2xs transition-all disabled:opacity-50 cursor-pointer"
+                        onClick={(e) => handleCopyDraft(draft, e)}
+                        className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs ${
+                          isCopied
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-stone-900 hover:bg-black dark:bg-red-600 dark:hover:bg-red-700 text-white'
+                        }`}
                       >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Publish</span>
+                        {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{isCopied ? 'Copied!' : 'Copy Draft'}</span>
                       </button>
                     </div>
                   </div>
@@ -490,147 +496,159 @@ export default function AdminReviewPage() {
         )}
       </main>
 
-      {/* Review & Edit Full Modal */}
-      {editingDraft && (
+      {/* View & Copy Full Content Modal */}
+      {viewingDraft && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-3xl rounded-2xl bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 shadow-2xl overflow-hidden my-8">
+          <div className="w-full max-w-3xl rounded-3xl bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 shadow-2xl overflow-hidden my-8">
             {/* Modal Header */}
             <div className="px-6 py-4 border-b border-stone-200 dark:border-slate-800 flex items-center justify-between bg-stone-50/50 dark:bg-slate-800/40">
               <div className="flex items-center gap-2 min-w-0">
                 <FileText className="w-5 h-5 text-red-600 shrink-0" />
                 <h3 className="text-sm sm:text-base font-black text-stone-900 dark:text-white truncate">
-                  Review &amp; Edit Ingested News Draft
+                  AI Draft Inspector &amp; Content Exporter
                 </h3>
               </div>
               <button
                 type="button"
-                onClick={() => setEditingDraft(null)}
-                className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200"
+                onClick={() => setViewingDraft(null)}
+                className="text-stone-400 hover:text-stone-700 dark:hover:text-stone-200 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Modal Form Body */}
-            <form onSubmit={handleSaveDraftEdits} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
-              {/* Title */}
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase tracking-wider text-stone-600 dark:text-gray-300">
-                  Article Headline (English)
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 text-sm font-bold text-stone-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-600"
-                />
+            {/* Modal Content Body */}
+            <div className="p-6 space-y-5 max-h-[70vh] overflow-y-auto text-xs">
+              {/* Headline */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-black uppercase tracking-wider text-stone-600 dark:text-gray-300">
+                    Headline
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyField(viewingDraft.title, 'Headline')}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>Copy Title</span>
+                  </button>
+                </div>
+                <div className="p-3 rounded-xl bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 text-sm font-bold text-stone-900 dark:text-white break-words">
+                  {viewingDraft.title}
+                </div>
               </div>
 
-              {/* Category and Author Desk */}
+              {/* Meta information */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-black uppercase tracking-wider text-stone-600 dark:text-gray-300">
-                    Category Desk
+                  <label className="font-black uppercase tracking-wider text-stone-600 dark:text-gray-300">
+                    Suggested Category
                   </label>
-                  <select
-                    value={editCategory}
-                    onChange={(e) => setEditCategory(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 text-xs font-bold text-stone-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-600"
-                  >
-                    {VALID_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="p-2.5 rounded-xl bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 font-bold text-stone-900 dark:text-white">
+                    {viewingDraft.category || 'News'}
+                  </div>
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-xs font-black uppercase tracking-wider text-stone-600 dark:text-gray-300">
-                    Byline / Author Desk
+                  <label className="font-black uppercase tracking-wider text-stone-600 dark:text-gray-300">
+                    Suggested Desk / Byline
                   </label>
-                  <input
-                    type="text"
-                    value={editAuthor}
-                    onChange={(e) => setEditAuthor(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 text-xs font-bold text-stone-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-600"
-                  />
+                  <div className="p-2.5 rounded-xl bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 font-bold text-stone-900 dark:text-white">
+                    {viewingDraft.author || 'Editorial Bureau'}
+                  </div>
                 </div>
               </div>
 
               {/* Excerpt */}
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase tracking-wider text-stone-600 dark:text-gray-300">
-                  Summary / Excerpt
-                </label>
-                <textarea
-                  rows={2}
-                  value={editExcerpt}
-                  onChange={(e) => setEditExcerpt(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 text-xs text-stone-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-600 leading-relaxed"
-                />
-              </div>
+              {viewingDraft.excerpt && (
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="font-black uppercase tracking-wider text-stone-600 dark:text-gray-300">
+                      Summary / Excerpt
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyField(viewingDraft.excerpt || '', 'Excerpt')}
+                      className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
+                    >
+                      <Copy className="w-3 h-3" />
+                      <span>Copy Excerpt</span>
+                    </button>
+                  </div>
+                  <div className="p-3 rounded-xl bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 text-stone-800 dark:text-gray-200 leading-relaxed break-words">
+                    {viewingDraft.excerpt}
+                  </div>
+                </div>
+              )}
 
-              {/* Content */}
-              <div className="space-y-1">
-                <label className="text-xs font-black uppercase tracking-wider text-stone-600 dark:text-gray-300">
-                  Full Story Body (English Editorial Text)
-                </label>
-                <textarea
-                  rows={8}
-                  required
-                  value={editContent}
-                  onChange={(e) => setEditContent(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 text-xs sm:text-sm text-stone-900 dark:text-white focus:outline-hidden focus:ring-2 focus:ring-red-600 leading-relaxed font-normal"
-                />
+              {/* Full Content */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="font-black uppercase tracking-wider text-stone-600 dark:text-gray-300">
+                    Full Article Content
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => handleCopyField(viewingDraft.content || '', 'Content Body')}
+                    className="inline-flex items-center gap-1 text-[11px] font-bold text-red-600 hover:underline cursor-pointer"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>Copy Content Body</span>
+                  </button>
+                </div>
+                <div className="p-4 rounded-xl bg-stone-50 dark:bg-slate-800 border border-stone-200 dark:border-slate-700 text-stone-900 dark:text-white whitespace-pre-wrap leading-relaxed font-normal text-xs sm:text-sm max-h-60 overflow-y-auto">
+                  {viewingDraft.content || 'No detailed content body available.'}
+                </div>
               </div>
 
               {/* Original Source Reference */}
-              {editingDraft.sourceUrl && (
-                <div className="p-3 rounded-xl bg-stone-100 dark:bg-slate-800/60 text-xs text-stone-500 dark:text-gray-400 flex items-center justify-between gap-3">
-                  <span className="truncate">Original: {editingDraft.sourceUrl}</span>
+              {viewingDraft.sourceUrl && (
+                <div className="p-3 rounded-xl bg-stone-100 dark:bg-slate-800/60 text-stone-500 dark:text-gray-400 flex items-center justify-between gap-3">
+                  <span className="truncate">Source URL: {viewingDraft.sourceUrl}</span>
                   <a
-                    href={editingDraft.sourceUrl}
+                    href={viewingDraft.sourceUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-red-600 dark:text-red-400 font-bold hover:underline shrink-0 inline-flex items-center gap-1"
                   >
-                    <span>View Article</span>
+                    <span>Open Original</span>
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
               )}
+            </div>
 
-              {/* Modal Footer Actions */}
-              <div className="pt-4 border-t border-stone-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+            {/* Modal Footer Actions */}
+            <div className="p-5 bg-stone-50 dark:bg-slate-800/40 border-t border-stone-200 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+              <button
+                type="button"
+                onClick={() => handleDismissDraft(viewingDraft)}
+                className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Dismiss Draft</span>
+              </button>
+
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/admin"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-300 dark:border-slate-700 hover:bg-stone-100 dark:hover:bg-slate-800 text-xs font-bold text-stone-700 dark:text-gray-200 transition-colors"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Go to Admin Publishing</span>
+                </Link>
+
                 <button
                   type="button"
-                  onClick={() => handleReject(editingDraft)}
-                  className="inline-flex items-center gap-1 px-4 py-2 rounded-xl text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
+                  onClick={() => handleCopyDraft(viewingDraft)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider shadow-md transition-all cursor-pointer"
                 >
-                  <Trash2 className="w-4 h-4" />
-                  <span>Reject &amp; Delete</span>
+                  <Copy className="w-4 h-4" />
+                  <span>Copy Full Structured Draft</span>
                 </button>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="submit"
-                    className="px-4 py-2 rounded-xl border border-stone-300 dark:border-slate-700 hover:bg-stone-100 dark:hover:bg-slate-800 text-xs font-bold text-stone-700 dark:text-gray-200 transition-colors cursor-pointer"
-                  >
-                    Save Draft Edits
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleApprove(editingDraft)}
-                    className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase tracking-wider shadow-xs transition-all cursor-pointer"
-                  >
-                    <Check className="w-4 h-4" />
-                    <span>Approve &amp; Publish Live</span>
-                  </button>
-                </div>
               </div>
-            </form>
+            </div>
           </div>
         </div>
       )}

@@ -19,6 +19,7 @@ import {
   X,
   Building2,
 } from 'lucide-react';
+import AdSlider from '../AdSlider';
 
 declare global {
   interface Window {
@@ -51,7 +52,7 @@ export interface PopupStory {
   title: string;
   category: string;
   tag: string;
-  readTime: string;
+  timeAgo?: string;
   imageUrl?: string;
   videoUrl?: string;
   excerpt?: string;
@@ -166,9 +167,11 @@ function SubMenuDropdown({
 
             <div className="flex-1 min-w-0 space-y-1.5 py-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider">
-                  {activeStory.readTime}
-                </span>
+                {activeStory.timeAgo && (
+                  <span className="text-[10px] font-extrabold text-red-600 dark:text-red-400 uppercase tracking-wider">
+                    {activeStory.timeAgo}
+                  </span>
+                )}
                 {!activeStory.imageUrl && (
                   <span className="bg-stone-200 dark:bg-slate-700 text-stone-700 dark:text-stone-300 text-[9px] font-black px-2 py-0.5 rounded uppercase">
                     {activeStory.tag}
@@ -485,7 +488,7 @@ export default function DynamicHeader() {
         title: a.title,
         category: a.category || catId.toUpperCase(),
         tag: a.subCategory || (a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : 'LATEST'),
-        readTime: a.readTime || (a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '3 min read'),
+        timeAgo: a.publishedAt ? new Date(a.publishedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : 'Live Story',
         imageUrl: cleanImg,
         videoUrl: a.videoUrl,
         excerpt: a.excerpt || a.content?.slice(0, 100),
@@ -548,52 +551,7 @@ export default function DynamicHeader() {
       <div id="google_translate_element" style={{ display: 'none' }} className="hidden" />
 
       {/* 1. TOP_HEADER_LEADERBOARD PROMINENT BANNER (ABSOLUTE TOP OF SITE) */}
-      {topLeaderboardAd && topLeaderboardAd.active !== false && (
-        <div className="w-full bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 py-2 px-2 md:px-4 lg:px-6">
-          <div className="w-full max-w-[1400px] mx-auto min-h-[90px] md:min-h-[130px] max-h-[160px] flex items-center justify-between relative overflow-hidden rounded-xl border border-stone-200 dark:border-slate-800 bg-stone-950 shadow-xs group">
-            <a
-              href={topLeaderboardAd.linkUrl || topLeaderboardAd.ctaUrl || 'https://todayscoimbatore.com'}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="block w-full h-full relative"
-            >
-              {/* Dynamic Banner Image */}
-              <img
-                src={topLeaderboardAd.imageUrl || topLeaderboardAd.bannerUrl || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1400&q=80'}
-                alt={topLeaderboardAd.title || 'TIDEL Park Coimbatore'}
-                className="w-full h-28 sm:h-32 md:h-36 max-h-[160px] object-cover group-hover:scale-105 transition-transform duration-500 block"
-              />
-
-              {/* High Contrast Gradient Overlay with Title, Description, and CTA */}
-              <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-black/95 via-black/65 to-black/35 flex items-center justify-between p-3.5 sm:p-4 md:px-6 text-white">
-                <div className="max-w-2xl space-y-0.5 min-w-0 pr-3">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="bg-red-600 text-white text-[9px] md:text-[10px] font-black px-2 py-0.5 rounded tracking-wide uppercase shadow-xs shrink-0">
-                      {topLeaderboardAd.advertiser || 'SPONSORED'}
-                    </span>
-                    <span className="text-[10px] font-bold text-white/80 uppercase truncate hidden sm:inline">
-                      Coimbatore Tech Corridor
-                    </span>
-                  </div>
-                  <h3 className="text-xs sm:text-sm md:text-lg font-black text-white leading-tight drop-shadow-sm truncate md:whitespace-normal line-clamp-1 md:line-clamp-2">
-                    {topLeaderboardAd.title || 'TIDEL Park Coimbatore Phase-2 Office Suites Open for Booking'}
-                  </h3>
-                  <p className="text-[11px] md:text-xs text-stone-200 font-medium line-clamp-1 leading-normal hidden md:block">
-                    {topLeaderboardAd.description || 'Grade-A tech park infrastructure along Avinashi Road with 100% power backup and direct metro access.'}
-                  </p>
-                </div>
-
-                <div className="shrink-0">
-                  <span className="inline-flex items-center gap-1 sm:gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg sm:rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] sm:text-xs md:text-sm uppercase tracking-wide shadow-md transition-all whitespace-nowrap">
-                    <span>{topLeaderboardAd.ctaText || 'Explore Floor Plans'}</span>
-                    <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                  </span>
-                </div>
-              </div>
-            </a>
-          </div>
-        </div>
-      )}
+      <AdSlider ad={topLeaderboardAd} variant="header" />
 
       {/* 2. RED LIVE ALERT BANNER WITH DYNAMIC SHUTDOWN TICKER & HOVER-PAUSE */}
       <div className="w-full bg-red-600 text-white text-xs font-bold py-1.5 px-2 md:px-4 lg:px-6 flex items-center justify-between gap-3 select-none overflow-hidden relative">

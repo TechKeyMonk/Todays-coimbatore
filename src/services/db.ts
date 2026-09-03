@@ -6,7 +6,7 @@ export interface Article {
   subCategory: string;
   subTag?: string;
   author: string;
-  readTime: string;
+  readTime?: string;
   publishedAt: string;
   createdAt: string; // ISO 8601 string for created_at DESC sorting
   updatedAt?: string; // ISO 8601 string for updated_at
@@ -122,22 +122,37 @@ export interface OutageRecord {
 export interface AdSlotRecord {
   id: string;
   slotId: string;
-  placementKey?: 'TOP_HEADER_LEADERBOARD' | 'HOME_IN_FEED_1' | 'HOME_IN_FEED_2' | 'RIGHT_SIDEBAR_TOP' | 'RIGHT_SIDEBAR_BOTTOM' | 'ARTICLE_DETAIL_BOTTOM' | string;
+  placementKey?:
+    | 'TOP_HEADER_LEADERBOARD'
+    | 'HOME_IN_FEED_1'
+    | 'HOME_IN_FEED_2'
+    | 'LEFT_SIDEBAR_BANNER'
+    | 'RIGHT_SIDEBAR_BANNER'
+    | 'RIGHT_SIDEBAR_TOP'
+    | 'RIGHT_SIDEBAR_BOTTOM'
+    | 'ARTICLE_DETAIL_BOTTOM'
+    | 'left_sidebar'
+    | 'right_sidebar'
+    | 'top_banner'
+    | 'in_article'
+    | string;
   format: string;
-  title: string;
-  description?: string;
-  advertiser: string;
-  imageUrl?: string;
-  bannerUrl?: string;
-  linkUrl?: string;
-  ctaUrl?: string;
-  ctaText?: string;
   impressions: string;
   ctr: string;
   active: boolean;
-  startDate: string;
-  endDate: string;
-  fallbackAdSense: boolean;
+  startDate?: string;
+  endDate?: string;
+  fallbackAdSense?: boolean;
+  slides: AdSlide[];
+}
+
+export interface AdSlide {
+  id: string;
+  title: string;
+  advertiser: string;
+  description?: string;
+  imageUrl: string;
+  active: boolean;
 }
 
 export interface BloodDonorRecord {
@@ -251,367 +266,7 @@ export const INITIAL_CONTACT_ENQUIRIES_DB: ContactEnquiryRecord[] = [
   },
 ];
 
-export const INITIAL_DATABASE_ARTICLES: Article[] = [
-  {
-    id: 'art-race-course-1',
-    slug: 'race-course-walkers-botanical-boulevard-smart-lighting',
-    title: 'Race Course Walker’s Botanical Boulevard Upgraded with Sensor-Driven Smart Solar Illumination',
-    category: 'NEWS',
-    subCategory: 'Smart City',
-    author: 'Urban Civic Desk',
-    readTime: '3 min',
-    publishedAt: '10 mins ago',
-    createdAt: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
-    isExclusive: false,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=800&q=80',
-    videoTitle: 'Race Course Night View: Smart Solar Lighting Live',
-    videoDuration: '01:50',
-    excerpt: 'CCMC installs 120 motion-sensing LED pillars, emergency SOS kiosks, and heritage fountains across the iconic 2.5 km running loop.',
-    content: 'Coimbatore City Municipal Corporation completes the smart botanical promenade modernization along Race Course Road, featuring intelligent solar-powered night lighting, dedicated pedestrian hydration stations, and continuous CCTV surveillance.',
-    highlightStat: '120 Smart Solar Pillars',
-    commentsCount: 52,
-  },
-  {
-    id: 'art-hero-1',
-    slug: 'the-quiet-revolution-in-covais-ev-corridor',
-    title: 'The Quiet Revolution in Covai’s EV Corridor: How 400+ Local MSMEs Power India’s Electric Transition',
-    category: 'TECH',
-    subCategory: 'EV Mobility',
-    author: 'Covai Urban Bureau',
-    readTime: '5 min',
-    publishedAt: '18 mins ago',
-    createdAt: new Date(Date.now() - 18 * 60 * 1000).toISOString(),
-    isExclusive: true,
-    status: 'published',
-    mediaType: 'video',
-    imageUrl: 'https://images.unsplash.com/photo-1558441719-8b489c634a10?auto=format&fit=crop&w=800&q=80',
-    videoUrl: 'https://www.youtube.com/watch?v=8V-2Z0m2c0s',
-    videoTitle: 'Coimbatore EV Component Park & Cleanroom Walkthrough',
-    videoDuration: '03:20',
-    excerpt: 'From precision motor stator windings in Peelamedu to smart battery thermal management modules in Sulur, Coimbatore’s deep-rooted precision engineering heritage is quietly positioning the city as India’s premier electric mobility hub.',
-    content: 'Coimbatore MSMEs have successfully pivoted towards electric vehicle components with over 400 specialized manufacturing facilities supplying to major automotive OEMs across India.',
-    highlightStat: '400+ EV MSMEs',
-    commentsCount: 64,
-  },
-  {
-    id: 'art-top-1',
-    slug: 'avinashi-road-elevated-flyover-milestone',
-    title: 'Avinashi Road 10.1 km Elevated Flyover Crosses 80% Milestone: Final Spans Launched',
-    category: 'NEWS',
-    subCategory: 'Trending Now',
-    author: 'Infra Bureau',
-    readTime: '3 min',
-    publishedAt: '25 mins ago',
-    createdAt: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
-    isExclusive: false,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1545459720-aac8509eb02c?auto=format&fit=crop&w=800&q=80',
-    videoUrl: 'https://www.youtube.com/watch?v=8V-2Z0m2c0s',
-    videoTitle: 'Avinashi Road Elevated Corridor Drone Fly-Through',
-    videoDuration: '02:15',
-    excerpt: 'With 284 out of 306 spans successfully launched, the corridor from Uppilipalayam to Goldwins enters its final surfacing phase.',
-    content: 'State highways engineers confirm completion of 80% deck construction along the 10.1 km elevated expressway.',
-    highlightStat: '80% Deck Complete',
-    commentsCount: 38,
-  },
-  {
-    id: 'art-top-2',
-    slug: 'siruvani-reservoir-storage-summer-water',
-    title: 'Siruvani Reservoir Storage at 45.4 ft: Summer Water Rationing Prevented',
-    category: 'OUR CITY',
-    subCategory: 'Civic Watch',
-    author: 'Water Resources Desk',
-    readTime: '3 min',
-    publishedAt: '35 mins ago',
-    createdAt: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
-    isExclusive: false,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
-    videoTitle: 'Siruvani Reservoir Water Level & Supply Inspection',
-    videoDuration: '01:45',
-    excerpt: 'Full supply capacity of 86 MLD maintained for West and Central zones as Pilloor-III distribution testing wraps up.',
-    content: 'Coimbatore City Municipal Corporation confirms uninterrupted drinking water supply following robust seasonal storage levels.',
-    highlightStat: '45.4 ft Storage',
-    commentsCount: 22,
-  },
-  {
-    id: 'art-top-3',
-    slug: 'codissia-intec-2026-automation-robotics',
-    title: 'CODISSIA Intec 2026: 450+ Global Automation & Robotics Exhibitors Finalize Arena',
-    category: 'BUSINESS',
-    subCategory: 'Industry Watch',
-    author: 'Industrial Bureau',
-    readTime: '4 min',
-    publishedAt: '45 mins ago',
-    createdAt: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-    isExclusive: false,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&q=80',
-    videoUrl: 'https://www.youtube.com/watch?v=8V-2Z0m2c0s',
-    videoTitle: 'Codissia Intec 2026 Arena Walkthrough & Setup',
-    videoDuration: '03:45',
-    excerpt: 'South India’s premier industrial expo introduces a dedicated pavilion for precision EV motor stamping and aerospace titanium tooling.',
-    content: 'International trade delegations from Germany, Japan, and Taiwan arrive for the flagship biennial industrial trade fair.',
-    highlightStat: '450+ Exhibitors',
-    commentsCount: 29,
-  },
-  {
-    id: 'art-top-4',
-    slug: 'coimbatore-metro-rail-phase-1-approved',
-    title: 'Coimbatore Metro Rail Phase-1 DPR Approved by Union Ministry with ₹10,740 Cr Outlay',
-    category: 'NEWS',
-    subCategory: 'Metro Transit',
-    author: 'Transit Correspondent',
-    readTime: '4 min',
-    publishedAt: '1 hour ago',
-    createdAt: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
-    isExclusive: false,
-    status: 'published',
-    mediaType: 'video',
-    imageUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80',
-    videoUrl: 'https://www.youtube.com/watch?v=8V-2Z0m2c0s',
-    videoTitle: 'Coimbatore Metro Alignment Map & Corridor 1 & 2 Blueprint',
-    videoDuration: '04:10',
-    excerpt: 'Dual-corridor network spanning 44 km from Collectorate to Bilichi and Karanampettai gets center clearance.',
-    content: 'Chennai Metro Rail Limited initiates preliminary land acquisition and utility diversion works along Avinashi Road.',
-    highlightStat: '₹10,740 Cr Approved',
-    commentsCount: 75,
-  },
-  {
-    id: 'art-top-5',
-    title: 'TIDEL Park Phase-2 at Avinashi Road Reaches 90% Pre-Lease Occupancy Across Tech Towers',
-    category: 'TECH',
-    subCategory: 'IT Corridor',
-    author: 'Tech Bureau',
-    readTime: '3 min',
-    publishedAt: '2 hours ago',
-    createdAt: new Date(Date.now() - 120 * 60 * 1000).toISOString(),
-    isExclusive: false,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=800&q=80',
-    videoUrl: 'https://www.youtube.com/watch?v=8V-2Z0m2c0s',
-    videoTitle: 'TIDEL Park Phase-2 Construction Aerial Tour',
-    videoDuration: '03:30',
-    excerpt: 'Five Fortune-500 SaaS and engineering R&D hubs book 8.5 lakh sq.ft of Grade-A office space adjacent to ELCOT IT SEZ.',
-    content: 'State infrastructure corporation confirms on-schedule handover of IT tower suites in Q3 2026.',
-    highlightStat: '90% Pre-Leased',
-    commentsCount: 41,
-  },
-  {
-    id: 'art-ceo-1',
-    title: 'Sridhar Vembu: How Coimbatore & Rural Tech Hubs Power Global Enterprise SaaS',
-    category: 'CEO',
-    subCategory: 'Founder Spotlights',
-    author: 'Executive Bureau',
-    readTime: '6 min',
-    publishedAt: '3 hours ago',
-    createdAt: new Date(Date.now() - 180 * 60 * 1000).toISOString(),
-    isExclusive: true,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=500&q=80',
-    videoTitle: 'Sridhar Vembu Keynote on Rural Technology Clusters',
-    videoDuration: '05:30',
-    excerpt: 'Coimbatore’s rich engineering DNA and grounding prove that global enterprise software can thrive sustainably without big-city burnout.',
-    content: 'Zoho founder explores deep-tech decentralization and engineering talent retention in Tamil Nadu tier-2 centers.',
-    highlightStat: 'Exclusive Interview',
-    commentsCount: 52,
-  },
-  {
-    id: 'art-sports-1',
-    title: '14th Annual Coimbatore Marathon Crosses 18,000 Runners for Cancer Awareness',
-    category: 'SPORTS',
-    subCategory: 'Sports & Community',
-    author: 'Sports Desk',
-    readTime: '3 min',
-    publishedAt: '4 hours ago',
-    createdAt: new Date(Date.now() - 240 * 60 * 1000).toISOString(),
-    isExclusive: false,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?auto=format&fit=crop&w=600&q=80',
-    videoTitle: 'Coimbatore Marathon Route Highlights & Registration',
-    videoDuration: '03:15',
-    excerpt: 'Coimbatore Cancer Foundation announces certified 5K, 10K, and 21K half-marathon circuits with medical support stations.',
-    content: 'Over 18,000 participants register for the annual Covai marathon raising crucial awareness and community cancer care funds.',
-    highlightStat: '18K+ Runners',
-    commentsCount: 33,
-  },
-  {
-    id: 'art-edu-1',
-    title: 'PSG Tech & Coimbatore Innovation Hub Launch ₹25 Cr Deep-Tech Collegiate Accelerator Fund',
-    category: 'EDUCATION',
-    subCategory: 'Collegiate Innovation',
-    author: 'Academic Cell',
-    readTime: '4 min',
-    publishedAt: '5 hours ago',
-    createdAt: new Date(Date.now() - 300 * 60 * 1000).toISOString(),
-    isExclusive: false,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=600&q=80',
-    videoTitle: 'PSG Tech DeepTech Lab Demo Day',
-    videoDuration: '04:15',
-    excerpt: 'Collegiate entrepreneurs receive seed funding and lab infrastructure for precision agriculture robotics and healthcare AI diagnostics.',
-    content: 'New innovation endowment supports 20 student-led research spin-offs across biomedical and robotics disciplines.',
-    highlightStat: '₹25 Cr Seed Fund',
-    commentsCount: 19,
-  },
-  {
-    id: 'art-events-1',
-    title: 'Covai Food Carnival 2026: 60+ Authentic Kongu Delicacies at VOC Grounds',
-    category: 'EVENTS',
-    subCategory: 'Weekend Happening',
-    author: 'Culture Desk',
-    readTime: '2 min',
-    publishedAt: '6 hours ago',
-    createdAt: new Date(Date.now() - 360 * 60 * 1000).toISOString(),
-    isExclusive: false,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=600&q=80',
-    videoTitle: 'Covai Food Carnival Stalls & Kongu Cuisine Preview',
-    videoDuration: '02:40',
-    excerpt: 'Featuring traditional Kongu non-veg curries, Pallipalayam specialties, and traditional millet desserts across 60 curated stalls.',
-    content: 'Three-day cultural festival attracts thousands of food enthusiasts celebrating indigenous Kongu culinary heritage.',
-    highlightStat: '60+ Food Stalls',
-    commentsCount: 47,
-  },
-  {
-    id: 'art-epaper-1',
-    title: 'Todays Coimbatore Daily e-Paper Edition: Full Digital Newspaper Replica',
-    category: 'E-PAPER',
-    subCategory: 'Daily Edition',
-    author: 'Editorial Board',
-    readTime: '8 min',
-    publishedAt: 'Today 06:00 AM',
-    createdAt: new Date(Date.now() - 480 * 60 * 1000).toISOString(),
-    isExclusive: true,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1586339949916-3e9457bef6d3?auto=format&fit=crop&w=600&q=80',
-    videoTitle: 'Daily e-Paper Digital Reader Tour',
-    videoDuration: '02:00',
-    excerpt: 'Access high-resolution PDF pages, editorial columns, classifieds, and district pullouts in the official digital paper format.',
-    content: 'Complete daily district edition covering civic infrastructure, textile markets, commerce, and civic announcements.',
-    highlightStat: 'Daily 24-Page e-Paper',
-    commentsCount: 15,
-  },
-  {
-    id: 'art-news-3',
-    title: 'Coimbatore International Airport Expansion: ₹2,000 Cr Runway & New Integrated Terminal Tender Awarded',
-    category: 'NEWS',
-    subCategory: 'Aviation & Transit',
-    author: 'Aviation Desk',
-    readTime: '4 min',
-    publishedAt: '2 hours ago',
-    createdAt: new Date(Date.now() - 130 * 60 * 1000).toISOString(),
-    isExclusive: true,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80',
-    excerpt: 'Land acquisition for 627 acres wraps up as Airport Authority of India finalizes global EPC bids for the 12,500 ft wide-body runway extension.',
-    content: 'The expansion will enable direct long-haul international flights connecting Coimbatore to Europe, Southeast Asia, and the Middle East.',
-    highlightStat: '₹2,000 Cr Expansion',
-    commentsCount: 54,
-  },
-  {
-    id: 'art-news-4',
-    title: 'Western Ring Road Phase-1 Crosses 65% Physical Progress: Kuniyamuthur to Madukkarai Stretch Nears Completion',
-    category: 'NEWS',
-    subCategory: 'Road Infrastructure',
-    author: 'Highways Bureau',
-    readTime: '3 min',
-    publishedAt: '3 hours ago',
-    createdAt: new Date(Date.now() - 190 * 60 * 1000).toISOString(),
-    isExclusive: false,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1506521781263-d8422e82f27a?auto=format&fit=crop&w=800&q=80',
-    excerpt: 'The 32.4 km four-lane bypass corridor will divert over 25,000 heavy commercial vehicles daily away from Coimbatore core city roads.',
-    content: 'State Highways Department confirms scheduled opening of Phase-1 before the upcoming monsoon season.',
-    highlightStat: '32.4 km Bypass',
-    commentsCount: 31,
-  },
-  {
-    id: 'art-news-5',
-    title: 'Coimbatore Corporation Smart City Lakefronts at Valankulam & Kurichi Draw Record 85,000 Weekend Visitors',
-    category: 'NEWS',
-    subCategory: 'City Life & Tourism',
-    author: 'Civic Reporter',
-    readTime: '3 min',
-    publishedAt: '4 hours ago',
-    createdAt: new Date(Date.now() - 250 * 60 * 1000).toISOString(),
-    isExclusive: false,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
-    excerpt: 'Illuminated floating fountains, open-air food kiosks, and eco-cycling tracks transform Covai’s historic lake system into prime leisure hubs.',
-    content: 'Municipal authorities announce expanded weekend cultural programming and battery-operated shuttle services around lake perimeters.',
-    highlightStat: '85K+ Visitors',
-    commentsCount: 42,
-  },
-  {
-    id: 'art-news-6',
-    title: 'Coimbatore Junction Railway Station Redevelopment to Feature Multi-Modal Transit Hub & Airport-Style Concourse',
-    category: 'NEWS',
-    subCategory: 'Railway Modernization',
-    author: 'Transit Correspondent',
-    readTime: '4 min',
-    publishedAt: '5 hours ago',
-    createdAt: new Date(Date.now() - 310 * 60 * 1000).toISOString(),
-    isExclusive: false,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1474487548417-781cb71495f3?auto=format&fit=crop&w=800&q=80',
-    excerpt: 'Southern Railway finalizes ₹450 Cr world-class station revamp with elevated roof plaza, segregated arrival/departure gates, and 1,200-car multi-level parking.',
-    content: 'Construction crews begin platform canopy modernization and passenger skywalk connections to the nearby central bus terminal.',
-    highlightStat: '₹450 Cr Modernization',
-    commentsCount: 39,
-  },
-  {
-    id: 'art-news-7',
-    title: 'VOC Park & Mini Zoo Modernization: ₹45 Cr Bio-Park & Botanical Conservatory DPR Finalized',
-    category: 'NEWS',
-    subCategory: 'Urban Green Spaces',
-    author: 'Environment Desk',
-    readTime: '3 min',
-    publishedAt: '6 hours ago',
-    createdAt: new Date(Date.now() - 370 * 60 * 1000).toISOString(),
-    isExclusive: false,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=800&q=80',
-    excerpt: 'New eco-friendly masterplan introduces native Western Ghats flora pavilions, interactive science exhibits, and underground stormwater harvesting.',
-    content: 'Coimbatore Corporation Council approves immediate execution of Phase-1 landscaping and heritage tree preservation.',
-    highlightStat: '₹45 Cr Masterplan',
-    commentsCount: 26,
-  },
-  {
-    id: 'art-news-8',
-    title: 'Coimbatore District Health Department Deploys 24 Mobile Medical Screening Vans Across Rural Kongu Panchayats',
-    category: 'NEWS',
-    subCategory: 'Public Health',
-    author: 'Health Correspondent',
-    readTime: '3 min',
-    publishedAt: '7 hours ago',
-    createdAt: new Date(Date.now() - 430 * 60 * 1000).toISOString(),
-    isExclusive: false,
-    status: 'published',
-    mediaType: 'image',
-    imageUrl: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?auto=format&fit=crop&w=800&q=80',
-    excerpt: 'Equipped with digital ECG, ultrasound diagnostics, and tele-consultation suites, the fleet delivers primary healthcare to 120+ village centers.',
-    content: 'District Collector flags off the state-of-the-art mobile medical units aimed at early non-communicable disease detection.',
-    highlightStat: '24 Mobile Clinics',
-    commentsCount: 18,
-  },
-];
+export const INITIAL_DATABASE_ARTICLES: Article[] = [];
 
 export const INITIAL_CATEGORIES: CategoryRecord[] = [
   { id: 'cat-1', name: 'NEWS', slug: 'news', description: 'Hyper-local city and district headlines', totalArticles: 0, status: 'active' },
@@ -692,215 +347,144 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
     slotId: 'TOP_HEADER_LEADERBOARD',
     placementKey: 'TOP_HEADER_LEADERBOARD',
     format: 'Top Header Leaderboard (728x90)',
-    title: 'TIDEL Park Coimbatore Phase-2 Office Suites Open for Booking',
-    description: 'Grade-A tech park infrastructure along Avinashi Road with 100% power backup and direct metro access.',
-    advertiser: 'ELCOT / TIDEL Coimbatore',
-    imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
-    bannerUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
-    linkUrl: 'https://todayscoimbatore.com',
-    ctaText: 'Explore Floor Plans',
     impressions: '24,580',
     ctr: '3.8%',
     active: true,
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    slides: [
+      {
+        id: 'slide-1',
+        title: 'TIDEL Park Coimbatore Phase-2 Office Suites Open for Booking',
+        description: 'Grade-A tech park infrastructure along Avinashi Road with 100% power backup and direct metro access.',
+        advertiser: 'ELCOT / TIDEL Coimbatore',
+        imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
+        active: true,
+      },
+      {
+        id: 'slide-2',
+        title: 'Coimbatore Metro Phase 1 Corridors Approved',
+        description: 'Upcoming high-speed transit connecting major IT hubs and industrial zones.',
+        advertiser: 'Covai Transit',
+        imageUrl: 'https://images.unsplash.com/photo-1541888045610-18451121d5a7?auto=format&fit=crop&w=1400&q=80',
+        active: true,
+      }
+    ]
+  },
+  {
+    id: 'ad-slot-left',
+    slotId: 'LEFT_SIDEBAR_BANNER',
+    placementKey: 'LEFT_SIDEBAR_BANNER',
+    format: 'Left Sticky Sidebar Banner (210x400 Vertical)',
+    impressions: '28,140',
+    ctr: '4.6%',
+    active: true,
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+    fallbackAdSense: true,
+    slides: [
+      {
+        id: 'slide-left-1',
+        title: 'PSG College of Technology — Autonomous & NIRF Ranked Admissions 2026',
+        description: 'Admissions 2026',
+        advertiser: 'PSG Tech',
+        imageUrl: 'https://images.unsplash.com/photo-1562774053-701939374585?auto=format&fit=crop&w=600&q=80',
+        active: true,
+      }
+    ]
+  },
+  {
+    id: 'ad-slot-right',
+    slotId: 'RIGHT_SIDEBAR_BANNER',
+    placementKey: 'RIGHT_SIDEBAR_BANNER',
+    format: 'Right Sticky Sidebar Banner (210x400 Vertical)',
+    impressions: '26,790',
+    ctr: '4.3%',
+    active: true,
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+    fallbackAdSense: true,
+    slides: [
+      {
+        id: 'slide-right-1',
+        title: 'Kongu Living Estates — Luxury Smart Villas in Saravanampatti',
+        description: 'Real Estate',
+        advertiser: 'Kongu Living',
+        imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80',
+        active: true,
+      }
+    ]
   },
   {
     id: 'ad-slot-2',
     slotId: 'HOME_IN_FEED_1',
     placementKey: 'HOME_IN_FEED_1',
     format: 'Home In-Feed 1 (Between Stories & Our City)',
-    title: 'ELGi Industrial Air Compressors & Smart Automation Solutions',
-    description: 'Upgrade factory floor efficiency with Industry 4.0 energy-saving rotary screw compressors manufactured in Coimbatore.',
-    advertiser: 'ELGi Equipments Global',
-    imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
-    bannerUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
-    linkUrl: 'https://todayscoimbatore.com',
-    ctaText: 'Book Free Plant Energy Audit',
     impressions: '18,950',
     ctr: '4.2%',
     active: true,
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    slides: [
+      {
+        id: 'slide-infeed1-1',
+        title: 'ELGi Industrial Air Compressors & Smart Automation Solutions',
+        description: 'Upgrade factory floor efficiency with Industry 4.0 energy-saving rotary screw compressors manufactured in Coimbatore.',
+        advertiser: 'ELGi Equipments Global',
+        imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
+        active: true,
+      }
+    ]
   },
   {
     id: 'ad-slot-3',
     slotId: 'HOME_IN_FEED_2',
     placementKey: 'HOME_IN_FEED_2',
     format: 'Home In-Feed 2 (Between Business & Tech)',
-    title: 'Kongu Living Gated Villa Community in Saravanampatti IT Corridor',
-    description: 'DTCP & RERA approved 3 & 4 BHK luxury smart villas with clubhouse, EV charging points, and 24/7 security.',
-    advertiser: 'Kongu Living Developers',
-    imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
-    bannerUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
-    linkUrl: 'https://todayscoimbatore.com',
-    ctaText: 'Schedule Site Visit & Brochure',
     impressions: '16,740',
     ctr: '3.9%',
     active: true,
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
-  },
-  {
-    id: 'ad-slot-4',
-    slotId: 'RIGHT_SIDEBAR_TOP',
-    placementKey: 'RIGHT_SIDEBAR_TOP',
-    format: 'Right Sidebar Top (300x250 Medium Rectangle)',
-    title: 'Invest in Premium Villa Plots in Saravanampatti',
-    description: 'DTCP & RERA approved gated layout with 40-ft roads and clubhouse amenities.',
-    advertiser: 'Kongu Living Estates',
-    imageUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80',
-    bannerUrl: 'https://images.unsplash.com/photo-1512917774080-9991f1c4c750?auto=format&fit=crop&w=600&q=80',
-    linkUrl: 'https://todayscoimbatore.com',
-    ctaText: 'View Layout Plan',
-    impressions: '22,410',
-    ctr: '3.8%',
-    active: true,
-    startDate: '2026-01-01',
-    endDate: '2026-12-31',
-    fallbackAdSense: true,
-  },
-  {
-    id: 'ad-slot-5',
-    slotId: 'RIGHT_SIDEBAR_BOTTOM',
-    placementKey: 'RIGHT_SIDEBAR_BOTTOM',
-    format: 'Right Sidebar Bottom (300x380 / Half Page)',
-    title: 'PSG Tech Executive Management & Industry 4.0 Programs',
-    description: 'Weekend executive certifications and advanced engineering leadership degrees for professionals.',
-    advertiser: 'PSG College of Technology',
-    imageUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=600&q=80',
-    bannerUrl: 'https://images.unsplash.com/photo-1523050854058-8df90110c9f1?auto=format&fit=crop&w=600&q=80',
-    linkUrl: 'https://todayscoimbatore.com',
-    ctaText: 'Apply Online',
-    impressions: '15,120',
-    ctr: '3.5%',
-    active: true,
-    startDate: '2026-01-01',
-    endDate: '2026-12-31',
-    fallbackAdSense: true,
+    slides: [
+      {
+        id: 'slide-infeed2-1',
+        title: 'Kongu Living Gated Villa Community in Saravanampatti IT Corridor',
+        description: 'DTCP & RERA approved 3 & 4 BHK luxury smart villas with clubhouse, EV charging points, and 24/7 security.',
+        advertiser: 'Kongu Living Developers',
+        imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
+        active: true,
+      }
+    ]
   },
   {
     id: 'ad-slot-6',
     slotId: 'ARTICLE_DETAIL_BOTTOM',
     placementKey: 'ARTICLE_DETAIL_BOTTOM',
     format: 'Article Detail Bottom (In-Article Fluid)',
-    title: 'Coimbatore Airport Runway Expansion & Modern Logistics Terminal',
-    description: 'Direct air cargo handling facilities and multimodal connectivity across Kongu region.',
-    advertiser: 'Coimbatore Aviation Infrastructure Forum',
-    imageUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80',
-    bannerUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80',
-    linkUrl: 'https://todayscoimbatore.com',
-    ctaText: 'View Transit Report',
     impressions: '12,930',
     ctr: '4.5%',
     active: true,
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    slides: [
+      {
+        id: 'slide-article-1',
+        title: 'Coimbatore Airport Runway Expansion & Modern Logistics Terminal',
+        description: 'Direct air cargo handling facilities and multimodal connectivity across Kongu region.',
+        advertiser: 'Coimbatore Aviation Infrastructure Forum',
+        imageUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80',
+        active: true,
+      }
+    ]
   },
 ];
 
-export const INITIAL_BLOOD_DONORS_DB: BloodDonorRecord[] = [
-  {
-    id: 'donor-1',
-    name: 'Dr. S. K. Vignesh',
-    bloodGroup: 'O+',
-    area: 'Peelamedu & PSG Tech',
-    phone: '+91 98422 12345',
-    whatsapp: '+91 98422 12345',
-    isAvailable: true,
-    isVerified: true,
-    lastDonated: '2026-06-10',
-    registeredDate: '2025-01-15',
-  },
-  {
-    id: 'donor-2',
-    name: 'K. R. Anand Kumar',
-    bloodGroup: 'A+',
-    area: 'RS Puram & DB Road',
-    phone: '+91 97890 23456',
-    whatsapp: '+91 97890 23456',
-    isAvailable: true,
-    isVerified: true,
-    lastDonated: '2026-05-18',
-    registeredDate: '2025-02-20',
-  },
-  {
-    id: 'donor-3',
-    name: 'P. Meena Soundararajan',
-    bloodGroup: 'B+',
-    area: 'Gandhipuram & Cross Cut',
-    phone: '+91 98940 34567',
-    whatsapp: '+91 98940 34567',
-    isAvailable: true,
-    isVerified: true,
-    lastDonated: '2026-07-02',
-    registeredDate: '2025-03-12',
-  },
-  {
-    id: 'donor-4',
-    name: 'M. Naveen Prakash',
-    bloodGroup: 'AB+',
-    area: 'Saravanampatti IT Park',
-    phone: '+91 99440 45678',
-    whatsapp: '+91 99440 45678',
-    isAvailable: true,
-    isVerified: true,
-    lastDonated: '2026-06-25',
-    registeredDate: '2025-04-05',
-  },
-  {
-    id: 'donor-5',
-    name: 'T. Karthikeyan',
-    bloodGroup: 'O-',
-    area: 'Thudiyalur & Vadavalli',
-    phone: '+91 96290 56789',
-    whatsapp: '+91 96290 56789',
-    isAvailable: true,
-    isVerified: true,
-    lastDonated: '2026-04-14',
-    registeredDate: '2025-05-18',
-  },
-  {
-    id: 'donor-6',
-    name: 'R. Divya Bharathi',
-    bloodGroup: 'A-',
-    area: 'Singanallur & Ondipudur',
-    phone: '+91 94430 67890',
-    whatsapp: '+91 94430 67890',
-    isAvailable: true,
-    isVerified: true,
-    lastDonated: '2026-05-30',
-    registeredDate: '2025-06-22',
-  },
-  {
-    id: 'donor-7',
-    name: 'S. Rajesh Kannan',
-    bloodGroup: 'B-',
-    area: 'Saibaba Colony & NSR Rd',
-    phone: '+91 98430 78901',
-    whatsapp: '+91 98430 78901',
-    isAvailable: true,
-    isVerified: true,
-    lastDonated: '2026-07-15',
-    registeredDate: '2025-07-01',
-  },
-  {
-    id: 'donor-8',
-    name: 'V. Gokulnath',
-    bloodGroup: 'AB-',
-    area: 'Kuniyamuthur & Sundarapuram',
-    phone: '+91 97500 89012',
-    whatsapp: '+91 97500 89012',
-    isAvailable: true,
-    isVerified: true,
-    lastDonated: '2026-06-01',
-    registeredDate: '2025-08-10',
-  },
-];
+export const INITIAL_BLOOD_DONORS_DB: BloodDonorRecord[] = [];
 
 export const INITIAL_EMERGENCY_ALERTS_DB: EmergencyBloodAlert[] = [
   {
@@ -927,91 +511,7 @@ export const INITIAL_EMERGENCY_ALERTS_DB: EmergencyBloodAlert[] = [
   },
 ];
 
-export const INITIAL_EVENTS_DB: EventRecord[] = [
-  {
-    id: 'evt-1',
-    title: 'CODISSIA INTEC 2026: International Industrial Machinery & Automation Expo',
-    category: 'EXPO',
-    date: '2026-09-04',
-    time: '10:00 AM – 06:00 PM',
-    venue: 'CODISSIA Trade Fair Complex, Halls A to E, Coimbatore',
-    mapLink: 'https://maps.google.com/?q=CODISSIA+Trade+Fair+Complex+Coimbatore',
-    ticketPrice: 'Free Delegate Entry',
-    posterUrl: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=1200&q=80',
-    videoUrl: 'https://www.youtube.com/watch?v=8V-2Z0m2c0s',
-    description: 'South India’s largest international industrial machinery exposition showcasing smart robotics, precision manufacturing, EV drivetrains, and IoT automation.',
-    organizer: 'CODISSIA Coimbatore',
-    registrationLink: 'https://todayscoimbatore.com/events',
-    status: 'upcoming',
-    featured: true,
-  },
-  {
-    id: 'evt-2',
-    title: 'Covai DeepTech & AI Founders Summit 2026',
-    category: 'TECH',
-    date: '2026-09-12',
-    time: '09:30 AM – 05:30 PM',
-    venue: 'TIDEL Park Auditorium, Avinashi Road, Peelamedu, Coimbatore',
-    mapLink: 'https://maps.google.com/?q=TIDEL+Park+Coimbatore',
-    ticketPrice: '₹499 Early Bird',
-    posterUrl: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=1200&q=80',
-    videoUrl: 'https://www.youtube.com/watch?v=8V-2Z0m2c0s',
-    description: 'Annual gathering of 500+ SaaS builders, venture capitalists, and tech leaders discussing generative AI workflows, aerospace tooling, and startup scaling.',
-    organizer: 'Coimbatore Product Leaders Forum',
-    registrationLink: 'https://todayscoimbatore.com/events',
-    status: 'upcoming',
-    featured: true,
-  },
-  {
-    id: 'evt-3',
-    title: 'Kongu Traditional Food & Organic Agri Carnival',
-    category: 'CULTURAL',
-    date: '2026-09-19',
-    time: '11:00 AM – 10:00 PM',
-    venue: 'VOC Grounds, Near Central Prison, Gandhipuram, Coimbatore',
-    mapLink: 'https://maps.google.com/?q=VOC+Grounds+Coimbatore',
-    ticketPrice: '₹50 Entry',
-    posterUrl: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?auto=format&fit=crop&w=1200&q=80',
-    description: 'Over 80 authentic kongu heritage food stalls featuring Arisi Paruppu Sadam, Pallipalayam delicacies, native millet sweets, organic farm produce, and folk music.',
-    organizer: 'Coimbatore Agri-Tourism Council',
-    registrationLink: 'https://todayscoimbatore.com/events',
-    status: 'upcoming',
-    featured: false,
-  },
-  {
-    id: 'evt-4',
-    title: '14th Annual Coimbatore Half-Marathon for Cancer Care',
-    category: 'SPORTS',
-    date: '2026-10-04',
-    time: '05:30 AM – 10:00 AM',
-    venue: 'Race Course Promenade, Near Thomas Park, Coimbatore',
-    mapLink: 'https://maps.google.com/?q=Race+Course+Coimbatore',
-    ticketPrice: '₹600 Registration',
-    posterUrl: 'https://images.unsplash.com/photo-1452626038306-9aae5e071dd3?auto=format&fit=crop&w=1200&q=80',
-    videoUrl: 'https://www.youtube.com/watch?v=8V-2Z0m2c0s',
-    description: 'Certified 5K, 10K, and 21.1K half-marathon supporting cancer care and hospice infrastructure with over 18,000 runners participating.',
-    organizer: 'Coimbatore Cancer Foundation & CCMC',
-    registrationLink: 'https://todayscoimbatore.com/events',
-    status: 'upcoming',
-    featured: true,
-  },
-  {
-    id: 'evt-5',
-    title: 'Covai Sangeetha Utsavam 2026: Carnatic & Western Fusion Concert',
-    category: 'MUSIC',
-    date: '2026-10-18',
-    time: '06:00 PM – 09:30 PM',
-    venue: 'PSG Tech Convention Centre, Peelamedu, Coimbatore',
-    mapLink: 'https://maps.google.com/?q=PSG+Tech+Coimbatore',
-    ticketPrice: '₹350 onwards',
-    posterUrl: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?auto=format&fit=crop&w=1200&q=80',
-    description: 'Enchanting evening of classical Carnatic recitals blended with Western string orchestrations featuring master vocalists and instrumentalists.',
-    organizer: 'Rasika Fine Arts Covai',
-    registrationLink: 'https://todayscoimbatore.com/events',
-    status: 'upcoming',
-    featured: false,
-  },
-];
+export const INITIAL_EVENTS_DB: EventRecord[] = [];
 
 export interface DirectoryCategoryRecord {
   id: string;
@@ -1193,7 +693,7 @@ class DatabaseService {
           const d = json.data;
           let changed = false;
 
-          if (Array.isArray(d.articles) && d.articles.length > 0) {
+          if (Array.isArray(d.articles)) {
             this.articles = d.articles;
             const dataStr = JSON.stringify(d.articles);
             localStorage.setItem('t_covai_articles', dataStr);
@@ -1204,7 +704,7 @@ class DatabaseService {
             changed = true;
           }
 
-          if (Array.isArray(d.listings) && d.listings.length > 0) {
+          if (Array.isArray(d.listings)) {
             this.directoryListings = d.listings;
             const dataStr = JSON.stringify(d.listings);
             localStorage.setItem('tc_directory_listings_v2', dataStr);
@@ -1212,13 +712,13 @@ class DatabaseService {
             changed = true;
           }
 
-          if (Array.isArray(d.categories) && d.categories.length > 0) {
+          if (Array.isArray(d.categories)) {
             this.directoryCategories = d.categories;
             localStorage.setItem('tc_directory_categories_v2', JSON.stringify(d.categories));
             changed = true;
           }
 
-          if (Array.isArray(d.bloodDonors) && d.bloodDonors.length > 0) {
+          if (Array.isArray(d.bloodDonors)) {
             this.donors = d.bloodDonors;
             const dataStr = JSON.stringify(d.bloodDonors);
             localStorage.setItem('t_covai_donors', dataStr);
@@ -1226,7 +726,7 @@ class DatabaseService {
             changed = true;
           }
 
-          if (Array.isArray(d.events) && d.events.length > 0) {
+          if (Array.isArray(d.events)) {
             this.events = d.events;
             const dataStr = JSON.stringify(d.events);
             localStorage.setItem('t_covai_events', dataStr);
@@ -1263,7 +763,11 @@ class DatabaseService {
           }
 
           if (Array.isArray(d.enquiries)) {
-            const mappedEnquiries: ContactEnquiryRecord[] = d.enquiries.map((e: any) => ({
+            // Guard: strip any system config rows that may appear in the bundle
+            const userEnquiries = d.enquiries.filter(
+              (e: any) => !String(e.user_name || '').startsWith('__SYSTEM_CONFIG_')
+            );
+            const mappedEnquiries: ContactEnquiryRecord[] = userEnquiries.map((e: any) => ({
               id: e.id,
               name: e.name || e.user_name || 'Anonymous',
               email: e.email || (e.user_phone?.includes('@') ? e.user_phone : ''),
@@ -1313,7 +817,7 @@ class DatabaseService {
         localStorage.getItem('covai_db_articles');
       if (storedArticles) {
         const parsed = JSON.parse(storedArticles);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           this.articles = parsed;
         }
       } else {
@@ -1323,7 +827,7 @@ class DatabaseService {
       const storedCategories = localStorage.getItem('covai_db_categories');
       if (storedCategories) {
         const parsed = JSON.parse(storedCategories);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           this.categories = parsed;
         }
       }
@@ -1331,7 +835,7 @@ class DatabaseService {
       const storedUsers = localStorage.getItem('covai_db_users');
       if (storedUsers) {
         const parsed = JSON.parse(storedUsers);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           this.users = parsed;
         }
       }
@@ -1342,7 +846,7 @@ class DatabaseService {
         localStorage.getItem('power_outages');
       if (storedOutages) {
         const parsed = JSON.parse(storedOutages);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           this.outages = parsed;
         }
       }
@@ -1353,13 +857,8 @@ class DatabaseService {
         localStorage.getItem('covai_db_ads');
       if (storedAds) {
         const parsed = JSON.parse(storedAds);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Merge with initial defaults to ensure all 6 placements exist
-          const merged = INITIAL_ADS_DB.map((initial) => {
-            const found = parsed.find((p: any) => p.id === initial.id || p.slotId === initial.slotId || p.placementKey === initial.placementKey);
-            return found ? { ...initial, ...found } : initial;
-          });
-          this.ads = merged;
+        if (Array.isArray(parsed)) {
+          this.ads = parsed;
         }
       } else {
         localStorage.setItem('t_covai_ads', JSON.stringify(this.ads));
@@ -1372,7 +871,7 @@ class DatabaseService {
         localStorage.getItem('blood_donors');
       if (storedDonors) {
         const parsed = JSON.parse(storedDonors);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           this.donors = parsed;
         }
       }
@@ -1382,7 +881,7 @@ class DatabaseService {
         localStorage.getItem('emergency_blood_alerts');
       if (storedEmergencyAlerts) {
         const parsed = JSON.parse(storedEmergencyAlerts);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           this.emergencyAlerts = parsed;
         }
       }
@@ -1393,7 +892,7 @@ class DatabaseService {
         localStorage.getItem('events_db');
       if (storedEvents) {
         const parsed = JSON.parse(storedEvents);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           this.events = parsed;
         }
       }
@@ -1413,7 +912,7 @@ class DatabaseService {
         localStorage.getItem('covai_db_enquiries');
       if (storedEnquiries) {
         const parsed = JSON.parse(storedEnquiries);
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           this.enquiries = parsed;
         }
       }
@@ -1455,17 +954,13 @@ class DatabaseService {
       if (storedDirectoryCategories) {
         try {
           const parsed = JSON.parse(storedDirectoryCategories);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const parsedSlugs = new Set(parsed.map((c: DirectoryCategoryRecord) => c.slug.toLowerCase()));
-            const missingInitials = INITIAL_DIRECTORY_CATEGORIES.filter(
-              (c) => !parsedSlugs.has(c.slug.toLowerCase())
-            );
-            this.directoryCategories = [...parsed, ...missingInitials];
+          if (Array.isArray(parsed)) {
+            this.directoryCategories = parsed;
           } else {
-            this.directoryCategories = [...INITIAL_DIRECTORY_CATEGORIES];
+            this.directoryCategories = [];
           }
         } catch (e) {
-          this.directoryCategories = [...INITIAL_DIRECTORY_CATEGORIES];
+          this.directoryCategories = [];
         }
       } else {
         this.directoryCategories = [...INITIAL_DIRECTORY_CATEGORIES];
@@ -1777,24 +1272,27 @@ class DatabaseService {
   }
 
   public async deleteArticle(id: string): Promise<boolean> {
+    // 1. Cloud persistence: Hard DELETE from Supabase 'news' table via server endpoint
+    if (this.isClient) {
+      const res = await fetch('/api/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete_article', id }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || json.error) {
+        const errMsg = json.error || `Server returned ${res.status} when deleting article`;
+        console.error('Failed to sync deleted article to Supabase news table:', errMsg);
+        throw new Error(errMsg);
+      }
+    }
+
+    // 2. Only mutate and persist local state after successful database deletion
     const beforeCount = this.articles.length;
     this.articles = this.articles.filter((a) => a.id !== id && a.slug !== id);
     this.persist('articles');
 
-    // Cloud persistence to Supabase via server API
-    if (this.isClient) {
-      try {
-        await fetch('/api/content', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'delete_article', id }),
-        });
-      } catch (e) {
-        console.error('Failed to sync deleted article to Supabase:', e);
-      }
-    }
-
-    return this.articles.length < beforeCount;
+    return true;
   }
 
   public async getDraftArticles(): Promise<Article[]> {
@@ -2440,7 +1938,11 @@ class DatabaseService {
         .then((res) => res.json())
         .then((json) => {
           if (json.success && Array.isArray(json.data) && json.data.length > 0) {
-            const mapped: ContactEnquiryRecord[] = json.data.map((e: any) => ({
+            // Guard: never populate local cache with system config rows
+            const userRows = json.data.filter(
+              (e: any) => !String(e.user_name || '').startsWith('__SYSTEM_CONFIG_')
+            );
+            const mapped: ContactEnquiryRecord[] = userRows.map((e: any) => ({
               id: e.id,
               name: e.name || e.user_name || 'Anonymous',
               email: e.email || (e.user_phone?.includes('@') ? e.user_phone : ''),
@@ -2521,14 +2023,14 @@ class DatabaseService {
     this.enquiries = this.enquiries.filter((e) => e.id !== id);
     this.persist('enquiries');
     if (this.isClient) {
-      fetch('/api/content', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete_enquiry', id }),
+      // Use direct DELETE verb targeting only real user enquiry rows
+      fetch(`/api/content?entity=enquiries&id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
       }).catch((e) => console.error('Failed to delete enquiry on server:', e));
     }
     return this.enquiries.length < before;
   }
+
 
   // Directory Listings CRUD
   public async getDirectoryListings(): Promise<DirectoryListing[]> {
