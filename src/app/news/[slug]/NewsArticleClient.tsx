@@ -193,7 +193,7 @@ export default function NewsArticleClient({ slug }: NewsArticleClientProps) {
   const articleImageUrl = (article?.imageUrl && article.imageUrl.trim() !== '') ? article.imageUrl.trim() : undefined;
 
   return (
-    <div className="w-full bg-[#fcfbf7] dark:bg-slate-950 text-[#111111] dark:text-gray-100 font-sans antialiased selection:bg-red-600 selection:text-white transition-colors duration-200 pb-[75px] lg:pb-0">
+    <div className="w-full bg-[#fcfbf7] dark:bg-slate-950 text-[#111111] dark:text-gray-100 font-sans antialiased selection:bg-red-600 selection:text-white transition-colors duration-200 pb-20 md:pb-0">
       <UniversalSideLayout pageType="article" className="mt-0 pt-0">
         {/* Breadcrumbs */}
         <nav className="flex items-center gap-2 text-xs font-bold text-stone-500 dark:text-gray-400 mb-2 uppercase tracking-wider">

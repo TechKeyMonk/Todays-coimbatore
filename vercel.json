@@ -1,8 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/fetch-news?secret=Todayscoimbatore@2026",
-      "schedule": "0 0 * * *"
+      "path": "/api/cron/fetch-news",
+      "schedule": "0 */6 * * *"
     }
   ]
 }

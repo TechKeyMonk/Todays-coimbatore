@@ -106,9 +106,10 @@ const jsonLdData = {
       description:
         "Independent hyper-local news and civic information publication covering breaking news, events, and community updates in Coimbatore, Tamil Nadu.",
       sameAs: [
-        'https://facebook.com/todayscoimbatore',
-        'https://twitter.com/todayscoimbatore',
-        'https://instagram.com/todayscoimbatore',
+        'https://www.facebook.com/p/TechKey-Monk-61554380970425/',
+        'https://x.com/TechKeyMonk',
+        'https://www.instagram.com/tech_key_monk/',
+        'https://www.youtube.com/@TechKeyMonk-CBE',
       ],
     },
     {

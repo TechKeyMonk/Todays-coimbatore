@@ -64,6 +64,8 @@ interface AdSlotSetting {
   startDate?: string;
   endDate?: string;
   fallbackAdSense?: boolean;
+  dimensions?: string;
+  orientation?: 'vertical' | 'horizontal';
   slides: {
     id: string;
     title: string;
@@ -125,6 +127,8 @@ const INITIAL_ADS: AdSlotSetting[] = [
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    dimensions: '728x90',
+    orientation: 'horizontal',
     slides: [
       {
         id: 'slide-1',
@@ -139,7 +143,7 @@ const INITIAL_ADS: AdSlotSetting[] = [
         title: 'Coimbatore Metro Phase 1 Corridors Approved',
         description: 'Upcoming high-speed transit connecting major IT hubs and industrial zones.',
         advertiser: 'Covai Transit',
-        imageUrl: 'https://images.unsplash.com/photo-1541888045610-18451121d5a7?auto=format&fit=crop&w=1400&q=80',
+        imageUrl: '/logo.png',
         active: true,
       }
     ]
@@ -155,6 +159,8 @@ const INITIAL_ADS: AdSlotSetting[] = [
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    dimensions: '210x400',
+    orientation: 'vertical',
     slides: [
       {
         id: 'slide-left-1',
@@ -177,6 +183,8 @@ const INITIAL_ADS: AdSlotSetting[] = [
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    dimensions: '210x400',
+    orientation: 'vertical',
     slides: [
       {
         id: 'slide-right-1',
@@ -199,6 +207,8 @@ const INITIAL_ADS: AdSlotSetting[] = [
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    dimensions: 'fluid',
+    orientation: 'horizontal',
     slides: [
       {
         id: 'slide-infeed1-1',
@@ -221,6 +231,8 @@ const INITIAL_ADS: AdSlotSetting[] = [
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    dimensions: 'fluid',
+    orientation: 'horizontal',
     slides: [
       {
         id: 'slide-infeed2-1',
@@ -243,6 +255,8 @@ const INITIAL_ADS: AdSlotSetting[] = [
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    dimensions: 'fluid',
+    orientation: 'horizontal',
     slides: [
       {
         id: 'slide-article-1',
@@ -682,6 +696,7 @@ export default function AdminPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-admin-action': 'sync-tangedco',
         },
         body: JSON.stringify({ date: targetDate }),
       });
@@ -733,7 +748,8 @@ export default function AdminPage() {
           setTimeout(() => setOutageSuccess(''), 5000);
         }
       } else {
-        throw new Error('API sync error');
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.message || errJson.error || `API sync error (${res.status})`);
       }
     } catch (err: any) {
       console.error('TNEB auto-sync error:', err);
@@ -2736,18 +2752,57 @@ export default function AdminPage() {
               )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {ads.map((ad) => {
+            {(() => {
+              const isLeftSidebar = (ad: AdSlotSetting) =>
+                ad.slotId === 'LEFT_SIDEBAR_BANNER' ||
+                ad.slotId === 'LEFT_STICKY_SIDEBAR_BANNER' ||
+                ad.placementKey === 'LEFT_SIDEBAR_BANNER' ||
+                ad.placementKey === 'LEFT_STICKY_SIDEBAR_BANNER' ||
+                ad.placementKey === 'left_sidebar' ||
+                ad.id === 'ad-slot-left' ||
+                (Boolean(ad.format) && ad.format.toLowerCase().includes('left') && ad.format.toLowerCase().includes('sidebar'));
+
+              const isRightSidebar = (ad: AdSlotSetting) =>
+                ad.slotId === 'RIGHT_SIDEBAR_BANNER' ||
+                ad.slotId === 'RIGHT_STICKY_SIDEBAR_BANNER' ||
+                ad.placementKey === 'RIGHT_SIDEBAR_BANNER' ||
+                ad.placementKey === 'RIGHT_STICKY_SIDEBAR_BANNER' ||
+                ad.placementKey === 'right_sidebar' ||
+                ad.id === 'ad-slot-right' ||
+                (Boolean(ad.format) && ad.format.toLowerCase().includes('right') && ad.format.toLowerCase().includes('sidebar'));
+
+              const isTopHeader = (ad: AdSlotSetting) =>
+                ad.slotId === 'TOP_HEADER_LEADERBOARD' ||
+                ad.slotId === 'TOP_HEADER_BANNER' ||
+                ad.placementKey === 'TOP_HEADER_LEADERBOARD' ||
+                ad.placementKey === 'TOP_HEADER_BANNER' ||
+                ad.placementKey === 'top_banner' ||
+                ad.id === 'ad-slot-1' ||
+                (Boolean(ad.format) && (ad.format.toLowerCase().includes('top header') || ad.format.toLowerCase().includes('leaderboard')));
+
+              // Partition into structured rows
+              const verticalSidebarAds = ads.filter((ad) => isLeftSidebar(ad) || isRightSidebar(ad));
+              verticalSidebarAds.sort((a, b) => {
+                if (isLeftSidebar(a) && !isLeftSidebar(b)) return -1;
+                if (!isLeftSidebar(a) && isLeftSidebar(b)) return 1;
+                return 0;
+              });
+
+              const topHeaderAds = ads.filter(isTopHeader);
+              const inFeedAndArticleAds = ads.filter(
+                (ad) => !isLeftSidebar(ad) && !isRightSidebar(ad) && !isTopHeader(ad)
+              );
+
+              const renderAdCard = (ad: AdSlotSetting) => {
                 const scheduleStatus = getAdScheduleStatus(ad);
                 const legacyAd = ad as any;
                 const mediaPreview = ad.slides?.[0]?.imageUrl || legacyAd.bannerUrl || legacyAd.imageUrl;
                 const isSidebarAd =
-                  ad.slotId === 'LEFT_SIDEBAR_BANNER' ||
-                  ad.slotId === 'RIGHT_SIDEBAR_BANNER' ||
-                  ad.placementKey === 'LEFT_SIDEBAR_BANNER' ||
-                  ad.placementKey === 'RIGHT_SIDEBAR_BANNER' ||
-                  ad.placementKey === 'left_sidebar' ||
-                  ad.placementKey === 'right_sidebar';
+                  isLeftSidebar(ad) ||
+                  isRightSidebar(ad) ||
+                  ad.orientation === 'vertical' ||
+                  ad.dimensions === '210x400';
+                const isHeaderAd = isTopHeader(ad);
 
                 return (
                   <div
@@ -2755,16 +2810,24 @@ export default function AdminPage() {
                     className={`p-4 sm:p-5 rounded-2xl border flex flex-col justify-between space-y-4 shadow-2xs transition-all ${
                       isSidebarAd
                         ? 'border-red-200 bg-red-50/20 dark:bg-slate-900'
+                        : isHeaderAd
+                        ? 'border-blue-200 bg-blue-50/20 dark:bg-slate-900'
                         : 'border-stone-200 bg-[#fcfbf7]'
                     }`}
                   >
                     <div>
                       <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
                         <span className="text-[#153d3b] uppercase tracking-wider text-[11px] font-black flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-red-600" />
+                          <span
+                            className={`w-2 h-2 rounded-full ${
+                              isSidebarAd ? 'bg-red-600' : isHeaderAd ? 'bg-blue-600' : 'bg-emerald-600'
+                            }`}
+                          />
                           {ad.format}
                         </span>
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase border ${scheduleStatus.badgeClass}`}>
+                        <span
+                          className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase border ${scheduleStatus.badgeClass}`}
+                        >
                           {scheduleStatus.label}
                         </span>
                       </div>
@@ -2775,9 +2838,9 @@ export default function AdminPage() {
                           <span className="px-2 py-0.5 rounded-md bg-red-100 text-red-800 text-[10px] font-black uppercase tracking-wider border border-red-200">
                             📐 210 × 400 Vertical Canvas (Homepage Rail)
                           </span>
-                        ) : ad.slotId === 'TOP_HEADER_LEADERBOARD' ? (
+                        ) : isHeaderAd ? (
                           <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-800 text-[10px] font-black uppercase tracking-wider border border-blue-200">
-                            📐 728 × 90 Horizontal Leaderboard
+                            📐 728 × 90 / Full-Bleed Leaderboard
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 text-[10px] font-black uppercase tracking-wider border border-stone-200">
@@ -2787,27 +2850,61 @@ export default function AdminPage() {
                       </div>
 
                       {/* Creative Thumbnail Preview */}
-                      {mediaPreview && (
-                        <div
-                          className={`mb-3 w-full rounded-xl overflow-hidden border border-stone-300 bg-slate-900 relative group ${
-                            isSidebarAd ? 'h-36 sm:h-44' : 'h-28 sm:h-32'
-                          }`}
-                        >
-                          <img
-                            src={mediaPreview}
-                            alt={ad.slides?.[0]?.title || legacyAd.title}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <span className="text-white text-xs font-bold px-2.5 py-1 bg-black/70 rounded-lg backdrop-blur-xs">
-                              Live Ad Creative
+                      {mediaPreview &&
+                        (isSidebarAd ? (
+                          <div className="my-3 flex flex-col items-center justify-center p-3 rounded-xl bg-stone-100/90 border border-stone-200">
+                            <span className="text-[10px] font-black text-stone-500 uppercase tracking-wider mb-2">
+                              Sidebar Rail Preview (210 × 400 Match)
+                            </span>
+                            <div className="w-[210px] h-[400px] overflow-hidden rounded-lg mx-auto border border-stone-300 bg-slate-900 relative group shadow-sm shrink-0">
+                              <img
+                                src={mediaPreview}
+                                alt={ad.slides?.[0]?.title || legacyAd.title}
+                                className="w-full h-full object-cover object-center"
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <span className="text-white text-xs font-bold px-2.5 py-1 bg-black/70 rounded-lg backdrop-blur-xs">
+                                  Live Ad Creative
+                                </span>
+                              </div>
+                              <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/80 text-white text-[9px] font-mono uppercase font-bold">
+                                {ad.slotId || ad.placementKey}
+                              </span>
+                            </div>
+                          </div>
+                        ) : isHeaderAd ? (
+                          <div className="mb-3 w-full h-32 sm:h-36 rounded-xl overflow-hidden border border-blue-200 bg-slate-900 relative group">
+                            <img
+                              src={mediaPreview}
+                              alt={ad.slides?.[0]?.title || legacyAd.title}
+                              className="w-full h-full object-cover object-center"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-white text-xs font-bold px-2.5 py-1 bg-black/70 rounded-lg backdrop-blur-xs">
+                                Live Header Creative
+                              </span>
+                            </div>
+                            <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/80 text-white text-[9px] font-mono uppercase font-bold">
+                              {ad.slotId || ad.placementKey}
                             </span>
                           </div>
-                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/80 text-white text-[9px] font-mono uppercase font-bold">
-                            {ad.slotId || ad.placementKey}
-                          </span>
-                        </div>
-                      )}
+                        ) : (
+                          <div className="mb-3 w-full h-28 sm:h-32 rounded-xl overflow-hidden border border-stone-300 bg-slate-900 relative group">
+                            <img
+                              src={mediaPreview}
+                              alt={ad.slides?.[0]?.title || legacyAd.title}
+                              className="w-full h-full object-cover object-center"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-white text-xs font-bold px-2.5 py-1 bg-black/70 rounded-lg backdrop-blur-xs">
+                                Live Ad Creative
+                              </span>
+                            </div>
+                            <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/80 text-white text-[9px] font-mono uppercase font-bold">
+                              {ad.slotId || ad.placementKey}
+                            </span>
+                          </div>
+                        ))}
 
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0 flex-1">
@@ -2820,7 +2917,10 @@ export default function AdminPage() {
                             </p>
                           )}
                           <p className="text-xs text-stone-500 mt-1">
-                            Sponsor / Advertiser: <strong className="text-stone-800">{ad.slides?.[0]?.advertiser || legacyAd.advertiser || 'N/A'}</strong>
+                            Sponsor / Advertiser:{' '}
+                            <strong className="text-stone-800">
+                              {ad.slides?.[0]?.advertiser || legacyAd.advertiser || 'N/A'}
+                            </strong>
                           </p>
                           <p className="text-xs text-stone-500 mt-1 font-bold">
                             Total Slides: {ad.slides?.length || 0} / 10
@@ -2831,16 +2931,18 @@ export default function AdminPage() {
                           type="button"
                           onClick={() => {
                             const legacyAd = ad as any;
-                            const slides = ad.slides?.length ? ad.slides : [
-                              {
-                                id: `legacy-${Date.now()}`,
-                                title: legacyAd.title || '',
-                                advertiser: legacyAd.advertiser || '',
-                                description: legacyAd.description || '',
-                                imageUrl: legacyAd.imageUrl || legacyAd.bannerUrl || '',
-                                active: true,
-                              }
-                            ];
+                            const slides = ad.slides?.length
+                              ? ad.slides
+                              : [
+                                  {
+                                    id: `legacy-${Date.now()}`,
+                                    title: legacyAd.title || '',
+                                    advertiser: legacyAd.advertiser || '',
+                                    description: legacyAd.description || '',
+                                    imageUrl: legacyAd.imageUrl || legacyAd.bannerUrl || '',
+                                    active: true,
+                                  },
+                                ];
                             setEditingAdSlot({ ...ad, slides });
                           }}
                           className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer shrink-0 flex items-center gap-1 shadow-2xs"
@@ -2852,9 +2954,15 @@ export default function AdminPage() {
                       </div>
 
                       <div className="flex items-center gap-4 text-xs font-mono text-stone-600 my-3 p-2 rounded-xl bg-white border border-stone-200">
-                        <span>👁️ <strong>{ad.impressions}</strong> Impr</span>
-                        <span>🎯 <strong>{ad.ctr}</strong> CTR</span>
-                        <span className="text-emerald-700 font-bold ml-auto truncate">Serving: {scheduleStatus.serving}</span>
+                        <span>
+                          👁️ <strong>{ad.impressions}</strong> Impr
+                        </span>
+                        <span>
+                          🎯 <strong>{ad.ctr}</strong> CTR
+                        </span>
+                        <span className="text-emerald-700 font-bold ml-auto truncate">
+                          Serving: {scheduleStatus.serving}
+                        </span>
                       </div>
 
                       <div className="space-y-3 pt-2 border-t border-stone-200">
@@ -2928,8 +3036,79 @@ export default function AdminPage() {
                     </div>
                   </div>
                 );
-              })}
-            </div>
+              };
+
+              return (
+                <div className="space-y-8">
+                  {/* ROW 1: VERTICAL SIDEBAR RAILS (SIDE-BY-SIDE 210x400) */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="px-2.5 py-1 rounded-md bg-red-100 text-red-800 text-xs font-black uppercase tracking-wider border border-red-200 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-red-600" />
+                          Row 1: Sticky Sidebar Rails (Vertical 210 × 400)
+                        </span>
+                        <span className="text-xs text-stone-500 hidden sm:inline">
+                          Primary Homepage &amp; Inner-Page Desktop Rails
+                        </span>
+                      </div>
+                      <span className="text-[11px] font-mono font-bold text-stone-400">
+                        {verticalSidebarAds.length} Slots
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {verticalSidebarAds.map(renderAdCard)}
+                    </div>
+                  </div>
+
+                  {/* ROW 2: TOP HEADER LEADERBOARD BANNER (FULL WIDTH) */}
+                  {topHeaderAds.length > 0 && (
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-1 rounded-md bg-blue-100 text-blue-800 text-xs font-black uppercase tracking-wider border border-blue-200 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-600" />
+                            Row 2: Top Header Leaderboard Banner
+                          </span>
+                          <span className="text-xs text-stone-500 hidden sm:inline">
+                            Full-Bleed Responsive Header Placement
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-mono font-bold text-stone-400">
+                          {topHeaderAds.length} Slots
+                        </span>
+                      </div>
+                      <div className="w-full">
+                        {topHeaderAds.map(renderAdCard)}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ROW 3 & BELOW: IN-FEED & ARTICLE AD SLOTS */}
+                  {inFeedAndArticleAds.length > 0 && (
+                    <div className="space-y-3 pt-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-1 rounded-md bg-stone-100 text-stone-800 text-xs font-black uppercase tracking-wider border border-stone-200 flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-emerald-600" />
+                            Row 3 &amp; Below: In-Feed &amp; Article Ad Placements
+                          </span>
+                          <span className="text-xs text-stone-500 hidden sm:inline">
+                            Between News Stories, Sections &amp; Article Details
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-mono font-bold text-stone-400">
+                          {inFeedAndArticleAds.length} Slots
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {inFeedAndArticleAds.map(renderAdCard)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         )}
 
@@ -4951,202 +5130,228 @@ export default function AdminPage() {
       {/* -------------------------------------------------------------------- */}
       {/* 6. EDIT AD SLOT CREATIVE & LINK MODAL                                */}
       {/* -------------------------------------------------------------------- */}
-      {editingAdSlot && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-stone-200 pb-3">
-              <div>
-                <span className="text-[10px] font-black uppercase text-red-600 tracking-wider block">
-                  AD PLACEMENT CREATIVE STUDIO
-                </span>
-                <h3 className="text-base font-black text-stone-900">
-                  {editingAdSlot.format}
-                </h3>
-                <p className="text-[11px] text-stone-500 font-bold mt-0.5">
-                  {editingAdSlot.slotId === 'LEFT_SIDEBAR_BANNER'
-                    ? '300 x 250 SQUARE CANVAS'
-                    : editingAdSlot.slotId?.includes('RIGHT_SIDEBAR') || editingAdSlot.slotId?.includes('RIGHT_STICKY')
-                    ? '210 x 400 VERTICAL CANVAS'
-                    : editingAdSlot.slotId === 'TOP_HEADER_LEADERBOARD'
-                    ? '970 x 90 HORIZONTAL CANVAS'
-                    : 'FLUID IN-FEED CREATIVE'}
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditingAdSlot(null)}
-                className="text-stone-400 hover:text-stone-700 text-xl font-bold p-1 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
+      {editingAdSlot && (() => {
+        const isEditingSidebarAd =
+          editingAdSlot.slotId === 'LEFT_SIDEBAR_BANNER' ||
+          editingAdSlot.slotId === 'RIGHT_SIDEBAR_BANNER' ||
+          editingAdSlot.placementKey === 'LEFT_SIDEBAR_BANNER' ||
+          editingAdSlot.placementKey === 'RIGHT_SIDEBAR_BANNER' ||
+          editingAdSlot.placementKey === 'left_sidebar' ||
+          editingAdSlot.placementKey === 'right_sidebar' ||
+          editingAdSlot.orientation === 'vertical' ||
+          editingAdSlot.dimensions === '210x400';
 
-            <form onSubmit={handleSaveAdCreative} className="space-y-3.5">
-              {editingAdSlot.slides?.map((slide, index) => (
-                <div key={slide.id} className="bg-stone-50 border border-stone-200 rounded-xl p-4 space-y-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-[11px] font-black text-stone-700 uppercase tracking-wider">
-                      Slide {index + 1}
-                    </h4>
-                    <div className="flex items-center gap-3">
-                      <label className="flex items-center gap-1.5 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={slide.active}
-                          onChange={(e) => {
-                            const newSlides = [...editingAdSlot.slides];
-                            newSlides[index].active = e.target.checked;
-                            setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
-                          }}
-                          className="w-3.5 h-3.5 accent-red-600 rounded"
-                        />
-                        <span className="text-[10px] font-bold text-stone-600 uppercase">Active</span>
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newSlides = editingAdSlot.slides.filter((_, i) => i !== index);
-                          setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
-                        }}
-                        className="text-red-600 hover:text-red-800 text-[10px] font-bold uppercase"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                      Ad Headline / Campaign Title *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={slide.title}
-                      onChange={(e) => {
-                        const newSlides = [...editingAdSlot.slides];
-                        newSlides[index].title = e.target.value;
-                        setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
-                      }}
-                      className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold text-stone-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                      Advertiser / Brand Name *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={slide.advertiser}
-                      onChange={(e) => {
-                        const newSlides = [...editingAdSlot.slides];
-                        newSlides[index].advertiser = e.target.value;
-                        setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
-                      }}
-                      className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs text-stone-900"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                      Supporting Marketing Copy / Description
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={slide.description || ''}
-                      onChange={(e) => {
-                        const newSlides = [...editingAdSlot.slides];
-                        newSlides[index].description = e.target.value;
-                        setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
-                      }}
-                      className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl p-2.5 text-xs text-stone-900 leading-relaxed"
-                    />
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-[#f8f6f0] border border-stone-300 space-y-2">
-                    <label className="block text-xs font-bold text-stone-700 uppercase">
-                      Ad Creative Media (Image Upload or URL) *
-                    </label>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <input
-                        type="file"
-                        accept="image/jpeg, image/png, image/webp, image/gif, image/svg+xml"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleSlideImageUpload(file, index);
-                        }}
-                        className="w-full sm:w-1/2 bg-white border border-stone-300 rounded-xl px-2 py-1 text-[10px] file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-stone-100 file:text-stone-700 hover:file:bg-stone-200 cursor-pointer"
-                      />
-                      <input
-                        type="text"
-                        required
-                        placeholder="Or Paste https:// URL..."
-                        value={slide.imageUrl || ''}
-                        onChange={(e) => {
-                          const newSlides = [...editingAdSlot.slides];
-                          newSlides[index].imageUrl = e.target.value;
-                          setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
-                        }}
-                        className="w-full sm:w-1/2 bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-mono"
-                      />
-                    </div>
-                    {slide.imageUrl && (
-                      <div className="mt-2 relative rounded-lg overflow-hidden border border-stone-300 bg-stone-900 h-28">
-                        <img
-                          src={slide.imageUrl}
-                          alt="Ad Preview"
-                          className="w-full h-full object-cover"
-                        />
-                      </div>
-                    )}
-                  </div>
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+              <div className="flex items-center justify-between border-b border-stone-200 pb-3">
+                <div>
+                  <span className="text-[10px] font-black uppercase text-red-600 tracking-wider block">
+                    AD PLACEMENT CREATIVE STUDIO
+                  </span>
+                  <h3 className="text-base font-black text-stone-900">
+                    {editingAdSlot.format}
+                  </h3>
+                  <p className="text-[11px] text-stone-500 font-bold mt-0.5">
+                    {isEditingSidebarAd
+                      ? '📐 210 × 400 VERTICAL CANVAS (HOMEPAGE RAIL)'
+                      : editingAdSlot.slotId === 'TOP_HEADER_LEADERBOARD'
+                      ? '📐 728 × 90 / EXPANDED HORIZONTAL LEADERBOARD'
+                      : '📐 FLUID IN-FEED CREATIVE'}
+                  </p>
                 </div>
-              ))}
-
-              {editingAdSlot.slides?.length < 10 && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    const newSlides = [
-                      ...(editingAdSlot.slides || []),
-                      {
-                        id: `slide-${Date.now()}`,
-                        title: '',
-                        advertiser: '',
-                        description: '',
-                        imageUrl: '',
-                        active: true,
-                      }
-                    ];
-                    setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
-                  }}
-                  className="w-full py-2.5 border-2 border-dashed border-stone-300 rounded-xl text-stone-500 font-bold text-[11px] uppercase tracking-wider hover:bg-stone-50 hover:border-stone-400 transition-colors"
-                >
-                  + Add Slide ({10 - (editingAdSlot.slides?.length || 0)} remaining)
-                </button>
-              )}
-
-              <div className="pt-3 border-t border-stone-200 flex justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setEditingAdSlot(null)}
-                  className="px-4 py-2 rounded-xl bg-stone-200 text-stone-800 font-bold text-xs"
+                  className="text-stone-400 hover:text-stone-700 text-xl font-bold p-1 cursor-pointer"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#153d3b] hover:bg-[#0d4d4d] text-white font-bold text-xs shadow-xs"
-                >
-                  Save &amp; Publish Creative Live
+                  ✕
                 </button>
               </div>
-            </form>
+
+              <form onSubmit={handleSaveAdCreative} className="space-y-3.5">
+                {editingAdSlot.slides?.map((slide, index) => (
+                  <div key={slide.id} className="bg-stone-50 border border-stone-200 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="text-[11px] font-black text-stone-700 uppercase tracking-wider">
+                        Slide {index + 1}
+                      </h4>
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-1.5 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={slide.active}
+                            onChange={(e) => {
+                              const newSlides = [...editingAdSlot.slides];
+                              newSlides[index].active = e.target.checked;
+                              setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                            }}
+                            className="w-3.5 h-3.5 accent-red-600 rounded"
+                          />
+                          <span className="text-[10px] font-bold text-stone-600 uppercase">Active</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newSlides = editingAdSlot.slides.filter((_, i) => i !== index);
+                            setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                          }}
+                          className="text-red-600 hover:text-red-800 text-[10px] font-bold uppercase"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                        Ad Headline / Campaign Title *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={slide.title}
+                        onChange={(e) => {
+                          const newSlides = [...editingAdSlot.slides];
+                          newSlides[index].title = e.target.value;
+                          setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                        }}
+                        className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold text-stone-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                        Advertiser / Brand Name *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={slide.advertiser}
+                        onChange={(e) => {
+                          const newSlides = [...editingAdSlot.slides];
+                          newSlides[index].advertiser = e.target.value;
+                          setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                        }}
+                        className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs text-stone-900"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                        Supporting Marketing Copy / Description
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={slide.description || ''}
+                        onChange={(e) => {
+                          const newSlides = [...editingAdSlot.slides];
+                          newSlides[index].description = e.target.value;
+                          setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                        }}
+                        className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl p-2.5 text-xs text-stone-900 leading-relaxed"
+                      />
+                    </div>
+
+                    <div className="p-3 rounded-xl bg-[#f8f6f0] border border-stone-300 space-y-2">
+                      <div className="flex items-center justify-between flex-wrap gap-1">
+                        <label className="block text-xs font-bold text-stone-700 uppercase">
+                          Ad Creative Media (Image Upload or URL) *
+                        </label>
+                        {isEditingSidebarAd && (
+                          <span className="text-[10px] font-black text-red-700 uppercase bg-red-100 px-2 py-0.5 rounded border border-red-200">
+                            📐 Required: 210 × 400 Vertical
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <input
+                          type="file"
+                          accept="image/jpeg, image/png, image/webp, image/gif, image/svg+xml"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleSlideImageUpload(file, index);
+                          }}
+                          className="w-full sm:w-1/2 bg-white border border-stone-300 rounded-xl px-2 py-1 text-[10px] file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-stone-100 file:text-stone-700 hover:file:bg-stone-200 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          required
+                          placeholder="Or Paste https:// URL..."
+                          value={slide.imageUrl || ''}
+                          onChange={(e) => {
+                            const newSlides = [...editingAdSlot.slides];
+                            newSlides[index].imageUrl = e.target.value;
+                            setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                          }}
+                          className="w-full sm:w-1/2 bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-mono"
+                        />
+                      </div>
+                      {slide.imageUrl && (
+                        <div className="mt-2 flex flex-col items-center justify-center p-3 bg-stone-100/90 rounded-xl border border-stone-200">
+                          <span className="text-[10px] font-black text-stone-500 mb-2 uppercase tracking-wider">
+                            {isEditingSidebarAd ? 'Preview (210 × 400 Vertical Rail Scale)' : 'Creative Preview'}
+                          </span>
+                          <div
+                            className={`relative rounded-lg overflow-hidden border border-stone-300 bg-slate-900 ${
+                              isEditingSidebarAd ? 'w-[210px] h-[400px] mx-auto shadow-sm' : 'w-full h-28'
+                            }`}
+                          >
+                            <img
+                              src={slide.imageUrl}
+                              alt="Ad Preview"
+                              className="w-full h-full object-cover object-center"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {editingAdSlot.slides?.length < 10 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newSlides = [
+                        ...(editingAdSlot.slides || []),
+                        {
+                          id: `slide-${Date.now()}`,
+                          title: '',
+                          advertiser: '',
+                          description: '',
+                          imageUrl: '',
+                          active: true,
+                        }
+                      ];
+                      setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                    }}
+                    className="w-full py-2.5 border-2 border-dashed border-stone-300 rounded-xl text-stone-500 font-bold text-[11px] uppercase tracking-wider hover:bg-stone-50 hover:border-stone-400 transition-colors"
+                  >
+                    + Add Slide ({10 - (editingAdSlot.slides?.length || 0)} remaining)
+                  </button>
+                )}
+
+                <div className="pt-3 border-t border-stone-200 flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingAdSlot(null)}
+                    className="px-4 py-2 rounded-xl bg-stone-200 text-stone-800 font-bold text-xs"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-xl bg-[#153d3b] hover:bg-[#0d4d4d] text-white font-bold text-xs shadow-xs"
+                  >
+                    Save &amp; Publish Creative Live
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ------------------------------------------------------------------ */}
       {/* MODAL: ADD NEW OUTAGE TICKER ITEM                                  */}

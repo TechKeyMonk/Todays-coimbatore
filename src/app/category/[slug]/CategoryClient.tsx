@@ -140,7 +140,7 @@ export default function CategoryClient({ slug }: { slug: string }) {
   };
 
   return (
-    <div className="min-h-screen bg-[#fcfbf7] dark:bg-slate-950 flex flex-col font-sans transition-colors duration-200">
+    <div className="min-h-screen bg-[#fcfbf7] dark:bg-slate-950 flex flex-col font-sans transition-colors duration-200 pb-20 md:pb-0">
       <UniversalSideLayout pageType="category">
         <div className="w-full space-y-6">
 

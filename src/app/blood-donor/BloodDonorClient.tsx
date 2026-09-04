@@ -198,7 +198,7 @@ export default function BloodDonorClient() {
                   key={alert.id}
                   className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-xl p-3.5 flex items-center justify-between gap-3"
                 >
-                  <div className="space-y-1">
+                  <div className="space-y-1 min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="bg-white text-red-700 font-black text-xs px-2 py-0.5 rounded-md shadow-xs">
                         {alert.bloodGroup}

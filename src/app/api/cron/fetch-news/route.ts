@@ -379,12 +379,13 @@ async function handleIngest(request: Request) {
     const genAI = new GoogleGenerativeAI(geminiApiKey);
 
     async function generateWithFallback(prompt: string): Promise<string> {
-      // Verified active models with distinct quota pools
+      // Valid Gemini model fallback chain (ordered by speed and quota availability)
       const models = [
-        'gemini-3.1-flash-lite',  // 2.2s execution speed, high quota
-        'gemini-3-flash-preview', // 3.1s execution speed, separate quota bucket
-        'gemini-3.5-flash',       // Rich vocabulary & reasoning
-        'gemini-3.6-flash',       // Flagship flash model
+        'gemini-3.6-flash',   // Primary: fastest, verified active
+        'gemini-3.8-flash',   // Secondary: latest generation
+        'gemini-flash-latest',// Tertiary: alias fallback
+        'gemini-2.5-flash',   // Fallback
+        'gemini-1.5-flash',   // Fallback
       ];
       let lastErr: any = null;
 

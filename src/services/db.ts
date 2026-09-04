@@ -143,6 +143,8 @@ export interface AdSlotRecord {
   startDate?: string;
   endDate?: string;
   fallbackAdSense?: boolean;
+  dimensions?: string;
+  orientation?: 'vertical' | 'horizontal';
   slides: AdSlide[];
 }
 
@@ -226,10 +228,10 @@ export interface SocialLinksRecord {
 }
 
 export const INITIAL_SOCIAL_LINKS_DB: SocialLinksRecord = {
-  instagram: 'https://instagram.com/todayscoimbatore',
-  youtube: 'https://youtube.com/@todayscoimbatore',
-  facebook: 'https://facebook.com/todayscoimbatore',
-  twitter: 'https://x.com/todayscoimbatore',
+  instagram: 'https://www.instagram.com/tech_key_monk/',
+  youtube: 'https://www.youtube.com/@TechKeyMonk-CBE',
+  facebook: 'https://www.facebook.com/p/TechKey-Monk-61554380970425/',
+  twitter: 'https://x.com/TechKeyMonk',
 };
 
 export interface ContactEnquiryRecord {
@@ -353,6 +355,8 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    dimensions: '728x90',
+    orientation: 'horizontal',
     slides: [
       {
         id: 'slide-1',
@@ -367,7 +371,7 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
         title: 'Coimbatore Metro Phase 1 Corridors Approved',
         description: 'Upcoming high-speed transit connecting major IT hubs and industrial zones.',
         advertiser: 'Covai Transit',
-        imageUrl: 'https://images.unsplash.com/photo-1541888045610-18451121d5a7?auto=format&fit=crop&w=1400&q=80',
+        imageUrl: '/logo.png',
         active: true,
       }
     ]
@@ -383,6 +387,8 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    dimensions: '210x400',
+    orientation: 'vertical',
     slides: [
       {
         id: 'slide-left-1',
@@ -405,6 +411,8 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    dimensions: '210x400',
+    orientation: 'vertical',
     slides: [
       {
         id: 'slide-right-1',
@@ -427,6 +435,8 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    dimensions: 'fluid',
+    orientation: 'horizontal',
     slides: [
       {
         id: 'slide-infeed1-1',
@@ -449,6 +459,8 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    dimensions: 'fluid',
+    orientation: 'horizontal',
     slides: [
       {
         id: 'slide-infeed2-1',
@@ -471,6 +483,8 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
     startDate: '2026-01-01',
     endDate: '2026-12-31',
     fallbackAdSense: true,
+    dimensions: 'fluid',
+    orientation: 'horizontal',
     slides: [
       {
         id: 'slide-article-1',
@@ -751,7 +765,13 @@ class DatabaseService {
           }
 
           if (d.socialLinks && typeof d.socialLinks === 'object') {
-            this.socialLinks = { ...INITIAL_SOCIAL_LINKS_DB, ...d.socialLinks };
+            const isLegacy = (url?: string) => !url || url.includes('todayscoimbatore');
+            this.socialLinks = {
+              instagram: isLegacy(d.socialLinks.instagram) ? INITIAL_SOCIAL_LINKS_DB.instagram : d.socialLinks.instagram,
+              youtube: isLegacy(d.socialLinks.youtube) ? INITIAL_SOCIAL_LINKS_DB.youtube : d.socialLinks.youtube,
+              facebook: isLegacy(d.socialLinks.facebook) ? INITIAL_SOCIAL_LINKS_DB.facebook : d.socialLinks.facebook,
+              twitter: isLegacy(d.socialLinks.twitter) ? INITIAL_SOCIAL_LINKS_DB.twitter : d.socialLinks.twitter,
+            };
             localStorage.setItem('t_covai_social_links', JSON.stringify(this.socialLinks));
             changed = true;
           }
@@ -858,7 +878,17 @@ class DatabaseService {
       if (storedAds) {
         const parsed = JSON.parse(storedAds);
         if (Array.isArray(parsed)) {
-          this.ads = parsed;
+          this.ads = parsed.map((slot: any) => {
+            if (Array.isArray(slot.slides)) {
+              slot.slides = slot.slides.map((s: any) => {
+                if (s.imageUrl && s.imageUrl.includes('photo-1541888045610-18451121d5a7')) {
+                  s.imageUrl = '/logo.png';
+                }
+                return s;
+              });
+            }
+            return slot;
+          });
         }
       } else {
         localStorage.setItem('t_covai_ads', JSON.stringify(this.ads));
@@ -903,7 +933,14 @@ class DatabaseService {
       if (storedSocialLinks) {
         const parsed = JSON.parse(storedSocialLinks);
         if (parsed && typeof parsed === 'object') {
-          this.socialLinks = { ...INITIAL_SOCIAL_LINKS_DB, ...parsed };
+          const isLegacy = (url?: string) => !url || url.includes('todayscoimbatore');
+          this.socialLinks = {
+            instagram: isLegacy(parsed.instagram) ? INITIAL_SOCIAL_LINKS_DB.instagram : parsed.instagram,
+            youtube: isLegacy(parsed.youtube) ? INITIAL_SOCIAL_LINKS_DB.youtube : parsed.youtube,
+            facebook: isLegacy(parsed.facebook) ? INITIAL_SOCIAL_LINKS_DB.facebook : parsed.facebook,
+            twitter: isLegacy(parsed.twitter) ? INITIAL_SOCIAL_LINKS_DB.twitter : parsed.twitter,
+          };
+          localStorage.setItem('t_covai_social_links', JSON.stringify(this.socialLinks));
         }
       }
 

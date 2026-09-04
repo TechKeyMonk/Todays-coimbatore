@@ -923,12 +923,11 @@ export default function HomePage() {
   };
 
   const topLeaderboardAd = getAd('TOP_HEADER_LEADERBOARD') || getAd('slot-leaderboard-top');
-  const homeInFeed1 = getAd('HOME_IN_FEED_1') || getAd('slot-between-stories-mycity');
   const homeInFeed2 = getAd('HOME_IN_FEED_2');
   const sidebarTopAd = getAd('RIGHT_SIDEBAR_TOP') || getAd('slot-sidebar-rect-1');
 
   return (
-    <div className="w-full max-w-full bg-[#fcfbf7] dark:bg-slate-950 text-[#111111] dark:text-gray-100 font-sans antialiased selection:bg-red-600 selection:text-white transition-colors duration-200 box-border relative pb-[75px] lg:pb-0">
+    <div className="w-full max-w-full bg-[#fcfbf7] dark:bg-slate-950 text-[#111111] dark:text-gray-100 font-sans antialiased selection:bg-red-600 selection:text-white transition-colors duration-200 box-border relative pb-20 md:pb-0">
       {/* ==================================================================== */}
       {/* 2. UNIVERSAL SIDEBAR LAYOUT (STICKY LOCKED 3-COLUMN STRUCTURE)        */}
       {/* ==================================================================== */}
@@ -1352,15 +1351,6 @@ export default function HomePage() {
               )}
             </div>
 
-        {/* ============================================================== */}
-        {/* SPONSORED AD BANNER BREAK 1 (HOME_IN_FEED_1)                   */}
-        {/* ============================================================== */}
-        <div className="w-full max-w-full h-auto flex flex-col justify-start align-top mb-2 pb-0 box-border">
-          <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#555555] dark:text-gray-400 mb-1">
-            Advertisement • {homeInFeed1?.slides?.[0]?.advertiser || 'Sponsored Feature'}
-          </div>
-          <AdSlider ad={homeInFeed1} variant="infeed" label="SPONSORED FEATURE" />
-        </div>
 
         {/* ================================================================== */}
         {/* NEW FULL-WIDTH 3-CARD ROW 1: "TOP STORIES • LIVE 24/7"            */}
@@ -1410,14 +1400,18 @@ export default function HomePage() {
         {/* ================================================================== */}
         {/* DYNAMIC SLOT INJECTION: ADBANNER BETWEEN TOP STORIES & MY CITY     */}
         {/* ================================================================== */}
-        <div className="w-full max-w-full my-6 box-border">
-          <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#555555] dark:text-gray-400 mb-1">
-            Advertisement • Automated Partner &amp; Programmatic Ad Slot
+        <div className="w-full max-w-full my-6 box-border relative z-10">
+          <div className="flex items-center justify-between text-[10px] font-extrabold uppercase tracking-wider text-[#555555] dark:text-gray-400 mb-1.5 px-0.5">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
+              Advertisement • Automated Partner &amp; Programmatic Ad Slot
+            </span>
+            <span className="text-[9px] font-mono text-stone-400">Featured Partner</span>
           </div>
           <AdBanner
             slotId="slot-between-stories-mycity"
             format="in-feed"
-            className="shadow-sm"
+            className="shadow-sm mt-0"
           />
         </div>
 
@@ -1425,17 +1419,17 @@ export default function HomePage() {
         {/* HIGH-PRIORITY TANGEDCO POWER OUTAGE RED ALERT BANNER               */}
         {/* ================================================================== */}
         {tangedcoAlert?.isTomorrow && (
-          <div className="w-full max-w-full my-4 px-0 box-border animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="w-full max-w-full my-6 px-0 box-border relative z-10 animate-in fade-in slide-in-from-top-2 duration-300">
             <div className="relative overflow-hidden rounded-2xl border-2 border-red-600 bg-gradient-to-r from-red-700 via-red-600 to-rose-800 text-white p-4 sm:p-5 shadow-lg">
               {/* Subtle background glow */}
               <div className="absolute -right-8 -bottom-8 w-40 h-40 bg-white/10 rounded-full blur-2xl pointer-events-none" />
 
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative z-10">
-                <div className="flex items-start gap-3.5">
+                <div className="flex items-start gap-3.5 min-w-0 flex-1">
                   <div className="p-2.5 sm:p-3 rounded-xl bg-white text-red-600 font-black text-lg sm:text-xl shrink-0 shadow-md flex items-center justify-center">
                     ⚡
                   </div>
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
                       <span className="bg-white/20 text-white text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full tracking-wider border border-white/30 backdrop-blur-xs">
                         HIGH PRIORITY CIVIC ALERT
@@ -1451,7 +1445,7 @@ export default function HomePage() {
 
                     {/* Affected Area Tags */}
                     <div className="flex items-center gap-1.5 flex-wrap mt-2.5">
-                      <span className="text-xs font-bold text-red-100">Affected Sectors:</span>
+                      <span className="text-xs font-bold text-red-100 shrink-0">Affected Sectors:</span>
                       {tangedcoAlert.affectedAreas.map((area) => (
                         <span
                           key={area}
@@ -1465,10 +1459,10 @@ export default function HomePage() {
                 </div>
 
                 {/* 24/7 Hotline Quick Dial Button */}
-                <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                <div className="flex items-center gap-2 shrink-0 w-full md:w-auto mt-2 md:mt-0">
                   <a
                     href={`tel:${tangedcoAlert.hotline}`}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white hover:bg-red-50 text-red-700 text-xs sm:text-sm font-black transition-all shadow-md active:scale-95"
+                    className="inline-flex items-center justify-center gap-2 w-full md:w-auto px-4 py-2.5 rounded-xl bg-white hover:bg-red-50 text-red-700 text-xs sm:text-sm font-black transition-all shadow-md active:scale-95 text-center"
                   >
                     <span>📞 Emergency Hotline:</span>
                     <span className="underline font-mono text-sm sm:text-base">{tangedcoAlert.hotline}</span>

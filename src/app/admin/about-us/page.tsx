@@ -104,7 +104,7 @@ export default function AdminAboutUsPage() {
                 required
                 value={socialLinks.instagram}
                 onChange={(e) => setSocialLinks({ ...socialLinks, instagram: e.target.value })}
-                placeholder="https://instagram.com/todayscoimbatore"
+                placeholder="https://www.instagram.com/tech_key_monk/"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-red-600 transition-all font-mono"
               />
             </div>
@@ -120,7 +120,7 @@ export default function AdminAboutUsPage() {
                 required
                 value={socialLinks.youtube}
                 onChange={(e) => setSocialLinks({ ...socialLinks, youtube: e.target.value })}
-                placeholder="https://youtube.com/@todayscoimbatore"
+                placeholder="https://www.youtube.com/@TechKeyMonk-CBE"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-red-600 transition-all font-mono"
               />
             </div>
@@ -136,7 +136,7 @@ export default function AdminAboutUsPage() {
                 required
                 value={socialLinks.facebook}
                 onChange={(e) => setSocialLinks({ ...socialLinks, facebook: e.target.value })}
-                placeholder="https://facebook.com/todayscoimbatore"
+                placeholder="https://www.facebook.com/p/TechKey-Monk-61554380970425/"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-red-600 transition-all font-mono"
               />
             </div>
@@ -152,7 +152,7 @@ export default function AdminAboutUsPage() {
                 required
                 value={socialLinks.twitter}
                 onChange={(e) => setSocialLinks({ ...socialLinks, twitter: e.target.value })}
-                placeholder="https://x.com/todayscoimbatore"
+                placeholder="https://x.com/TechKeyMonk"
                 className="w-full px-4 py-2.5 rounded-xl border border-slate-700 bg-slate-800 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-red-600 transition-all font-mono"
               />
             </div>

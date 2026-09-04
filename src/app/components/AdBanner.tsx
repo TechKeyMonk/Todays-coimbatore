@@ -175,24 +175,24 @@ export const AdBanner: React.FC<AdBannerProps> = ({
   /*               Format: In-Feed / Standard Native Unit                     */
   /* ------------------------------------------------------------------------ */
   return (
-    <div className={`my-4 overflow-hidden rounded-xl bg-white p-2 border border-gray-200 dark:border-slate-800 dark:bg-slate-900 shadow-sm flex items-center justify-center isolation-isolate w-full ${className}`}>
+    <div className={`my-4 overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 shadow-sm flex items-center justify-center relative z-10 w-full ${className}`}>
       <aside
         role="region"
         aria-label="Sponsored In-Feed Article"
         data-ad-slot={slotId}
-        className="group relative w-full overflow-hidden rounded-xl border border-stone-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 text-[#111111] dark:text-white shadow-xs transition-all duration-200 hover:border-stone-400 dark:hover:border-slate-700"
+        className="group relative w-full overflow-hidden rounded-2xl border border-stone-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 text-[#111111] dark:text-white shadow-xs transition-all duration-200 hover:border-stone-400 dark:hover:border-slate-700"
       >
         <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
           {/* Thumbnail */}
           {displayImage && (
-            <div className="relative sm:w-48 sm:h-32 w-full h-44 shrink-0 overflow-hidden rounded-lg border border-stone-200 dark:border-slate-800 bg-slate-900">
+            <div className="relative sm:w-52 sm:h-36 w-full h-44 shrink-0 overflow-hidden rounded-xl border border-stone-200 dark:border-slate-800 bg-slate-900 shadow-xs">
               <img
                 src={displayImage}
                 alt={displayTitle}
                 style={{ filter: 'none', mixBlendMode: 'normal', opacity: 1 }}
-                className="!filter-none !mix-blend-normal !opacity-100 dark:!filter-none object-contain mx-auto block ad-banner-media h-full w-full transition-transform duration-300 group-hover:scale-105"
+                className="!filter-none !mix-blend-normal !opacity-100 dark:!filter-none object-cover object-center mx-auto block ad-banner-media h-full w-full transition-transform duration-300 group-hover:scale-105"
               />
-              <span className="absolute top-2 left-2 rounded bg-black/80 text-white px-2 py-0.5 text-[10px] font-black tracking-wider uppercase">
+              <span className="absolute top-2 left-2 rounded bg-black/80 text-white px-2 py-0.5 text-[10px] font-black tracking-wider uppercase backdrop-blur-xs">
                 {displayBadge}
               </span>
             </div>
@@ -201,18 +201,20 @@ export const AdBanner: React.FC<AdBannerProps> = ({
           {/* Content */}
           <div className="flex flex-1 flex-col justify-between min-w-0">
             <div>
-              <div className="flex items-center justify-between text-xs text-[#444444] dark:text-gray-400 mb-1 font-bold">
-                <div className="flex items-center gap-2">
-                  <span className="text-[#111111] dark:text-gray-100 font-black">{displayAdvertiser}</span>
+              <div className="flex items-center justify-between gap-2 flex-wrap text-xs text-[#444444] dark:text-gray-400 mb-1 font-bold">
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <span className="text-[#111111] dark:text-gray-100 font-black truncate max-w-[220px]">
+                    {displayAdvertiser}
+                  </span>
                   <span className="text-stone-300 dark:text-slate-700">•</span>
-                  <span className="text-emerald-700 dark:text-emerald-400">
+                  <span className="text-emerald-700 dark:text-emerald-400 text-[11px] font-bold truncate">
                     {isProgrammatic ? 'AdSense Automated Program' : 'Verified Partner'}
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-stone-400">Sponsored</span>
+                <span className="text-[10px] font-mono text-stone-400 shrink-0">Sponsored</span>
               </div>
 
-              <h3 className="text-base sm:text-lg font-bold text-[#111111] dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors line-clamp-2">
+              <h3 className="text-base sm:text-lg font-bold text-[#111111] dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors line-clamp-2 leading-snug">
                 {displayTitle}
               </h3>
 
@@ -221,15 +223,15 @@ export const AdBanner: React.FC<AdBannerProps> = ({
               </p>
             </div>
 
-            <div className="mt-3 sm:mt-2 flex items-center justify-between pt-2 border-t border-stone-200 dark:border-slate-800">
-              <span className="text-[11px] text-[#444444] dark:text-gray-400 font-bold">
+            <div className="mt-3 sm:mt-2 flex items-center justify-between gap-2 flex-wrap pt-2.5 border-t border-stone-200 dark:border-slate-800">
+              <span className="text-[10px] sm:text-[11px] text-[#444444] dark:text-gray-400 font-bold truncate max-w-[240px]">
                 {isProgrammatic ? 'Ad Choices • Google Network' : 'Direct Advertiser Placement'}
               </span>
               <a
                 href={displayUrl}
                 target="_blank"
                 rel="noopener noreferrer sponsored"
-                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-red-600 dark:text-red-400 hover:underline"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-black transition-colors shrink-0 shadow-xs active:scale-95"
               >
                 <span>{displayCta}</span>
                 <span>&rarr;</span>

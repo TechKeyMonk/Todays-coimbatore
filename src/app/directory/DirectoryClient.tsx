@@ -574,6 +574,7 @@ export default function DirectoryPage() {
                 placeholder="Search by business title, owner name, category, or area (e.g. RS Puram, Peelamedu)..."
                 value={searchQuery}
                 onChange={(e) => handleSearchChange(e.target.value)}
+                suppressHydrationWarning={true}
                 className="w-full pl-12 pr-14 py-3.5 sm:py-4 rounded-2xl bg-stone-50 dark:bg-slate-800 text-stone-900 dark:text-white placeholder:text-stone-400 placeholder:truncate text-xs sm:text-sm font-semibold shadow-inner focus:outline-none focus:ring-2 focus:ring-red-600 border border-stone-200 dark:border-slate-700"
               />
               {searchQuery && (
