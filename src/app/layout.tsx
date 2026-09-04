@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '../context/ThemeContext';
 import ScrollRestoration from '../components/ScrollRestoration';
+import DisableDevTools from '../components/DisableDevTools';
 import DynamicHeader from '../components/layout/DynamicHeader';
 import MainLayoutWrapper from '../components/layout/MainLayoutWrapper';
 
@@ -172,6 +173,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <ThemeProvider>
+          <DisableDevTools />
           <ScrollRestoration />
           <MainLayoutWrapper>{children}</MainLayoutWrapper>
         </ThemeProvider>
