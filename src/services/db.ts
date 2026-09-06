@@ -1,3 +1,5 @@
+import { isArticleInCategory } from '@/lib/categories';
+
 export interface Article {
   id: string;
   title: string;
@@ -11,12 +13,15 @@ export interface Article {
   createdAt: string; // ISO 8601 string for created_at DESC sorting
   updatedAt?: string; // ISO 8601 string for updated_at
   isExclusive: boolean;
+  isSpotlight?: boolean;
+  is_spotlight?: boolean;
   status: 'published' | 'draft' | 'archived';
   sourceUrl?: string;
   source_url?: string;
   mediaType: 'image' | 'video';
   imageUrl?: string;
   image?: string;
+  image_url?: string | null;
   mediaUrl?: string;
   videoUrl?: string;
   videoTitle?: string;
@@ -214,10 +219,71 @@ export interface EventRecord {
   description: string;
   organizer: string;
   registrationLink?: string;
+  contactPhone?: string;
   status: 'upcoming' | 'ongoing' | 'completed' | 'cancelled';
   featured?: boolean;
   createdAt?: string;
   updatedAt?: string;
+  slug?: string;
+}
+
+export function mapNewsRowToEvent(row: any): EventRecord {
+  const createdDate = row.created_at ? new Date(row.created_at) : new Date();
+  const formattedDate = !isNaN(createdDate.getTime())
+    ? createdDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    : 'Upcoming';
+
+  const rawImg = row.image_url || row.image || row.og_image_url;
+  const cleanImg =
+    rawImg && typeof rawImg === 'string' && rawImg.trim() !== '' && rawImg.trim() !== 'null' && rawImg.trim() !== 'undefined'
+      ? rawImg.trim()
+      : undefined;
+
+  return {
+    id: row.id,
+    title: row.title || 'Untitled Event',
+    category: (row.category || 'EVENTS').toUpperCase(),
+    date: formattedDate,
+    time: 'All Day Event',
+    venue: 'Coimbatore, Tamil Nadu',
+    organizer: row.author || 'Coimbatore Event Bureau',
+    description: row.content || row.meta_description || row.excerpt || 'Explore upcoming event highlights in Coimbatore.',
+    posterUrl: cleanImg,
+    featured: Boolean(row.is_exclusive || row.featured),
+    videoUrl: row.video_url || undefined,
+    mapLink: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('Coimbatore')}`,
+    status: 'upcoming',
+    createdAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || row.created_at || new Date().toISOString(),
+    slug: row.slug || row.id,
+  };
+}
+
+export function mapDedicatedEventToEvent(e: any): EventRecord {
+  const rawImg = e.image_url || e.posterUrl || e.poster_url;
+  const cleanImg =
+    rawImg && typeof rawImg === 'string' && rawImg.trim() !== '' && rawImg.trim() !== 'null' && rawImg.trim() !== 'undefined'
+      ? rawImg.trim()
+      : undefined;
+
+  return {
+    id: e.id,
+    title: e.event_name || e.title || 'Coimbatore Event',
+    category: (e.category || 'EXPO').toUpperCase(),
+    date: e.event_date || e.date || 'Upcoming',
+    time: e.time || '10:00 AM - 06:00 PM',
+    venue: e.location || e.venue || 'Coimbatore',
+    organizer: e.organizer || 'Coimbatore Event Bureau',
+    description: e.description || '',
+    posterUrl: cleanImg,
+    featured: Boolean(e.featured),
+    videoUrl: e.video_url || e.videoUrl || undefined,
+    mapLink: e.map_link || e.mapLink || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(e.location || e.venue || 'Coimbatore')}`,
+    status: (e.status as any) || 'upcoming',
+    createdAt: e.created_at || new Date().toISOString(),
+    updatedAt: e.updated_at || e.created_at || new Date().toISOString(),
+    slug: e.slug || e.id,
+  };
 }
 
 export interface SocialLinksRecord {
@@ -234,39 +300,21 @@ export const INITIAL_SOCIAL_LINKS_DB: SocialLinksRecord = {
   twitter: 'https://x.com/TechKeyMonk',
 };
 
+export type ContactEnquiryStatus = 'unread' | 'read' | 'replied' | 'converted' | 'resolved' | 'archived';
+
 export interface ContactEnquiryRecord {
   id: string;
   name: string;
   email: string;
   phone: string;
   subject: string;
+  category?: string;
   message: string;
   createdAt: string;
-  status: 'unread' | 'read' | 'replied' | 'archived';
+  status: ContactEnquiryStatus;
 }
 
-export const INITIAL_CONTACT_ENQUIRIES_DB: ContactEnquiryRecord[] = [
-  {
-    id: 'enq-1',
-    name: 'Karthik Sivakumar',
-    email: 'karthik@covaisaas.com',
-    phone: '+91 98422 12345',
-    subject: 'Covering our DeepTech startup launch at Peelamedu',
-    message: 'Hello Editorial Team, we are launching an AI-powered textile spindle monitoring system this month and would love to share a press release.',
-    createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
-    status: 'unread',
-  },
-  {
-    id: 'enq-2',
-    name: 'Dr. Meena Ramesh',
-    email: 'm.ramesh@psghospitals.edu',
-    phone: '+91 94433 67890',
-    subject: 'Blood Donation Camp announcement for this weekend',
-    message: 'We are organizing a city-wide voluntary blood donation drive at PSG IMS&R. Requesting coverage in TodaysCoimbatore.',
-    createdAt: new Date(Date.now() - 14 * 3600 * 1000).toISOString(),
-    status: 'read',
-  },
-];
+export const INITIAL_CONTACT_ENQUIRIES_DB: ContactEnquiryRecord[] = [];
 
 export const INITIAL_DATABASE_ARTICLES: Article[] = [];
 
@@ -580,6 +628,7 @@ export interface DirectoryListing {
   verified?: boolean;
   tags?: string[];
   imageUrl?: string;
+  images?: string[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -616,6 +665,151 @@ export const INITIAL_DIRECTORY_REVIEWS: DirectoryReview[] = [];
 
 export const INITIAL_DIRECTORY_LISTINGS: DirectoryListing[] = [];
 
+/**
+ * Safely purges redundant/duplicate storage keys to free up browser quota.
+ * Ensures canonical key has articles if available before removing duplicates.
+ */
+export function purgeLegacyDuplicateKeys(): void {
+  if (typeof window === 'undefined' || !window.localStorage) return;
+  try {
+    // 1. Ensure canonical key has articles if available in a legacy key
+    if (!localStorage.getItem('t_covai_articles')) {
+      const fallback =
+        localStorage.getItem('admin_published_articles') ||
+        localStorage.getItem('publishedArticles') ||
+        localStorage.getItem('news_articles') ||
+        localStorage.getItem('covai_db_articles');
+      if (fallback) {
+        try {
+          localStorage.setItem('t_covai_articles', fallback);
+        } catch {}
+      }
+    }
+
+    // 2. Remove all redundant duplicate keys
+    const redundantKeys = [
+      'admin_published_articles',
+      'publishedArticles',
+      'news_articles',
+      'covai_db_articles',
+      'covai_db_outages',
+      'power_outages',
+      'covai_db_ads',
+      'adSlots',
+      'covai_db_donors',
+      'blood_donors',
+      'covai_db_events',
+      'events_db',
+      't_covai_directory_v2',
+      'emergency_blood_alerts',
+      'covai_db_enquiries',
+      't_covai_directory_categories_v2',
+      't_covai_directory_verifications_v2',
+      't_covai_directory_reviews_v2',
+      'covai_db_social_links',
+      'covai_db_donor_enquiries',
+    ];
+
+    for (const key of redundantKeys) {
+      try {
+        localStorage.removeItem(key);
+      } catch {}
+    }
+  } catch (err) {
+    console.warn('Storage purge warning:', err);
+  }
+}
+
+/**
+ * Safely writes to localStorage with automatic quota recovery:
+ * - Catches QuotaExceededError and prevents unhandled runtime exceptions.
+ * - Auto-purges legacy duplicate storage keys on quota exhaustion.
+ * - Truncates bulky offline article bodies if quota is extremely constrained.
+ */
+export function safeSetItem(key: string, value: string): boolean {
+  if (typeof window === 'undefined' || !window.localStorage) return false;
+
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch (err: any) {
+    const isQuota =
+      err?.name === 'QuotaExceededError' ||
+      err?.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+      err?.code === 22 ||
+      err?.code === 1014 ||
+      (typeof err?.message === 'string' && err.message.toLowerCase().includes('quota'));
+
+    if (!isQuota) {
+      console.warn(`[Storage] Failed to set "${key}":`, err);
+      return false;
+    }
+
+    // Attempt Recovery 1: Purge all duplicate legacy keys
+    purgeLegacyDuplicateKeys();
+
+    try {
+      localStorage.setItem(key, value);
+      return true;
+    } catch {}
+
+    // Attempt Recovery 2: If key is articles, compress by trimming long content and stripping base64
+    if (key === 't_covai_articles' || key.includes('articles') || key === 'admin_published_articles') {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          const compact = parsed.slice(0, 40).map((a: any) => ({
+            id: a.id || a.slug,
+            title: (a.title || 'Untitled Story').slice(0, 150),
+            slug: a.slug,
+            category: a.category || 'News',
+            publishedAt: a.publishedAt || a.createdAt,
+            createdAt: a.createdAt,
+            updatedAt: a.updatedAt,
+            author: (a.author || 'Editorial Bureau').slice(0, 60),
+            status: a.status || 'published',
+            isExclusive: !!(a.isExclusive || a.isSpotlight),
+            content: a.content && a.content.length > 250 ? a.content.slice(0, 250) + '...' : a.content,
+            imageUrl: typeof a.imageUrl === 'string' && !a.imageUrl.startsWith('data:') ? a.imageUrl : undefined,
+            image: typeof a.image === 'string' && !a.image.startsWith('data:') ? a.image : undefined,
+          }));
+          localStorage.setItem(key, JSON.stringify(compact));
+          return true;
+        }
+      } catch {}
+
+      // Fallback 2b: ultra-minimal fields
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          const minimal = parsed.slice(0, 50).map((a: any) => ({
+            id: a.id || a.slug,
+            title: (a.title || 'Untitled Story').slice(0, 120),
+            slug: a.slug,
+            category: a.category || 'News',
+            publishedAt: a.publishedAt || a.createdAt,
+          }));
+          localStorage.setItem(key, JSON.stringify(minimal));
+          return true;
+        }
+      } catch {}
+    }
+
+    // Attempt Recovery 3: Clear any stale non-critical cache keys
+    try {
+      const keysToClear = ['t_covai_outages', 't_covai_ads', 't_covai_events', 't_covai_donors'];
+      for (const k of keysToClear) {
+        if (k !== key) localStorage.removeItem(k);
+      }
+      localStorage.setItem(key, value);
+      return true;
+    } catch {}
+
+    console.warn('LocalStorage quota exceeded. Skipping local cache update.');
+    return false;
+  }
+}
+
 // Production Database Service with Local Persistence & Zero Auto-Deletion
 class DatabaseService {
   private articles: Article[] = [...INITIAL_DATABASE_ARTICLES];
@@ -627,7 +821,7 @@ class DatabaseService {
   private emergencyAlerts: EmergencyBloodAlert[] = [...INITIAL_EMERGENCY_ALERTS_DB];
   private events: EventRecord[] = [...INITIAL_EVENTS_DB];
   private socialLinks: SocialLinksRecord = { ...INITIAL_SOCIAL_LINKS_DB };
-  private enquiries: ContactEnquiryRecord[] = [...INITIAL_CONTACT_ENQUIRIES_DB];
+  private enquiries: ContactEnquiryRecord[] = [];
   private directoryListings: DirectoryListing[] = [...INITIAL_DIRECTORY_LISTINGS];
   private directoryCategories: DirectoryCategoryRecord[] = [...INITIAL_DIRECTORY_CATEGORIES];
   private verifications: DirectoryVerificationRecord[] = [...INITIAL_DIRECTORY_VERIFICATIONS];
@@ -640,6 +834,7 @@ class DatabaseService {
   private lastEnquiriesSyncTime = 0;
 
   constructor() {
+    purgeLegacyDuplicateKeys();
     this.reloadFromStorage();
 
     if (this.isClient) {
@@ -710,57 +905,48 @@ class DatabaseService {
           if (Array.isArray(d.articles)) {
             this.articles = d.articles;
             const dataStr = JSON.stringify(d.articles);
-            localStorage.setItem('t_covai_articles', dataStr);
-            localStorage.setItem('admin_published_articles', dataStr);
-            localStorage.setItem('publishedArticles', dataStr);
-            localStorage.setItem('news_articles', dataStr);
-            localStorage.setItem('covai_db_articles', dataStr);
+            safeSetItem('t_covai_articles', dataStr);
             changed = true;
           }
 
           if (Array.isArray(d.listings)) {
             this.directoryListings = d.listings;
             const dataStr = JSON.stringify(d.listings);
-            localStorage.setItem('tc_directory_listings_v2', dataStr);
-            localStorage.setItem('t_covai_directory_v2', dataStr);
+            safeSetItem('tc_directory_listings_v2', dataStr);
             changed = true;
           }
 
           if (Array.isArray(d.categories)) {
             this.directoryCategories = d.categories;
-            localStorage.setItem('tc_directory_categories_v2', JSON.stringify(d.categories));
+            safeSetItem('tc_directory_categories_v2', JSON.stringify(d.categories));
             changed = true;
           }
 
           if (Array.isArray(d.bloodDonors)) {
             this.donors = d.bloodDonors;
             const dataStr = JSON.stringify(d.bloodDonors);
-            localStorage.setItem('t_covai_donors', dataStr);
-            localStorage.setItem('blood_donors', dataStr);
+            safeSetItem('t_covai_donors', dataStr);
             changed = true;
           }
 
           if (Array.isArray(d.events)) {
             this.events = d.events;
             const dataStr = JSON.stringify(d.events);
-            localStorage.setItem('t_covai_events', dataStr);
-            localStorage.setItem('events_db', dataStr);
+            safeSetItem('t_covai_events', dataStr);
             changed = true;
           }
 
           if (Array.isArray(d.outages) && d.outages.length > 0) {
             this.outages = d.outages;
             const dataStr = JSON.stringify(d.outages);
-            localStorage.setItem('t_covai_outages', dataStr);
-            localStorage.setItem('power_outages', dataStr);
+            safeSetItem('t_covai_outages', dataStr);
             changed = true;
           }
 
           if (Array.isArray(d.ads) && d.ads.length > 0) {
             this.ads = d.ads;
             const dataStr = JSON.stringify(d.ads);
-            localStorage.setItem('t_covai_ads', dataStr);
-            localStorage.setItem('adSlots', dataStr);
+            safeSetItem('t_covai_ads', dataStr);
             changed = true;
           }
 
@@ -772,13 +958,13 @@ class DatabaseService {
               facebook: isLegacy(d.socialLinks.facebook) ? INITIAL_SOCIAL_LINKS_DB.facebook : d.socialLinks.facebook,
               twitter: isLegacy(d.socialLinks.twitter) ? INITIAL_SOCIAL_LINKS_DB.twitter : d.socialLinks.twitter,
             };
-            localStorage.setItem('t_covai_social_links', JSON.stringify(this.socialLinks));
+            safeSetItem('t_covai_social_links', JSON.stringify(this.socialLinks));
             changed = true;
           }
 
           if (Array.isArray(d.emergencyAlerts) && d.emergencyAlerts.length > 0) {
             this.emergencyAlerts = d.emergencyAlerts;
-            localStorage.setItem('t_covai_emergency_blood', JSON.stringify(d.emergencyAlerts));
+            safeSetItem('t_covai_emergency_blood', JSON.stringify(d.emergencyAlerts));
             changed = true;
           }
 
@@ -793,24 +979,24 @@ class DatabaseService {
               email: e.email || (e.user_phone?.includes('@') ? e.user_phone : ''),
               phone: e.phone || (!e.user_phone?.includes('@') ? e.user_phone : ''),
               subject: e.subject || e.service_requested || 'General Enquiry',
+              category: e.category || e.service_requested || e.subject || 'General Query',
               message: e.message || '',
               status: (e.status?.toLowerCase() === 'pending' ? 'unread' : (e.status?.toLowerCase() || 'unread')) as any,
               createdAt: e.createdAt || e.created_at || new Date().toISOString(),
             }));
             this.enquiries = mappedEnquiries;
-            localStorage.setItem('t_covai_enquiries', JSON.stringify(mappedEnquiries));
-            localStorage.setItem('covai_db_enquiries', JSON.stringify(mappedEnquiries));
+            safeSetItem('t_covai_enquiries', JSON.stringify(mappedEnquiries));
             changed = true;
           }
 
           if (Array.isArray(d.verifications) && d.verifications.length > 0) {
             this.verifications = d.verifications;
-            localStorage.setItem('tc_directory_verifications_v2', JSON.stringify(d.verifications));
+            safeSetItem('tc_directory_verifications_v2', JSON.stringify(d.verifications));
           }
 
           if (Array.isArray(d.reviews) && d.reviews.length > 0) {
             this.reviews = d.reviews;
-            localStorage.setItem('tc_directory_reviews_v2', JSON.stringify(d.reviews));
+            safeSetItem('tc_directory_reviews_v2', JSON.stringify(d.reviews));
           }
 
           this.lastServerSyncTime = Date.now();
@@ -841,7 +1027,7 @@ class DatabaseService {
           this.articles = parsed;
         }
       } else {
-        localStorage.setItem('t_covai_articles', JSON.stringify(this.articles));
+        safeSetItem('t_covai_articles', JSON.stringify(this.articles));
       }
 
       const storedCategories = localStorage.getItem('covai_db_categories');
@@ -891,8 +1077,7 @@ class DatabaseService {
           });
         }
       } else {
-        localStorage.setItem('t_covai_ads', JSON.stringify(this.ads));
-        localStorage.setItem('adSlots', JSON.stringify(this.ads));
+        safeSetItem('t_covai_ads', JSON.stringify(this.ads));
       }
 
       const storedDonors =
@@ -940,7 +1125,7 @@ class DatabaseService {
             facebook: isLegacy(parsed.facebook) ? INITIAL_SOCIAL_LINKS_DB.facebook : parsed.facebook,
             twitter: isLegacy(parsed.twitter) ? INITIAL_SOCIAL_LINKS_DB.twitter : parsed.twitter,
           };
-          localStorage.setItem('t_covai_social_links', JSON.stringify(this.socialLinks));
+          safeSetItem('t_covai_social_links', JSON.stringify(this.socialLinks));
         }
       }
 
@@ -948,10 +1133,19 @@ class DatabaseService {
         localStorage.getItem('t_covai_enquiries') ||
         localStorage.getItem('covai_db_enquiries');
       if (storedEnquiries) {
-        const parsed = JSON.parse(storedEnquiries);
-        if (Array.isArray(parsed)) {
-          this.enquiries = parsed;
+        try {
+          const parsed = JSON.parse(storedEnquiries);
+          if (Array.isArray(parsed)) {
+            const mockIds = new Set(['enq-1', 'enq-2', 'enq-3', 'enq-4', 'enq-5']);
+            this.enquiries = parsed.filter((e) => !mockIds.has(e.id));
+          } else {
+            this.enquiries = [];
+          }
+        } catch {
+          this.enquiries = [];
         }
+      } else {
+        this.enquiries = [];
       }
 
       const storedDirectory =
@@ -1001,7 +1195,7 @@ class DatabaseService {
         }
       } else {
         this.directoryCategories = [...INITIAL_DIRECTORY_CATEGORIES];
-        localStorage.setItem('tc_directory_categories_v2', JSON.stringify(INITIAL_DIRECTORY_CATEGORIES));
+        safeSetItem('tc_directory_categories_v2', JSON.stringify(INITIAL_DIRECTORY_CATEGORIES));
       }
 
       const storedVerifications =
@@ -1013,7 +1207,7 @@ class DatabaseService {
           this.verifications = parsed;
         }
       } else {
-        localStorage.setItem('tc_directory_verifications_v2', JSON.stringify(INITIAL_DIRECTORY_VERIFICATIONS));
+        safeSetItem('tc_directory_verifications_v2', JSON.stringify(INITIAL_DIRECTORY_VERIFICATIONS));
       }
 
       const storedReviews =
@@ -1025,7 +1219,7 @@ class DatabaseService {
           this.reviews = parsed;
         }
       } else {
-        localStorage.setItem('tc_directory_reviews_v2', JSON.stringify(INITIAL_DIRECTORY_REVIEWS));
+        safeSetItem('tc_directory_reviews_v2', JSON.stringify(INITIAL_DIRECTORY_REVIEWS));
       }
 
       const storedDonorEnquiries =
@@ -1068,95 +1262,79 @@ class DatabaseService {
     if (!this.isClient) return;
     try {
       if (table === 'articles') {
-        const data = JSON.stringify(this.articles);
-        localStorage.setItem('t_covai_articles', data);
-        localStorage.setItem('admin_published_articles', data);
-        localStorage.setItem('publishedArticles', data);
-        localStorage.setItem('news_articles', data);
-        localStorage.setItem('covai_db_articles', data);
+        try {
+          const data = JSON.stringify(this.articles);
+          safeSetItem('t_covai_articles', data);
+        } catch (e) {
+          console.warn('LocalStorage quota exceeded. Skipping local cache update.');
+        }
         window.dispatchEvent(new Event('newsStorageUpdate'));
       }
       if (table === 'categories') {
-        localStorage.setItem('covai_db_categories', JSON.stringify(this.categories));
+        safeSetItem('covai_db_categories', JSON.stringify(this.categories));
       }
       if (table === 'users') {
-        localStorage.setItem('covai_db_users', JSON.stringify(this.users));
+        safeSetItem('covai_db_users', JSON.stringify(this.users));
       }
       if (table === 'outages') {
         const data = JSON.stringify(this.outages);
-        localStorage.setItem('t_covai_outages', data);
-        localStorage.setItem('covai_db_outages', data);
-        localStorage.setItem('power_outages', data);
+        safeSetItem('t_covai_outages', data);
         window.dispatchEvent(new Event('outagesStorageUpdate'));
       }
       if (table === 'ads') {
         const data = JSON.stringify(this.ads);
-        localStorage.setItem('t_covai_ads', data);
-        localStorage.setItem('covai_db_ads', data);
-        localStorage.setItem('adSlots', data);
+        safeSetItem('t_covai_ads', data);
         window.dispatchEvent(new Event('adsStorageUpdate'));
       }
       if (table === 'donors') {
         const data = JSON.stringify(this.donors);
-        localStorage.setItem('t_covai_donors', data);
-        localStorage.setItem('covai_db_donors', data);
-        localStorage.setItem('blood_donors', data);
+        safeSetItem('t_covai_donors', data);
         window.dispatchEvent(new Event('donorsStorageUpdate'));
       }
       if (table === 'emergency_blood') {
         const data = JSON.stringify(this.emergencyAlerts);
-        localStorage.setItem('t_covai_emergency_blood', data);
-        localStorage.setItem('emergency_blood_alerts', data);
+        safeSetItem('t_covai_emergency_blood', data);
       }
       if (table === 'events') {
         const data = JSON.stringify(this.events);
-        localStorage.setItem('t_covai_events', data);
-        localStorage.setItem('covai_db_events', data);
-        localStorage.setItem('events_db', data);
+        safeSetItem('t_covai_events', data);
         window.dispatchEvent(new Event('eventsStorageUpdate'));
       }
       if (table === 'social_links') {
         const data = JSON.stringify(this.socialLinks);
-        localStorage.setItem('t_covai_social_links', data);
-        localStorage.setItem('covai_db_social_links', data);
+        safeSetItem('t_covai_social_links', data);
       }
       if (table === 'enquiries') {
         const data = JSON.stringify(this.enquiries);
-        localStorage.setItem('t_covai_enquiries', data);
-        localStorage.setItem('covai_db_enquiries', data);
+        safeSetItem('t_covai_enquiries', data);
         window.dispatchEvent(new Event('enquiriesStorageUpdate'));
       }
       if (table === 'directory') {
         const data = JSON.stringify(this.directoryListings);
-        localStorage.setItem('tc_directory_listings_v2', data);
-        localStorage.setItem('t_covai_directory_v2', data);
+        safeSetItem('tc_directory_listings_v2', data);
         window.dispatchEvent(new Event('directoryStorageUpdate'));
       }
       if (table === 'directory_categories') {
         const data = JSON.stringify(this.directoryCategories);
-        localStorage.setItem('tc_directory_categories_v2', data);
-        localStorage.setItem('t_covai_directory_categories_v2', data);
+        safeSetItem('tc_directory_categories_v2', data);
       }
       if (table === 'verifications') {
         const data = JSON.stringify(this.verifications);
-        localStorage.setItem('tc_directory_verifications_v2', data);
-        localStorage.setItem('t_covai_directory_verifications_v2', data);
+        safeSetItem('tc_directory_verifications_v2', data);
       }
       if (table === 'reviews') {
         const data = JSON.stringify(this.reviews);
-        localStorage.setItem('tc_directory_reviews_v2', data);
-        localStorage.setItem('t_covai_directory_reviews_v2', data);
+        safeSetItem('tc_directory_reviews_v2', data);
       }
       if (table === 'donor_enquiries') {
         const data = JSON.stringify(this.donorEnquiries);
-        localStorage.setItem('tc_donor_enquiries_v1', data);
-        localStorage.setItem('covai_db_donor_enquiries', data);
+        safeSetItem('tc_donor_enquiries_v1', data);
       }
 
       window.dispatchEvent(new CustomEvent('todayscoimbatore:db-updated', { detail: { table } }));
       this.notify();
     } catch (e) {
-      console.error(`Error saving ${table}`, e);
+      console.warn(`Storage persistence notice for ${table}:`, e);
     }
   }
 
@@ -1164,9 +1342,10 @@ class DatabaseService {
   public async getArticles(category?: string): Promise<Article[]> {
     this.reloadFromStorage();
     let list = this.articles.filter((a) => a.status !== 'draft');
-    if (category && category !== 'ALL') {
-      const normCat = category.toUpperCase().trim();
-      list = list.filter((a) => a.category?.toUpperCase().trim() === normCat);
+    if (category && category.toUpperCase() !== 'ALL') {
+      list = list.filter((a) => isArticleInCategory(a, category));
+    } else {
+      list = list.filter((a) => (a.category || '').toUpperCase().trim() !== 'EVENTS');
     }
 
     return list.sort((a, b) => {
@@ -1189,21 +1368,31 @@ class DatabaseService {
   }
 
   public async createArticle(data: Partial<Article>): Promise<Article> {
-    const wordCount = ((data.content || '') + ' ' + (data.title || '')).trim().split(/\s+/).filter(Boolean).length;
+    const rawTitle = (data.title || 'Untitled Coimbatore Story').trim();
+    const wordCount = (((data.content || '') + ' ' + rawTitle).trim().split(/\s+/).filter(Boolean)).length;
     const computedReadTime = data.readTime || `${Math.max(1, Math.ceil(wordCount / 130))} min`;
     const resolvedImg = data.imageUrl || data.image || data.mediaUrl;
     const finalImg = resolvedImg && typeof resolvedImg === 'string' && resolvedImg.trim() !== '' && resolvedImg.trim() !== 'null' && resolvedImg.trim() !== 'undefined'
       ? resolvedImg.trim()
       : undefined;
 
-    const slug = data.slug || (data.title ? data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '') : `news-${Date.now()}`);
+    const rawSlugCandidate = (data.slug || rawTitle)
+      .toLowerCase()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 90)
+      .replace(/-+$/, '');
+    const slug = rawSlugCandidate || `news-${Date.now()}`;
     const nowIso = data.createdAt || data.updatedAt || new Date().toISOString();
+    const safeContent = (data.content || data.excerpt || rawTitle).trim();
+    const safeExcerpt = (data.excerpt || safeContent).slice(0, 200) || 'Coimbatore hyper-local reporting.';
 
     const newArticle: Article = {
       id: data.id || `art-${Date.now()}`,
-      title: data.title || 'Untitled Coimbatore Story',
+      title: rawTitle,
       slug: slug,
-      category: data.category || 'NEWS',
+      category: (data.category && data.category.toUpperCase().trim() === 'EVENTS') ? 'NEWS' : (data.category || 'NEWS'),
       subCategory: data.subCategory || 'General',
       subTag: data.subTag || data.category || 'General',
       author: data.author || 'Editorial Bureau',
@@ -1211,18 +1400,21 @@ class DatabaseService {
       publishedAt: nowIso,
       createdAt: nowIso,
       updatedAt: nowIso,
-      isExclusive: !!data.isExclusive,
+      isExclusive: !!(data.isExclusive || data.isSpotlight || data.is_spotlight),
+      isSpotlight: !!(data.isExclusive || data.isSpotlight || data.is_spotlight),
+      is_spotlight: !!(data.isExclusive || data.isSpotlight || data.is_spotlight),
       status: data.status || 'published',
       mediaType: data.mediaType === 'video' ? 'video' : 'image',
       imageUrl: finalImg,
       image: finalImg,
+      image_url: finalImg || null,
       mediaUrl: data.mediaType === 'video' ? data.videoUrl : finalImg,
       videoUrl: data.mediaType === 'video' ? data.videoUrl : undefined,
-      videoTitle: data.videoTitle || data.title,
+      videoTitle: data.videoTitle || rawTitle,
       videoDuration: data.videoDuration || '03:00',
-      excerpt: data.excerpt || data.content?.slice(0, 180) || 'Coimbatore hyper-local reporting.',
-      content: data.content || '',
-      highlightStat: data.highlightStat || (data.isExclusive ? 'Spotlight Exclusive' : 'Breaking Story'),
+      excerpt: safeExcerpt,
+      content: safeContent,
+      highlightStat: data.highlightStat || (data.isExclusive || data.isSpotlight || data.is_spotlight ? 'Spotlight Exclusive' : 'Breaking Story'),
       commentsCount: 0,
       articleHref: `/article/${slug}`,
     };
@@ -1244,10 +1436,16 @@ class DatabaseService {
             const canonical = json.data as Article;
             this.articles = [canonical, ...this.articles.filter((a) => a.id !== newArticle.id && a.slug !== newArticle.slug && a.id !== canonical.id)];
             this.persist('articles');
+            return canonical;
           }
+        } else {
+          const errJson = await res.json().catch(() => ({}));
+          console.error('Failed to sync new article to Supabase:', errJson);
+          throw new Error(errJson?.error || `Server returned error (${res.status}) saving article`);
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error('Failed to sync new article to Supabase:', e);
+        throw e;
       }
     }
 
@@ -1258,25 +1456,54 @@ class DatabaseService {
     const idx = this.articles.findIndex((a) => a.id === id || a.slug === id);
     if (idx === -1) return null;
 
-    const resolvedImg = updates.imageUrl !== undefined ? updates.imageUrl : updates.image !== undefined ? updates.image : updates.mediaUrl !== undefined ? updates.mediaUrl : this.articles[idx].imageUrl;
-    const finalImg = resolvedImg && typeof resolvedImg === 'string' && resolvedImg.trim() !== '' && resolvedImg.trim() !== 'null' && resolvedImg.trim() !== 'undefined'
-      ? resolvedImg.trim()
-      : undefined;
+    const safeUpdates = { ...updates };
+    if (safeUpdates.category && safeUpdates.category.toUpperCase().trim() === 'EVENTS') {
+      delete safeUpdates.category;
+    }
 
-    const nowIso = updates.updatedAt || new Date().toISOString();
+    const imageExplicitlyRemoved = 
+      safeUpdates.image_url === null ||
+      safeUpdates.imageUrl === null ||
+      safeUpdates.imageUrl === '' ||
+      safeUpdates.image === null ||
+      safeUpdates.image === '' ||
+      ('imageUrl' in safeUpdates && !safeUpdates.imageUrl && !safeUpdates.image && !safeUpdates.mediaUrl);
+
+    let finalImg: string | undefined;
+    if (imageExplicitlyRemoved) {
+      finalImg = undefined;
+    } else {
+      const resolvedImg = safeUpdates.imageUrl !== undefined 
+        ? safeUpdates.imageUrl 
+        : safeUpdates.image !== undefined 
+          ? safeUpdates.image 
+          : safeUpdates.image_url !== undefined
+            ? safeUpdates.image_url
+            : safeUpdates.mediaUrl !== undefined 
+              ? safeUpdates.mediaUrl 
+              : this.articles[idx].imageUrl;
+      finalImg = resolvedImg && typeof resolvedImg === 'string' && resolvedImg.trim() !== '' && resolvedImg.trim() !== 'null' && resolvedImg.trim() !== 'undefined'
+        ? resolvedImg.trim()
+        : undefined;
+    }
+
+    const nowIso = safeUpdates.updatedAt || new Date().toISOString();
 
     this.articles[idx] = {
       ...this.articles[idx],
-      ...updates,
+      ...safeUpdates,
       updatedAt: nowIso,
       createdAt: updates.createdAt || this.articles[idx].createdAt || nowIso,
       publishedAt: nowIso,
-      isExclusive: updates.isExclusive !== undefined ? !!updates.isExclusive : this.articles[idx].isExclusive,
-      imageUrl: updates.mediaType === 'image' || updates.imageUrl !== undefined || updates.image !== undefined ? finalImg : this.articles[idx].imageUrl,
-      image: updates.mediaType === 'image' || updates.imageUrl !== undefined || updates.image !== undefined ? finalImg : this.articles[idx].image,
+      isExclusive: updates.isSpotlight !== undefined ? !!updates.isSpotlight : (updates.is_spotlight !== undefined ? !!updates.is_spotlight : (updates.isExclusive !== undefined ? !!updates.isExclusive : this.articles[idx].isExclusive)),
+      isSpotlight: updates.isSpotlight !== undefined ? !!updates.isSpotlight : (updates.is_spotlight !== undefined ? !!updates.is_spotlight : (updates.isExclusive !== undefined ? !!updates.isExclusive : this.articles[idx].isExclusive)),
+      is_spotlight: updates.isSpotlight !== undefined ? !!updates.isSpotlight : (updates.is_spotlight !== undefined ? !!updates.is_spotlight : (updates.isExclusive !== undefined ? !!updates.isExclusive : this.articles[idx].isExclusive)),
+      imageUrl: updates.mediaType === 'image' || updates.imageUrl !== undefined || updates.image !== undefined || imageExplicitlyRemoved ? finalImg : this.articles[idx].imageUrl,
+      image: updates.mediaType === 'image' || updates.imageUrl !== undefined || updates.image !== undefined || imageExplicitlyRemoved ? finalImg : this.articles[idx].image,
+      image_url: updates.mediaType === 'image' || updates.imageUrl !== undefined || updates.image !== undefined || imageExplicitlyRemoved ? (finalImg || null) : (this.articles[idx].image_url || null),
       mediaUrl: updates.mediaType === 'video' ? (updates.videoUrl || this.articles[idx].videoUrl) : finalImg,
       videoUrl: updates.mediaType === 'video' ? (updates.videoUrl || this.articles[idx].videoUrl) : this.articles[idx].videoUrl,
-      highlightStat: updates.isExclusive ? 'Spotlight Exclusive' : (updates.highlightStat || this.articles[idx].highlightStat),
+      highlightStat: (updates.isSpotlight || updates.is_spotlight || updates.isExclusive) ? 'Spotlight Exclusive' : (updates.highlightStat || this.articles[idx].highlightStat),
     };
     this.persist('articles');
 
@@ -1294,6 +1521,10 @@ class DatabaseService {
             this.articles[idx] = {
               ...this.articles[idx],
               ...json.data,
+              imageUrl: finalImg,
+              image: finalImg,
+              image_url: finalImg || null,
+              mediaUrl: updates.mediaType === 'video' ? (updates.videoUrl || this.articles[idx].videoUrl) : finalImg,
               updatedAt: nowIso,
               createdAt: this.articles[idx].createdAt || nowIso,
             };
@@ -1327,7 +1558,11 @@ class DatabaseService {
     // 2. Only mutate and persist local state after successful database deletion
     const beforeCount = this.articles.length;
     this.articles = this.articles.filter((a) => a.id !== id && a.slug !== id);
-    this.persist('articles');
+    try {
+      this.persist('articles');
+    } catch (persistErr) {
+      console.warn('LocalStorage quota exceeded during delete article. Memory state active.', persistErr);
+    }
 
     return true;
   }
@@ -1879,7 +2114,15 @@ class DatabaseService {
   // Events CRUD
   public async getEvents(): Promise<EventRecord[]> {
     this.reloadFromStorage();
-    return [...this.events];
+    const eventArticles = this.articles.filter((a) => isArticleInCategory(a, 'events'));
+    const mappedNewsEvents = eventArticles.map(mapNewsRowToEvent);
+    const combined = [...mappedNewsEvents];
+    for (const e of this.events) {
+      if (!combined.some((c) => c.id === e.id || c.title.toLowerCase() === e.title.toLowerCase())) {
+        combined.push(e);
+      }
+    }
+    return combined;
   }
 
   public async saveEvents(events: EventRecord[]): Promise<boolean> {
@@ -1969,12 +2212,12 @@ class DatabaseService {
   public async getContactEnquiries(): Promise<ContactEnquiryRecord[]> {
     this.reloadFromStorage();
     const now = Date.now();
-    if (this.isClient && now - this.lastEnquiriesSyncTime > 15000) {
+    if (this.isClient && now - this.lastEnquiriesSyncTime > 4000) {
       this.lastEnquiriesSyncTime = now;
       fetch('/api/content?entity=enquiries', { cache: 'no-store' })
         .then((res) => res.json())
         .then((json) => {
-          if (json.success && Array.isArray(json.data) && json.data.length > 0) {
+          if (json.success && Array.isArray(json.data)) {
             // Guard: never populate local cache with system config rows
             const userRows = json.data.filter(
               (e: any) => !String(e.user_name || '').startsWith('__SYSTEM_CONFIG_')
@@ -1985,6 +2228,7 @@ class DatabaseService {
               email: e.email || (e.user_phone?.includes('@') ? e.user_phone : ''),
               phone: e.phone || (!e.user_phone?.includes('@') ? e.user_phone : ''),
               subject: e.subject || e.service_requested || 'General Enquiry',
+              category: e.category || e.service_requested || e.subject || 'General Query',
               message: e.message || '',
               status: (e.status?.toLowerCase() === 'pending' ? 'unread' : (e.status?.toLowerCase() || 'unread')) as any,
               createdAt: e.createdAt || e.created_at || new Date().toISOString(),
@@ -1995,6 +2239,7 @@ class DatabaseService {
               this.enquiries = mapped;
               localStorage.setItem('t_covai_enquiries', nextStr);
               localStorage.setItem('covai_db_enquiries', nextStr);
+              this.notify();
               window.dispatchEvent(new Event('enquiriesStorageUpdate'));
             }
           }
@@ -2008,6 +2253,7 @@ class DatabaseService {
     this.reloadFromStorage();
     const newEnquiry: ContactEnquiryRecord = {
       ...data,
+      category: data.category || data.subject || 'General Query',
       id: `enq-${Date.now()}`,
       createdAt: new Date().toISOString(),
       status: 'unread',
@@ -2023,6 +2269,7 @@ class DatabaseService {
           name: data.name,
           email: data.email,
           phone: data.phone || '',
+          category: data.category || data.subject || 'General Query',
           subject: data.subject || 'Contact Form',
           message: data.message,
         }),
@@ -2059,6 +2306,7 @@ class DatabaseService {
     const before = this.enquiries.length;
     this.enquiries = this.enquiries.filter((e) => e.id !== id);
     this.persist('enquiries');
+    this.notify();
     if (this.isClient) {
       // Use direct DELETE verb targeting only real user enquiry rows
       fetch(`/api/content?entity=enquiries&id=${encodeURIComponent(id)}`, {
@@ -2285,6 +2533,13 @@ class DatabaseService {
     };
     this.directoryCategories.push(newCategory);
     this.persist('directory_categories');
+    if (this.isClient) {
+      fetch('/api/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'create_category', data: newCategory }),
+      }).catch((e) => console.error('Failed to sync category to server:', e));
+    }
     return newCategory;
   }
 

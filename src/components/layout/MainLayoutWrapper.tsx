@@ -94,6 +94,7 @@ export default function MainLayoutWrapper({
       '/about-us',
       '/contact',
       '/contact-us',
+      '/enquiry',
       '/tneb-updates',
       '/events',
       '/blood-donor',
@@ -136,13 +137,13 @@ export default function MainLayoutWrapper({
     );
   }
 
-  // RULE 2: Home, Category, Article, Search (3-Column with DynamicHeader and Bound Sticky Sidebars)
+  // RULE 2: Home, Category, Article, Search (Locked Sidebar Proportions with Elastic Center Feed)
   return (
     <>
       <DynamicHeader />
-      <div className="w-full px-2 md:px-4 lg:px-6 mx-auto pt-3 md:pt-4 flex flex-row items-start justify-between min-h-screen gap-4 relative">
+      <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 pt-3 md:pt-4 flex flex-col lg:flex-row items-start justify-between min-h-screen gap-4 lg:gap-5 relative">
         
-        {/* LEFT UNIFIED STICKY SIDEBAR (210px) */}
+        {/* LEFT UNIFIED STICKY SIDEBAR (210 x 400 Rail Width: w-[210px] shrink-0) */}
         <aside
           style={{
             position: 'sticky',
@@ -152,23 +153,22 @@ export default function MainLayoutWrapper({
             maxHeight: 'calc(100vh - 32px)',
             zIndex: 20,
             width: '210px',
-            flexShrink: 0,
           }}
-          className="hidden xl:block w-[210px] flex-shrink-0 space-y-3 no-scrollbar sticky top-4 self-start transition-all duration-300"
+          className="hidden lg:block w-[210px] shrink-0 space-y-4 no-scrollbar sticky top-4 self-start transition-all duration-300 min-w-0"
         >
           {/* Top Left Dynamic Micro Widget: HOME = Bullion Rate, INNER = Live Traffic Alerts */}
           {isHomePage ? <CovaiBullionWidget /> : <CovaiTrafficWidget />}
 
-          {/* Dynamic Left Side Banner Ad (210x400 Vertical) */}
+          {/* Dynamic Left Side Banner Ad (210 x 400) */}
           <AdSlider ad={leftAd} variant="sidebar" label="SPONSORED AD" />
         </aside>
 
-        {/* CENTER MAIN FEED */}
-        <main className="flex-1 min-w-0 space-y-4">
+        {/* CENTER MAIN FEED (Boundary Guarded: flex-1 w-full min-w-0 overflow-hidden) */}
+        <main className="flex-1 w-full min-w-0 space-y-4 overflow-hidden">
           {children}
         </main>
 
-        {/* RIGHT UNIFIED STICKY SIDEBAR (210px) */}
+        {/* RIGHT UNIFIED STICKY SIDEBAR (210 x 400 Rail Width: w-[210px] shrink-0) */}
         <aside
           style={{
             position: 'sticky',
@@ -178,14 +178,13 @@ export default function MainLayoutWrapper({
             maxHeight: 'calc(100vh - 32px)',
             zIndex: 20,
             width: '210px',
-            flexShrink: 0,
           }}
-          className="hidden xl:block w-[210px] flex-shrink-0 space-y-3 no-scrollbar sticky top-4 self-start transition-all duration-300"
+          className="hidden lg:block w-[210px] shrink-0 space-y-4 no-scrollbar sticky top-4 self-start transition-all duration-300 min-w-0"
         >
           {/* Top Right Dynamic Micro Widget: HOME = Weather & AQI, INNER = Covai Pulse Poll */}
           {isHomePage ? <CovaiWeatherWidget /> : <PollWidget />}
 
-          {/* Dynamic Right Side Banner Ad (210x400 Vertical) */}
+          {/* Dynamic Right Side Banner Ad (210 x 400) */}
           <AdSlider ad={rightAd} variant="sidebar" label="FEATURED AD" />
         </aside>
 

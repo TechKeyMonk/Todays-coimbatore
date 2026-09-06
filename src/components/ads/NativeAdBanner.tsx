@@ -1,4 +1,5 @@
 import React from 'react';
+import Image from 'next/image';
 
 export type AdFormat = 'leaderboard' | 'medium-rectangle' | 'half-page' | 'in-feed';
 
@@ -155,7 +156,11 @@ export const NativeAdBanner: React.FC<NativeAdBannerProps> = ({
   showPlaceholder = true,
   children,
 }) => {
-  const activeFormat: AdFormat = format || type || 'leaderboard';
+  const rawFormat = (format || type || 'leaderboard') as string;
+  const activeFormat: AdFormat =
+    rawFormat === 'hero_banner' || rawFormat === 'large_banner' || rawFormat === 'in_feed_compact'
+      ? 'in-feed'
+      : (rawFormat as AdFormat);
 
   // If custom child ad script or node is provided, wrap in standardized container
   if (children) {
@@ -445,72 +450,66 @@ export const NativeAdBanner: React.FC<NativeAdBannerProps> = ({
   /* ------------------------------------------------------------------------ */
   /*                            Format: In-Feed                               */
   /*                  (Blends seamlessly into article feeds)                  */
-  /* ------------------------------------------------------------------------ */
+  const enquiryTargetUrl = ctaUrl && ctaUrl !== '#' ? ctaUrl : '/enquiry';
+
   return (
-    <div className={`my-4 overflow-hidden rounded-xl bg-white max-md:p-0 p-2 border border-gray-200 dark:border-slate-800 dark:bg-slate-900 shadow-sm flex items-center justify-center isolation-isolate w-full max-w-full max-md:mx-0 ${className}`}>
-      <aside
-        role="region"
-        aria-label="Sponsored In-Feed Article"
-        data-ad-slot={slotId}
-        className="group relative w-full overflow-hidden rounded-xl border border-stone-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 sm:p-5 text-[#111111] dark:text-white shadow-xs transition-all duration-200 hover:border-stone-400 dark:hover:border-slate-700 max-md:w-full"
-      >
-        <div className="flex flex-col sm:flex-row gap-4 sm:gap-5">
-          {/* Left / Top Image Thumbnail */}
-          <div className="relative sm:w-48 sm:h-32 w-full h-44 flex-shrink-0 overflow-hidden rounded-lg border border-stone-300 dark:border-slate-700 bg-[#f8f6f0] dark:bg-slate-800 flex items-center justify-center">
-            {validImageUrl ? (
-              <img
-                src={validImageUrl}
-                alt={displayTitle}
-                style={{ filter: 'none', mixBlendMode: 'normal', opacity: 1 }}
-                className="!filter-none !mix-blend-normal !opacity-100 dark:!filter-none object-contain mx-auto block ad-banner-media h-full w-full transition-transform duration-300 group-hover:scale-105"
-              />
-            ) : (
-              <div className="flex flex-col items-center justify-center gap-1.5 text-[#444444] dark:text-gray-400 p-2 text-center">
-                <PhotoPlaceholderIcon className="w-8 h-8 text-stone-500 dark:text-stone-400" />
-                <span className="text-[11px] font-black text-[#333333] dark:text-gray-300">
-                  Sponsored Feature
-                </span>
-              </div>
-            )}
-            <span className="absolute top-2 left-2 rounded bg-white/95 dark:bg-slate-800/95 px-2 py-0.5 text-[10px] font-black tracking-wider text-red-600 dark:text-red-400 uppercase border border-stone-300 dark:border-slate-700">
-              {badgeText}
+    <div
+      className={`my-6 w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900 ${className}`}
+    >
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 min-w-0">
+        {/* Extended Thumbnail + Details Flex Group */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 min-w-0 flex-1">
+          {/* Wider Image Area (Extended up to marked position) */}
+          <div className="relative h-28 sm:h-24 w-full sm:w-48 shrink-0 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
+            <Image
+              src={
+                validImageUrl ||
+                'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80'
+              }
+              alt={displayTitle || 'Advertisement'}
+              fill
+              unoptimized
+              sizes="(max-width: 640px) 100vw, 192px"
+              className="object-cover"
+            />
+            <span className="absolute left-1.5 top-1.5 rounded bg-black/70 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white backdrop-blur-xs">
+              {badgeText || 'PROPERTY SHOWCASE'}
             </span>
           </div>
 
-          {/* Right / Bottom Content */}
-          <div className="flex flex-1 flex-col justify-between min-w-0">
-            <div>
-              <div className="flex items-center gap-2 text-xs text-[#444444] dark:text-gray-400 mb-1 font-bold">
-                <span className="font-black text-[#111111] dark:text-white">{advertiserName}</span>
-                <span className="text-stone-300 dark:text-slate-600">•</span>
-                <span>Promoted Article</span>
-              </div>
-
-              <h3 className="text-base sm:text-lg font-bold text-[#111111] dark:text-white group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors line-clamp-2">
-                {displayTitle}
-              </h3>
-
-              <p className="mt-1.5 text-xs sm:text-sm font-medium text-[#222222] dark:text-gray-300 line-clamp-2 leading-relaxed">
-                {displayDescription}
-              </p>
+          {/* Content Info Block */}
+          <div className="flex flex-col min-w-0 flex-1 gap-1">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">
+                {advertiserName || 'Kongu Living Developers'}
+              </span>
+              <span className="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                Verified
+              </span>
             </div>
 
-            {/* Action Row */}
-            <div className="mt-3 sm:mt-2 flex items-center justify-between pt-2 border-t border-stone-200 dark:border-slate-800">
-              <span className="text-[11px] text-[#444444] dark:text-gray-400 font-bold">Sponsored Content</span>
-              <a
-                href={ctaUrl}
-                target="_blank"
-                rel="noopener noreferrer sponsored"
-                className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-black text-red-600 dark:text-red-400 hover:underline"
-              >
-                <span>{ctaText}</span>
-                <ExternalLinkIcon className="w-3.5 h-3.5" />
-              </a>
-            </div>
+            {/* Strict line-clamp prevents multi-line text from overflowing into button space */}
+            <h4 className="line-clamp-1 text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-tight min-w-0">
+              {displayTitle}
+            </h4>
+            <p className="line-clamp-2 text-xs text-gray-500 dark:text-gray-400 leading-normal min-w-0">
+              {displayDescription}
+            </p>
           </div>
         </div>
-      </aside>
+
+        {/* Action Button */}
+        <div className="shrink-0 w-full sm:w-auto self-center">
+          <a
+            href={enquiryTargetUrl}
+            target={enquiryTargetUrl.startsWith('http') ? '_blank' : '_self'}
+            rel="noopener noreferrer sponsored"
+            className="flex sm:inline-flex w-full sm:w-auto items-center justify-center rounded-xl bg-red-600 px-6 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:bg-red-700 active:scale-95 text-center"
+          >
+            For Enquiry
+          </a>
+        </div>
+      </div>
     </div>
   );
 };

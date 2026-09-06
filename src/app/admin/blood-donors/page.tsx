@@ -235,7 +235,7 @@ export default function AdminBloodDonorsPage() {
                         📝 Notes: "{req.notes}"
                       </p>
                     )}
-                    <div className="text-[10px] text-stone-400 font-mono pt-1">
+                    <div className="text-[10px] text-stone-400 font-mono pt-1" suppressHydrationWarning>
                       Submitted: {new Date(req.createdAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
 import { TrafficCone, ArrowRight } from 'lucide-react';
@@ -51,16 +51,16 @@ export default function CovaiTrafficWidget() {
   };
 
   return (
-    <div className="w-full bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 rounded-xl p-3 shadow-xs space-y-2 shrink-0 select-none">
+    <div className="w-full bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 rounded-xl p-2.5 shadow-xs space-y-2 shrink-0 select-none overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between text-[11px] font-extrabold border-b border-stone-100 dark:border-slate-800 pb-1.5">
-        <span className="text-stone-700 dark:text-gray-300 uppercase tracking-wider font-black flex items-center gap-1.5">
-          <TrafficCone className="w-3.5 h-3.5 text-amber-500" />
-          <span>COVAI LIVE TRAFFIC</span>
+      <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-extrabold border-b border-stone-100 dark:border-slate-800 pb-1.5 gap-1">
+        <span className="text-stone-700 dark:text-gray-300 uppercase tracking-wider font-black flex items-center gap-1.5 truncate min-w-0">
+          <TrafficCone className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+          <span className="truncate">COVAI TRAFFIC</span>
         </span>
-        <span className="text-emerald-600 font-black flex items-center gap-1 text-[10px]">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-          LIVE FEED
+        <span className="text-emerald-600 font-black flex items-center gap-1 text-[9px] sm:text-[10px] shrink-0 whitespace-nowrap">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0"></span>
+          LIVE
         </span>
       </div>
 

@@ -45,7 +45,12 @@ export const SupabaseTablesManager: React.FC = () => {
   const [enquiries, setEnquiries] = useState<SupabaseEnquiry[]>([]);
   const [eventsList, setEventsList] = useState<SupabaseEvent[]>([]);
 
-  // Emergency Delete Modal State
+  // Multi-Selection State
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState<boolean>(false);
+  const [bulkDeleteModalOpen, setBulkDeleteModalOpen] = useState<boolean>(false);
+
+  // Emergency Delete Modal State (Single row)
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Fetch all tables from Supabase
@@ -94,7 +99,7 @@ export const SupabaseTablesManager: React.FC = () => {
     }
   };
 
-  // Generic Emergency Delete Handler
+  // Single Row Emergency Delete Handler
   const handleConfirmDelete = async () => {
     if (!deletingId) return;
     setErrorMsg('');
@@ -107,10 +112,79 @@ export const SupabaseTablesManager: React.FC = () => {
       if (activeTable === 'events') await supabaseAdminService.deleteEvent(deletingId);
 
       notifySuccess('Record permanently deleted from Supabase PostgreSQL table!');
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        next.delete(deletingId);
+        return next;
+      });
       setDeletingId(null);
       loadAllData();
     } catch (err: any) {
       setErrorMsg(err.message || 'Failed to delete record from Supabase');
+    }
+  };
+
+  // Multi-Selection: Toggle Single Row Selection
+  const handleToggleRow = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  // Multi-Selection: Toggle Select All Filtered Rows
+  const handleToggleSelectAll = () => {
+    if (filteredData.length === 0) return;
+    const allSelected = filteredData.every((item) => selectedIds.has(item.id));
+    if (allSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredData.forEach((item) => next.delete(item.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        filteredData.forEach((item) => next.add(item.id));
+        return next;
+      });
+    }
+  };
+
+  // Multi-Selection: Bulk Delete Selected Rows
+  const handleConfirmBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    setIsBulkDeleting(true);
+    setErrorMsg('');
+    const ids = Array.from(selectedIds);
+    let successCount = 0;
+    try {
+      for (const id of ids) {
+        try {
+          if (activeTable === 'listings') await supabaseAdminService.deleteListing(id);
+          else if (activeTable === 'categories') await supabaseAdminService.deleteCategory(id);
+          else if (activeTable === 'blood_donors') await supabaseAdminService.deleteBloodDonor(id);
+          else if (activeTable === 'news') await supabaseAdminService.deleteNews(id);
+          else if (activeTable === 'enquiries') await supabaseAdminService.deleteEnquiry(id);
+          else if (activeTable === 'events') await supabaseAdminService.deleteEvent(id);
+          successCount++;
+        } catch (err) {
+          console.error(`Error deleting ${id} from ${activeTable}:`, err);
+        }
+      }
+      notifySuccess(`Successfully deleted ${successCount} of ${ids.length} record(s) from Supabase ${activeTable}!`);
+      setSelectedIds(new Set());
+      setBulkDeleteModalOpen(false);
+      await loadAllData();
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to complete bulk deletion from Supabase');
+    } finally {
+      setIsBulkDeleting(false);
     }
   };
 
@@ -243,7 +317,7 @@ export const SupabaseTablesManager: React.FC = () => {
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar p-1.5 bg-stone-100 dark:bg-slate-800/80 rounded-2xl border border-stone-200 dark:border-slate-700">
           <button
             type="button"
-            onClick={() => { setActiveTable('listings'); setSearchQuery(''); }}
+            onClick={() => { setActiveTable('listings'); setSearchQuery(''); setSelectedIds(new Set()); }}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTable === 'listings'
                 ? 'bg-red-600 text-white shadow-md'
@@ -256,7 +330,7 @@ export const SupabaseTablesManager: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => { setActiveTable('categories'); setSearchQuery(''); }}
+            onClick={() => { setActiveTable('categories'); setSearchQuery(''); setSelectedIds(new Set()); }}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTable === 'categories'
                 ? 'bg-red-600 text-white shadow-md'
@@ -269,7 +343,7 @@ export const SupabaseTablesManager: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => { setActiveTable('blood_donors'); setSearchQuery(''); }}
+            onClick={() => { setActiveTable('blood_donors'); setSearchQuery(''); setSelectedIds(new Set()); }}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTable === 'blood_donors'
                 ? 'bg-red-600 text-white shadow-md'
@@ -282,7 +356,7 @@ export const SupabaseTablesManager: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => { setActiveTable('news'); setSearchQuery(''); }}
+            onClick={() => { setActiveTable('news'); setSearchQuery(''); setSelectedIds(new Set()); }}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTable === 'news'
                 ? 'bg-red-600 text-white shadow-md'
@@ -295,7 +369,7 @@ export const SupabaseTablesManager: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => { setActiveTable('enquiries'); setSearchQuery(''); }}
+            onClick={() => { setActiveTable('enquiries'); setSearchQuery(''); setSelectedIds(new Set()); }}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTable === 'enquiries'
                 ? 'bg-red-600 text-white shadow-md'
@@ -308,7 +382,7 @@ export const SupabaseTablesManager: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => { setActiveTable('events'); setSearchQuery(''); }}
+            onClick={() => { setActiveTable('events'); setSearchQuery(''); setSelectedIds(new Set()); }}
             className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer shrink-0 whitespace-nowrap ${
               activeTable === 'events'
                 ? 'bg-red-600 text-white shadow-md'
@@ -342,6 +416,36 @@ export const SupabaseTablesManager: React.FC = () => {
         </div>
       </div>
 
+      {/* Multi-Selection Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="sticky top-20 z-20 p-3.5 bg-stone-900 text-white dark:bg-slate-800 border border-stone-700 dark:border-slate-700 rounded-2xl shadow-xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <span className="w-2.5 h-2.5 rounded-full bg-red-500 animate-pulse" />
+            <span className="text-xs font-black">
+              {selectedIds.size} row{selectedIds.size > 1 ? 's' : ''} selected in{' '}
+              <span className="font-mono text-red-400 capitalize">{activeTable.replace('_', ' ')}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedIds(new Set())}
+              className="text-[11px] font-bold text-stone-400 hover:text-white underline cursor-pointer ml-1"
+            >
+              Deselect All
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setBulkDeleteModalOpen(true)}
+            disabled={isBulkDeleting}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md disabled:opacity-50"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Delete Selected ({selectedIds.size})</span>
+          </button>
+        </div>
+      )}
+
       {/* 3. DATA TABLE DISPLAY */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl border border-stone-200 dark:border-slate-800 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
@@ -350,6 +454,15 @@ export const SupabaseTablesManager: React.FC = () => {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-stone-100 dark:bg-slate-800/80 border-b border-stone-200 dark:border-slate-700 text-stone-700 dark:text-gray-300 uppercase tracking-wider font-black text-[11px]">
+                  <th className="p-3.5 w-12 text-center whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={filteredData.length > 0 && filteredData.every((item) => selectedIds.has(item.id))}
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 rounded border-stone-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600"
+                      title="Select All Listings"
+                    />
+                  </th>
                   <th className="p-3.5 whitespace-nowrap min-w-[260px]">Business &amp; ID</th>
                   <th className="p-3.5 whitespace-nowrap min-w-[140px]">Category</th>
                   <th className="p-3.5 whitespace-nowrap min-w-[160px]">Area / Address</th>
@@ -362,18 +475,27 @@ export const SupabaseTablesManager: React.FC = () => {
               <tbody className="divide-y divide-stone-100 dark:divide-slate-800 font-medium">
                 {filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-stone-400">
+                    <td colSpan={8} className="p-8 text-center text-stone-400">
                       No listings found in Supabase table.
                     </td>
                   </tr>
                 ) : (
                   (filteredData as SupabaseListing[]).map((row) => (
-                    <tr key={row.id} className="hover:bg-stone-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr key={row.id} className={`hover:bg-stone-50/80 dark:hover:bg-slate-800/50 transition-colors ${selectedIds.has(row.id) ? 'bg-red-50/50 dark:bg-red-950/20' : ''}`}>
+                      <td className="p-3.5 text-center whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          onChange={() => handleToggleRow(row.id)}
+                          className="w-4 h-4 rounded border-stone-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600"
+                          title={`Select ${row.title}`}
+                        />
+                      </td>
                       <td className="p-3.5 font-bold text-stone-900 dark:text-white">
                         <div className="flex items-center gap-3">
                           <div className="w-11 h-11 rounded-xl overflow-hidden bg-slate-900 border border-stone-200 dark:border-slate-700 shrink-0 shadow-2xs">
                             <img
-                              src={(row as any).image_url || (row as any).imageUrl || getCategoryFallbackImage(row.category)}
+                              src={(Array.isArray(row.images) && row.images[0]) || (row as any).image_url || (row as any).imageUrl || getCategoryFallbackImage(row.category)}
                               alt={row.title}
                               className="w-full h-full object-cover"
                               loading="lazy"
@@ -420,6 +542,15 @@ export const SupabaseTablesManager: React.FC = () => {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-stone-100 dark:bg-slate-800/80 border-b border-stone-200 dark:border-slate-700 text-stone-700 dark:text-gray-300 uppercase tracking-wider font-black text-[11px]">
+                  <th className="p-3.5 w-12 text-center whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={filteredData.length > 0 && filteredData.every((item) => selectedIds.has(item.id))}
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 rounded border-stone-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600"
+                      title="Select All Categories"
+                    />
+                  </th>
                   <th className="p-3.5 w-16 whitespace-nowrap">Icon</th>
                   <th className="p-3.5 whitespace-nowrap min-w-[180px]">Category Name</th>
                   <th className="p-3.5 whitespace-nowrap min-w-[140px]">URL Slug</th>
@@ -430,13 +561,22 @@ export const SupabaseTablesManager: React.FC = () => {
               <tbody className="divide-y divide-stone-100 dark:divide-slate-800 font-medium">
                 {filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-stone-400">
+                    <td colSpan={6} className="p-8 text-center text-stone-400">
                       No categories found in Supabase table.
                     </td>
                   </tr>
                 ) : (
                   (filteredData as SupabaseCategory[]).map((row) => (
-                    <tr key={row.id} className="hover:bg-stone-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr key={row.id} className={`hover:bg-stone-50/80 dark:hover:bg-slate-800/50 transition-colors ${selectedIds.has(row.id) ? 'bg-red-50/50 dark:bg-red-950/20' : ''}`}>
+                      <td className="p-3.5 text-center whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          onChange={() => handleToggleRow(row.id)}
+                          className="w-4 h-4 rounded border-stone-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600"
+                          title={`Select ${row.name}`}
+                        />
+                      </td>
                       <td className="p-3.5 text-xl whitespace-nowrap">{row.icon || '📌'}</td>
                       <td className="p-3.5 font-bold text-stone-900 dark:text-white whitespace-nowrap">{row.name}</td>
                       <td className="p-3.5 font-mono text-red-600 dark:text-red-400 font-bold whitespace-nowrap">{row.slug}</td>
@@ -464,6 +604,15 @@ export const SupabaseTablesManager: React.FC = () => {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-stone-100 dark:bg-slate-800/80 border-b border-stone-200 dark:border-slate-700 text-stone-700 dark:text-gray-300 uppercase tracking-wider font-black text-[11px]">
+                  <th className="p-3.5 w-12 text-center whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={filteredData.length > 0 && filteredData.every((item) => selectedIds.has(item.id))}
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 rounded border-stone-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600"
+                      title="Select All Blood Donors"
+                    />
+                  </th>
                   <th className="p-3.5 whitespace-nowrap min-w-[200px]">Donor Name</th>
                   <th className="p-3.5 whitespace-nowrap min-w-[100px]">Blood Group</th>
                   <th className="p-3.5 whitespace-nowrap min-w-[160px]">Area &amp; Location</th>
@@ -475,13 +624,22 @@ export const SupabaseTablesManager: React.FC = () => {
               <tbody className="divide-y divide-stone-100 dark:divide-slate-800 font-medium">
                 {filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-stone-400">
+                    <td colSpan={7} className="p-8 text-center text-stone-400">
                       No blood donors found in Supabase table.
                     </td>
                   </tr>
                 ) : (
                   (filteredData as SupabaseBloodDonor[]).map((row) => (
-                    <tr key={row.id} className="hover:bg-stone-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr key={row.id} className={`hover:bg-stone-50/80 dark:hover:bg-slate-800/50 transition-colors ${selectedIds.has(row.id) ? 'bg-red-50/50 dark:bg-red-950/20' : ''}`}>
+                      <td className="p-3.5 text-center whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          onChange={() => handleToggleRow(row.id)}
+                          className="w-4 h-4 rounded border-stone-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600"
+                          title={`Select ${row.name}`}
+                        />
+                      </td>
                       <td className="p-3.5 font-bold text-stone-900 dark:text-white">
                         <div className="whitespace-nowrap">{row.name}</div>
                         <div className="text-[10px] text-stone-400 font-mono truncate">{row.id}</div>
@@ -527,6 +685,15 @@ export const SupabaseTablesManager: React.FC = () => {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-stone-100 dark:bg-slate-800/80 border-b border-stone-200 dark:border-slate-700 text-stone-700 dark:text-gray-300 uppercase tracking-wider font-black text-[11px]">
+                  <th className="p-3.5 w-12 text-center whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={filteredData.length > 0 && filteredData.every((item) => selectedIds.has(item.id))}
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 rounded border-stone-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600"
+                      title="Select All News"
+                    />
+                  </th>
                   <th className="p-3.5 min-w-[280px]">Headline &amp; Content</th>
                   <th className="p-3.5 whitespace-nowrap min-w-[120px]">Category</th>
                   <th className="p-3.5 whitespace-nowrap min-w-[120px]">Author</th>
@@ -537,13 +704,22 @@ export const SupabaseTablesManager: React.FC = () => {
               <tbody className="divide-y divide-stone-100 dark:divide-slate-800 font-medium">
                 {filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="p-8 text-center text-stone-400">
+                    <td colSpan={6} className="p-8 text-center text-stone-400">
                       No news articles found in Supabase table.
                     </td>
                   </tr>
                 ) : (
                   (filteredData as SupabaseNews[]).map((row) => (
-                    <tr key={row.id} className="hover:bg-stone-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr key={row.id} className={`hover:bg-stone-50/80 dark:hover:bg-slate-800/50 transition-colors ${selectedIds.has(row.id) ? 'bg-red-50/50 dark:bg-red-950/20' : ''}`}>
+                      <td className="p-3.5 text-center whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          onChange={() => handleToggleRow(row.id)}
+                          className="w-4 h-4 rounded border-stone-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600"
+                          title={`Select ${row.title}`}
+                        />
+                      </td>
                       <td className="p-3.5 max-w-md">
                         <div className="font-bold text-stone-900 dark:text-white line-clamp-1">{row.title}</div>
                         <div className="text-[11px] text-stone-500 dark:text-gray-400 line-clamp-1 mt-0.5">{row.content}</div>
@@ -580,6 +756,15 @@ export const SupabaseTablesManager: React.FC = () => {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-stone-100 dark:bg-slate-800/80 border-b border-stone-200 dark:border-slate-700 text-stone-700 dark:text-gray-300 uppercase tracking-wider font-black text-[11px]">
+                  <th className="p-3.5 w-12 text-center whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={filteredData.length > 0 && filteredData.every((item) => selectedIds.has(item.id))}
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 rounded border-stone-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600"
+                      title="Select All Enquiries"
+                    />
+                  </th>
                   <th className="p-3.5 whitespace-nowrap min-w-[160px]">User Name</th>
                   <th className="p-3.5 whitespace-nowrap min-w-[130px]">Contact Phone</th>
                   <th className="p-3.5 whitespace-nowrap min-w-[150px]">Service Requested</th>
@@ -591,13 +776,22 @@ export const SupabaseTablesManager: React.FC = () => {
               <tbody className="divide-y divide-stone-100 dark:divide-slate-800 font-medium">
                 {filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-stone-400">
+                    <td colSpan={7} className="p-8 text-center text-stone-400">
                       No enquiries found in Supabase table.
                     </td>
                   </tr>
                 ) : (
                   (filteredData as SupabaseEnquiry[]).map((row) => (
-                    <tr key={row.id} className="hover:bg-stone-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr key={row.id} className={`hover:bg-stone-50/80 dark:hover:bg-slate-800/50 transition-colors ${selectedIds.has(row.id) ? 'bg-red-50/50 dark:bg-red-950/20' : ''}`}>
+                      <td className="p-3.5 text-center whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          onChange={() => handleToggleRow(row.id)}
+                          className="w-4 h-4 rounded border-stone-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600"
+                          title={`Select ${row.user_name}`}
+                        />
+                      </td>
                       <td className="p-3.5 font-bold text-stone-900 dark:text-white whitespace-nowrap">{row.user_name}</td>
                       <td className="p-3.5 font-mono text-stone-800 dark:text-gray-200 font-bold whitespace-nowrap">{row.user_phone}</td>
                       <td className="p-3.5 font-bold text-red-600 whitespace-nowrap">{row.service_requested || 'General'}</td>
@@ -641,6 +835,15 @@ export const SupabaseTablesManager: React.FC = () => {
             <table className="w-full text-left text-xs border-collapse">
               <thead>
                 <tr className="bg-stone-100 dark:bg-slate-800/80 border-b border-stone-200 dark:border-slate-700 text-stone-700 dark:text-gray-300 uppercase tracking-wider font-black text-[11px]">
+                  <th className="p-3.5 w-12 text-center whitespace-nowrap">
+                    <input
+                      type="checkbox"
+                      checked={filteredData.length > 0 && filteredData.every((item) => selectedIds.has(item.id))}
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 rounded border-stone-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600"
+                      title="Select All Events"
+                    />
+                  </th>
                   <th className="p-3.5 whitespace-nowrap min-w-[200px]">Event Name</th>
                   <th className="p-3.5 whitespace-nowrap min-w-[120px]">Event Date</th>
                   <th className="p-3.5 whitespace-nowrap min-w-[160px]">Location / Venue</th>
@@ -652,13 +855,22 @@ export const SupabaseTablesManager: React.FC = () => {
               <tbody className="divide-y divide-stone-100 dark:divide-slate-800 font-medium">
                 {filteredData.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-stone-400">
+                    <td colSpan={7} className="p-8 text-center text-stone-400">
                       No events found in Supabase table.
                     </td>
                   </tr>
                 ) : (
                   (filteredData as SupabaseEvent[]).map((row) => (
-                    <tr key={row.id} className="hover:bg-stone-50/80 dark:hover:bg-slate-800/50 transition-colors">
+                    <tr key={row.id} className={`hover:bg-stone-50/80 dark:hover:bg-slate-800/50 transition-colors ${selectedIds.has(row.id) ? 'bg-red-50/50 dark:bg-red-950/20' : ''}`}>
+                      <td className="p-3.5 text-center whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(row.id)}
+                          onChange={() => handleToggleRow(row.id)}
+                          className="w-4 h-4 rounded border-stone-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600"
+                          title={`Select ${row.event_name}`}
+                        />
+                      </td>
                       <td className="p-3.5 font-bold text-stone-900 dark:text-white whitespace-nowrap">{row.event_name}</td>
                       <td className="p-3.5 font-mono text-stone-700 dark:text-gray-300 font-bold whitespace-nowrap">{row.event_date || 'TBD'}</td>
                       <td className="p-3.5 text-stone-800 dark:text-gray-200 whitespace-nowrap">{row.location}</td>
@@ -684,7 +896,7 @@ export const SupabaseTablesManager: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. EMERGENCY DELETE CONFIRMATION MODAL */}
+      {/* 4. EMERGENCY DELETE CONFIRMATION MODAL (SINGLE ROW) */}
       {deletingId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
           <div className="bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
@@ -720,6 +932,55 @@ export const SupabaseTablesManager: React.FC = () => {
                 className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md"
               >
                 Delete from Supabase
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. BULK DELETE CONFIRMATION MODAL (MULTIPLE ROWS) */}
+      {bulkDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+          <div className="bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3 text-red-600">
+              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/60 flex items-center justify-center shrink-0">
+                <ShieldAlert className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-stone-900 dark:text-white">
+                  Confirm Bulk Deletion
+                </h3>
+                <p className="text-xs text-stone-500 dark:text-gray-400">
+                  PostgreSQL Table: <span className="font-mono font-bold text-red-600 capitalize">{activeTable.replace('_', ' ')}</span>
+                </p>
+              </div>
+            </div>
+
+            <p className="text-xs text-stone-600 dark:text-gray-300 leading-relaxed">
+              Are you sure you want to permanently delete <strong className="text-red-600 font-black">{selectedIds.size}</strong> selected record{selectedIds.size > 1 ? 's' : ''} from the live Supabase PostgreSQL database? This action is immediate and cannot be undone.
+            </p>
+
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-stone-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setBulkDeleteModalOpen(false)}
+                disabled={isBulkDeleting}
+                className="px-4 py-2 rounded-xl bg-stone-100 hover:bg-stone-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-stone-700 dark:text-gray-300 text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBulkDelete}
+                disabled={isBulkDeleting}
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md disabled:opacity-50"
+              >
+                {isBulkDeleting ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                <span>{isBulkDeleting ? `Deleting (${selectedIds.size})...` : `Delete ${selectedIds.size} Records`}</span>
               </button>
             </div>
           </div>

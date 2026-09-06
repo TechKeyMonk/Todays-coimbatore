@@ -57,7 +57,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const articleSlug = article?.slug || rawSlug;
   const canonicalUrl = `https://todayscoimbatore.com/news/${articleSlug}`;
 
-  const keywordsArray = article?.keywords
+  const keywordsArray = Array.isArray(article?.keywords)
+    ? article.keywords.map((k: any) => String(k).trim()).filter(Boolean)
+    : typeof article?.keywords === 'string'
     ? article.keywords.split(',').map((k: string) => k.trim()).filter(Boolean)
     : [
         'Coimbatore News',

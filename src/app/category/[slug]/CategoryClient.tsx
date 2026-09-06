@@ -5,9 +5,9 @@ import Link from 'next/link';
 import NewsCard from '../../../components/NewsCard';
 import Footer from '../../../components/Footer';
 import VideoPlayer from '../../../components/VideoPlayer';
-import MobileBottomBanner from '../../../components/MobileBottomBanner';
 import UniversalSideLayout from '../../../components/UniversalSideLayout';
 import dbService, { Article } from '../../../services/db';
+import { getCategoryConfig, isArticleInCategory, sanitizeCategorySlug } from '@/lib/categories';
 
 interface VideoModalData {
   title: string;
@@ -20,34 +20,18 @@ interface VideoModalData {
 }
 
 export default function CategoryClient({ slug }: { slug: string }) {
-  const rawSlug = slug || 'news';
+  const sanitizedSlug = sanitizeCategorySlug(slug || 'news');
+  const categoryConfig = getCategoryConfig(sanitizedSlug);
+  const categoryName = categoryConfig.displayName;
 
   const [articles, setArticles] = useState<Article[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [activeVideoModal, setActiveVideoModal] = useState<VideoModalData | null>(null);
 
-  // Clean formatted category title from route param
-  const formatCategoryName = (sParam: string): string => {
-    const s = (sParam || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    if (s === 'events' || s.includes('event')) return 'EVENTS';
-    if (s.includes('infra')) return 'INFRASTRUCTURE & CIVIC';
-    if (s.includes('civic') || s.includes('ourcity') || s.includes('mycity') || s === 'city') return 'OUR CITY';
-    if (s.includes('topstories') || s.includes('trending') || s.includes('spotlight') || s === 'news') return 'NEWS';
-    if (s.includes('business') || s.includes('startup') || s.includes('industry')) return 'BUSINESS';
-    if (s.includes('tech') || s.includes('ev') || s.includes('saas')) return 'TECH';
-    if (s.includes('sport')) return 'SPORTS';
-    if (s.includes('ceo') || s.includes('founder')) return 'CEO';
-    if (s.includes('edu')) return 'EDUCATION';
-    if (s.includes('paper')) return 'E-PAPER';
-    return (sParam || 'NEWS').toUpperCase().replace(/-/g, ' ');
-  };
-
-  const categoryName = formatCategoryName(rawSlug);
-
   // Scroll to top on category change
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
-  }, [rawSlug]);
+  }, [sanitizedSlug]);
 
   useEffect(() => {
     let isMounted = true;
@@ -55,70 +39,53 @@ export default function CategoryClient({ slug }: { slug: string }) {
     async function loadCategoryFeed() {
       setIsLoading(true);
       try {
-        const applyFilter = (publishedArticles: Article[]) => {
-          const sorted = [...publishedArticles].sort((a, b) => {
-            const timeA = Math.max(new Date(a.updatedAt || 0).getTime() || 0, new Date(a.createdAt || a.publishedAt || 0).getTime() || 0);
-            const timeB = Math.max(new Date(b.updatedAt || 0).getTime() || 0, new Date(b.createdAt || b.publishedAt || 0).getTime() || 0);
-            return timeB - timeA;
+        let fetchedArticles: Article[] = [];
+
+        // 1. Fetch live articles strictly filtered by category from backend API
+        try {
+          const res = await fetch(`/api/articles?category=${encodeURIComponent(categoryConfig.canonicalDbCategory)}`, {
+            cache: 'no-store',
           });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data)) {
+              fetchedArticles = data;
+            }
+          }
+        } catch (apiErr) {
+          console.warn('[CategoryClient] API fetch warning, falling back to dbService:', apiErr);
+        }
 
-          const routeSlug = (rawSlug || 'news').toLowerCase().trim();
-          const routeSlugClean = routeSlug.replace(/[^a-z0-9]/g, '');
+        // 2. If API returned no items or failed, check client dbService
+        if (fetchedArticles.length === 0) {
+          const localDb = await dbService.getArticles(categoryConfig.canonicalDbCategory);
+          if (Array.isArray(localDb)) {
+            fetchedArticles = localDb;
+          }
+        }
 
-          return sorted.filter((art) => {
-            const artCat = (art.category || '').toLowerCase().trim();
-            const artCatClean = artCat.replace(/[^a-z0-9]/g, '');
-            const artSub = (art.subCategory || '').toLowerCase().trim();
-            const artSubClean = artSub.replace(/[^a-z0-9]/g, '');
+        // 3. Apply strict category matching to eliminate any possible category bleed
+        const filtered = fetchedArticles.filter((art) => isArticleInCategory(art, sanitizedSlug));
 
-            if (routeSlugClean === 'events' || routeSlugClean === 'event') {
-              return (
-                artCatClean.includes('event') ||
-                artSubClean.includes('event') ||
-                artCat.toUpperCase() === 'EVENTS' ||
-                artSub.toUpperCase() === 'EVENTS'
-              );
-            }
+        // Sort by newest activity first
+        filtered.sort((a, b) => {
+          const timeA = Math.max(
+            new Date(a.updatedAt || 0).getTime() || 0,
+            new Date(a.createdAt || a.publishedAt || 0).getTime() || 0
+          );
+          const timeB = Math.max(
+            new Date(b.updatedAt || 0).getTime() || 0,
+            new Date(b.createdAt || b.publishedAt || 0).getTime() || 0
+          );
+          return timeB - timeA;
+        });
 
-            if (artCat === routeSlug || artCatClean === routeSlugClean) return true;
-            if (artSub === routeSlug || artSubClean === routeSlugClean) return true;
-
-            if (routeSlugClean.includes('infra') || routeSlugClean.includes('civic')) {
-              return artCatClean.includes('infra') || artCatClean.includes('civic') || artSubClean.includes('infra');
-            }
-            if (routeSlugClean.includes('city') || routeSlugClean.includes('ourcity')) {
-              return artCatClean.includes('city') || artCatClean.includes('civic') || artCatClean.includes('ourcity');
-            }
-            if (routeSlugClean.includes('ceo') || routeSlugClean.includes('founder')) {
-              return artCatClean.includes('ceo') || artSubClean.includes('ceo') || artSubClean.includes('founder');
-            }
-            if (routeSlugClean.includes('tech') || routeSlugClean.includes('ev') || routeSlugClean.includes('saas')) {
-              return artCatClean.includes('tech') || artCatClean.includes('ev') || artSubClean.includes('tech');
-            }
-            if (routeSlugClean.includes('sport')) {
-              return artCatClean.includes('sport') || artSubClean.includes('sport');
-            }
-            if (routeSlugClean.includes('edu')) {
-              return artCatClean.includes('edu') || artSubClean.includes('edu');
-            }
-            if (routeSlugClean.includes('business') || routeSlugClean.includes('startup')) {
-              return artCatClean.includes('business') || artCatClean.includes('startup') || artSubClean.includes('business');
-            }
-            if (routeSlugClean.includes('paper') || routeSlugClean.includes('epaper')) {
-              return artCatClean.includes('paper') || artSubClean.includes('paper');
-            }
-
-            return false;
-          });
-        };
-
-        const liveArticles = await dbService.getArticles();
         if (isMounted) {
-          const filtered = applyFilter(liveArticles);
           setArticles(filtered);
         }
       } catch (err) {
         console.error('Failed to load category feed:', err);
+        if (isMounted) setArticles([]);
       } finally {
         if (isMounted) setIsLoading(false);
       }
@@ -126,10 +93,22 @@ export default function CategoryClient({ slug }: { slug: string }) {
 
     loadCategoryFeed();
 
+    // Listen for real-time updates from Admin publishing/editing
+    const handleSync = () => {
+      loadCategoryFeed();
+    };
+
+    window.addEventListener('newsStorageUpdate', handleSync);
+    window.addEventListener('todayscoimbatore:db-updated', handleSync);
+    window.addEventListener('storage', handleSync);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('newsStorageUpdate', handleSync);
+      window.removeEventListener('todayscoimbatore:db-updated', handleSync);
+      window.removeEventListener('storage', handleSync);
     };
-  }, [rawSlug]);
+  }, [sanitizedSlug, categoryConfig.canonicalDbCategory]);
 
   const handleOpenVideoModal = (videoData: VideoModalData) => {
     setActiveVideoModal(videoData);
@@ -170,9 +149,11 @@ export default function CategoryClient({ slug }: { slug: string }) {
           ) : articles.length === 0 ? (
             <div className="py-16 text-center space-y-3 bg-white dark:bg-slate-900 rounded-xl border border-stone-200 dark:border-slate-800 p-8">
               <div className="text-4xl">📰</div>
-              <h3 className="text-lg font-bold text-[#1a1a1a] dark:text-gray-100">No Stories Published Yet</h3>
+              <h3 className="text-lg font-bold text-[#1a1a1a] dark:text-gray-100">
+                No Stories Found in {categoryName}
+              </h3>
               <p className="text-xs text-stone-600 dark:text-gray-400 max-w-sm mx-auto">
-                Check back soon! Our local bureau is constantly tracking new verified updates in Coimbatore.
+                There are currently no verified stories published under this category. Check back soon!
               </p>
               <div className="pt-2">
                 <Link
@@ -261,8 +242,6 @@ export default function CategoryClient({ slug }: { slug: string }) {
           </div>
         </div>
       )}
-
-      <MobileBottomBanner />
     </div>
   );
 }

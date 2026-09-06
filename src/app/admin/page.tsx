@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import dbService, {
   Article,
   CategoryRecord,
@@ -18,10 +19,18 @@ import dbService, {
   DirectoryReview,
   ContactEnquiryRecord,
   formatRelativeTime,
+  safeSetItem,
 } from '@/services/db';
 import { getCategoryMeta, getCategoryFallbackImage, slugify } from '@/app/directory/components/DirectoryIcons';
 import { SupabaseTablesManager } from './components/SupabaseTablesManager';
 import { supabase } from '@/lib/supabaseClient';
+import { DirectoryImageManager, ImageSlotItem, uploadDirectoryImages } from './components/DirectoryImageManager';
+import PollAnalytics from '@/components/admin/PollAnalytics';
+import {
+  minimizeArticlesForStorage,
+  purgeLargeOutdatedStorageKeys,
+  safeLocalStorageSet,
+} from '@/utils/storage';
 
 /* -------------------------------------------------------------------------- */
 /*                                Types & State                               */
@@ -277,7 +286,8 @@ export default function AdminPage() {
   const [adminPassword, setAdminPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [authError, setAuthError] = useState('');
-  const [activeTab, setActiveTab] = useState<'supabase' | 'articles' | 'outages' | 'ads' | 'blood' | 'events' | 'directory' | 'verifications' | 'reviews' | 'explorer'>('supabase');
+  const [activeTab, setActiveTab] = useState<'supabase' | 'articles' | 'outages' | 'ads' | 'blood' | 'events' | 'directory' | 'verifications' | 'reviews' | 'explorer'>('articles');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   
   // Articles state from DB Service
   const [articles, setArticles] = useState<Article[]>([]);
@@ -303,8 +313,18 @@ export default function AdminPage() {
   // Edit Article Modal State
   const [editingArticle, setEditingArticle] = useState<Article | null>(null);
 
+  // Bulk Selection State for Stories & Articles
+  const [selectedArticleIds, setSelectedArticleIds] = useState<Set<string>>(new Set());
+  const [isBulkDeletingArticles, setIsBulkDeletingArticles] = useState(false);
+  const [bulkArticleDeleteModalOpen, setBulkArticleDeleteModalOpen] = useState(false);
+
   // Category Filtering State in Admin Portal
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('All');
+
+  // Reset selected articles when filtering category changes
+  useEffect(() => {
+    setSelectedArticleIds(new Set());
+  }, [selectedCategoryFilter]);
 
   const ADMIN_FILTER_CATEGORIES = [
     'All',
@@ -314,16 +334,29 @@ export default function AdminPage() {
     'TECH',
     'INFRASTRUCTURE',
     'CEO',
-    'EVENTS',
     'SPORTS',
     'EDUCATION',
     'E-PAPER',
   ];
 
+  // Category Scroll Ref & Controls for Horizontal Filter Bar
+  const categoryScrollRef = useRef<HTMLDivElement | null>(null);
+
+  const scrollCategories = (direction: 'left' | 'right') => {
+    if (categoryScrollRef.current) {
+      const scrollAmount = 240;
+      categoryScrollRef.current.scrollBy({
+        left: direction === 'left' ? -scrollAmount : scrollAmount,
+        behavior: 'smooth',
+      });
+    }
+  };
+
   const getCategoryCount = (catName: string, catSlug?: string) => {
-    if (catName === 'All') return articles.length;
+    if (catName === 'All') return articles.filter((a: any) => (a.category || '').toUpperCase().trim() !== 'EVENTS').length;
     return articles.filter((article: any) => {
       const cat = (article.category || '').toLowerCase().trim();
+      if (cat === 'events') return false;
       const targetName = (catName || '').toLowerCase().trim();
       const targetSlug = (catSlug || '').toLowerCase().replace('/', '').trim();
       return cat === targetName || (targetSlug && cat === targetSlug);
@@ -331,9 +364,10 @@ export default function AdminPage() {
   };
 
   const filteredArticles = (selectedCategoryFilter === 'All'
-    ? articles
+    ? articles.filter((item) => (item.category || '').toUpperCase().trim() !== 'EVENTS')
     : articles.filter((item) => {
         const cat = (item.category || '').toLowerCase().trim();
+        if (cat === 'events') return false;
         const target = selectedCategoryFilter.toLowerCase().trim();
         const cleanTarget = target.replace(/-/g, ' ');
         const normCat = cat.replace(/[^a-z0-9]/g, '');
@@ -365,6 +399,8 @@ export default function AdminPage() {
   const [videoUrl, setVideoUrl] = useState('');
   const [videoFileName, setVideoFileName] = useState('');
   const [isDragging, setIsDragging] = useState(false);
+  const publishFileInputRef = useRef<HTMLInputElement | null>(null);
+  const editFileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Database Explorer State
   const [selectedTable, setSelectedTable] = useState<'articles' | 'categories' | 'power_outages' | 'users' | 'ad_slots' | 'donors' | 'events' | 'verifications' | 'reviews'>('articles');
@@ -437,13 +473,13 @@ export default function AdminPage() {
   // Events State
   const [events, setEvents] = useState<EventRecord[]>([]);
   const [eventSuccess, setEventSuccess] = useState('');
-  const [eventCategoryFilter, setEventCategoryFilter] = useState('ALL');
   const [editingEvent, setEditingEvent] = useState<EventRecord | null>(null);
   const [isAddingEvent, setIsAddingEvent] = useState(false);
+  const [isSubmittingEvent, setIsSubmittingEvent] = useState(false);
 
   // New Event Form state
   const [newEventTitle, setNewEventTitle] = useState('');
-  const [newEventCategory, setNewEventCategory] = useState('EXPO');
+  const [newEventCategory, setNewEventCategory] = useState('EVENT');
   const [newEventDate, setNewEventDate] = useState(getTomorrowDateStr());
   const [newEventTime, setNewEventTime] = useState('10:00 AM – 06:00 PM');
   const [newEventVenue, setNewEventVenue] = useState('');
@@ -459,6 +495,9 @@ export default function AdminPage() {
 
   // Directory Management State
   const [directoryListings, setDirectoryListings] = useState<DirectoryListing[]>([]);
+  const [supabaseCategories, setSupabaseCategories] = useState<{ id?: string; name: string; slug: string; icon?: string }[]>([]);
+  const [isDirLoading, setIsDirLoading] = useState(false);
+  const [isSubmittingDir, setIsSubmittingDir] = useState(false);
   const [dirSuccess, setDirSuccess] = useState('');
   const [dirCategoryFilter, setDirCategoryFilter] = useState('ALL');
   const [dirSearchQuery, setDirSearchQuery] = useState('');
@@ -481,15 +520,26 @@ export default function AdminPage() {
   const [reviewSearchQuery, setReviewSearchQuery] = useState('');
   const [reviewSuccess, setReviewSuccess] = useState('');
 
-  // Contact Enquiries State for Admin Notification Badge
+  // Contact Enquiries State for Admin Notification Badge & Sidebar Counter
   const [contactEnquiriesList, setContactEnquiriesList] = useState<ContactEnquiryRecord[]>([]);
 
-  const pendingEnquiriesCount = useMemo(() => {
+  const unreadEnquiriesCount = useMemo(() => {
+    if (!Array.isArray(contactEnquiriesList)) return 0;
     return contactEnquiriesList.filter((e) => {
       const st = (e.status || '').toLowerCase().trim();
       return st === 'unread' || st === 'pending';
     }).length;
   }, [contactEnquiriesList]);
+
+  const totalActiveEnquiriesCount = useMemo(() => {
+    if (!Array.isArray(contactEnquiriesList)) return 0;
+    return contactEnquiriesList.filter((e) => {
+      const st = (e.status || '').toLowerCase().trim();
+      return st !== 'archived';
+    }).length;
+  }, [contactEnquiriesList]);
+
+  const pendingEnquiriesCount = unreadEnquiriesCount;
 
   // New Directory Form state
   const [newDirName, setNewDirName] = useState('');
@@ -511,6 +561,8 @@ export default function AdminPage() {
   const [newDirVerified, setNewDirVerified] = useState(true);
   const [newDirTags, setNewDirTags] = useState('');
   const [newDirImageUrl, setNewDirImageUrl] = useState('');
+  const [newDirImageSlots, setNewDirImageSlots] = useState<ImageSlotItem[]>([]);
+  const [editingDirImageSlots, setEditingDirImageSlots] = useState<ImageSlotItem[]>([]);
 
   // Load all data from DB Service
   const refreshAllData = async () => {
@@ -560,8 +612,69 @@ export default function AdminPage() {
       setEventsDbList(eventList);
       setEvents(eventList);
 
-      const dirList = await dbService.getDirectoryListings();
-      setDirectoryListings(dirList);
+      // Fetch live directory categories from Supabase
+      try {
+        const { data: supaCats, error: supaCatsErr } = await supabase
+          .from('categories')
+          .select('*')
+          .order('name', { ascending: true });
+        if (!supaCatsErr && supaCats && supaCats.length > 0) {
+          setSupabaseCategories(supaCats.map((c: any) => ({
+            id: c.id,
+            name: c.name,
+            slug: c.slug || slugify(c.name),
+            icon: c.icon || getCategoryMeta(c.name).fallbackEmoji || '🏢',
+          })));
+        }
+      } catch (catErr) {
+        console.warn('Supabase categories load warning:', catErr);
+      }
+
+      // Fetch live directory listings directly from Supabase
+      setIsDirLoading(true);
+      try {
+        const { data: supaListings, error: supaListingsErr } = await supabase
+          .from('listings')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!supaListingsErr && supaListings) {
+          const mapped: DirectoryListing[] = supaListings.map((sl: any) => ({
+            id: sl.id,
+            name: sl.title || sl.name || 'Business Listing',
+            category: sl.category || 'General',
+            categorySlug: slugify(sl.category || 'general'),
+            icon: getCategoryMeta(sl.category || '').fallbackEmoji || '🏢',
+            phone: sl.phone || '',
+            address: sl.address || '',
+            area: sl.area || 'Coimbatore',
+            rating: typeof sl.rating === 'number' ? sl.rating : 4.8,
+            reviewsCount: 0,
+            verified: true,
+            featured: false,
+            popular: false,
+            description: sl.description || `${sl.title || sl.name} verified business in ${sl.area || 'Coimbatore'}.`,
+            createdAt: sl.created_at || new Date().toISOString(),
+            images: Array.isArray(sl.images) && sl.images.length > 0
+              ? sl.images
+              : (sl.image_url ? [sl.image_url] : (sl.photo_url ? [sl.photo_url] : [])),
+            imageUrl: (Array.isArray(sl.images) && sl.images[0]) || sl.image_url || sl.photo_url || undefined,
+            ownerName: sl.owner_name || sl.ownerName || undefined,
+            email: sl.email || undefined,
+            website: sl.website || undefined,
+          }));
+          setDirectoryListings(mapped);
+        } else {
+          const dirList = await dbService.getDirectoryListings();
+          setDirectoryListings(dirList);
+        }
+      } catch (dirErr) {
+        console.warn('Live listings load warning, using cache:', dirErr);
+        const dirList = await dbService.getDirectoryListings();
+        setDirectoryListings(dirList);
+      } finally {
+        setIsDirLoading(false);
+      }
 
       const verList = await dbService.getDirectoryVerifications();
       setVerificationsList(verList);
@@ -572,8 +685,38 @@ export default function AdminPage() {
       const enqList = await dbService.getDonorContactRequests();
       setDonorEnquiries(enqList);
 
-      const contactList = await dbService.getContactEnquiries();
-      setContactEnquiriesList(contactList);
+      // Live Supabase Enquiries Status Fetch
+      try {
+        const { data: enquiryRows, error: enqErr } = await supabase
+          .from('enquiries')
+          .select('id, status, user_name')
+          .not('user_name', 'like', '__SYSTEM_CONFIG_%');
+
+        if (!enqErr && Array.isArray(enquiryRows)) {
+          const mapped: ContactEnquiryRecord[] = enquiryRows.map((e: any) => ({
+            id: e.id,
+            name: e.user_name || 'Anonymous',
+            email: '',
+            phone: '',
+            subject: '',
+            message: '',
+            status: (e.status?.toLowerCase() === 'pending' ? 'unread' : (e.status?.toLowerCase() || 'unread')) as any,
+            createdAt: new Date().toISOString(),
+          }));
+          setContactEnquiriesList(mapped);
+        } else {
+          const contactList = await dbService.getContactEnquiries();
+          setContactEnquiriesList(Array.isArray(contactList) ? contactList : []);
+        }
+      } catch (enqErr) {
+        console.warn('Live enquiries fetch warning, using dbService:', enqErr);
+        try {
+          const contactList = await dbService.getContactEnquiries();
+          setContactEnquiriesList(Array.isArray(contactList) ? contactList : []);
+        } catch {
+          setContactEnquiriesList([]);
+        }
+      }
     } catch (err) {
       console.error('Error loading DB records', err);
     }
@@ -608,6 +751,42 @@ export default function AdminPage() {
     if (sessionAuth === 'true') {
       setIsAuthenticated(true);
       if (savedEmail) setAdminEmail(savedEmail);
+    }
+  }, []);
+
+  // Handle URL navigation params (e.g. ?tab=articles#publish-article-form) and AI Draft Review prefill
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      const tabParam = urlParams.get('tab');
+      if (tabParam && ['articles', 'supabase', 'outages', 'ads', 'blood', 'events', 'directory', 'verifications', 'reviews', 'explorer'].includes(tabParam)) {
+        setActiveTab(tabParam as any);
+      } else if (window.location.hash.includes('publish') || window.location.hash.includes('stories')) {
+        setActiveTab('articles');
+      }
+
+      // Check if user navigated with prefill draft from AI Draft Review
+      try {
+        const prefillRaw = localStorage.getItem('tc_prefill_draft');
+        if (prefillRaw) {
+          const prefill = JSON.parse(prefillRaw);
+          if (prefill?.title) setNewTitle(prefill.title);
+          if (prefill?.content) setNewContent(prefill.content);
+          if (prefill?.category) setNewCategory(prefill.category);
+          if (prefill?.author) setNewAuthor(prefill.author);
+          localStorage.removeItem('tc_prefill_draft');
+          setActiveTab('articles');
+          setTimeout(() => {
+            const formEl = document.getElementById('publish-article-form');
+            if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 350);
+        } else if (window.location.hash.includes('publish')) {
+          setTimeout(() => {
+            const formEl = document.getElementById('publish-article-form');
+            if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 350);
+        }
+      } catch (e) {}
     }
   }, []);
 
@@ -661,7 +840,11 @@ export default function AdminPage() {
   // Image Drag & Drop Handler with all standard format support
   const handleImageFileChange = async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      alert('Please upload an image file (.jpg, .jpeg, .png, .webp)');
+      alert('Please upload an image file (PNG, JPG, JPEG, WEBP, AVIF)');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert(`File "${file.name}" exceeds the maximum allowed size of 5MB.`);
       return;
     }
     setImageFileName(file.name);
@@ -684,6 +867,28 @@ export default function AdminPage() {
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleImageFileChange(e.dataTransfer.files[0]);
+    }
+  };
+
+  const handleRemovePublishImage = () => {
+    setImageUrl('');
+    setImageFileName('');
+    if (publishFileInputRef.current) {
+      publishFileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveEditImage = () => {
+    if (!editingArticle) return;
+    setEditingArticle({
+      ...editingArticle,
+      imageUrl: '' as any,
+      image: '' as any,
+      image_url: null,
+      mediaUrl: editingArticle.mediaType === 'video' ? editingArticle.videoUrl : undefined,
+    });
+    if (editFileInputRef.current) {
+      editFileInputRef.current.value = '';
     }
   };
 
@@ -781,8 +986,7 @@ export default function AdminPage() {
     );
     if (typeof window !== 'undefined') {
       const dataStr = JSON.stringify(updatedOutages);
-      localStorage.setItem('t_covai_outages', dataStr);
-      localStorage.setItem('power_outages', dataStr);
+      safeSetItem('t_covai_outages', dataStr);
       window.dispatchEvent(new Event('outagesStorageUpdate'));
       window.dispatchEvent(new CustomEvent('todayscoimbatore:db-updated', { detail: { table: 'outages' } }));
       window.dispatchEvent(new StorageEvent('storage', { key: 't_covai_outages', newValue: dataStr }));
@@ -921,8 +1125,7 @@ export default function AdminPage() {
     setDonors(updated);
     await dbService.saveBloodDonors(updated);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('t_covai_donors', JSON.stringify(updated));
-      localStorage.setItem('blood_donors', JSON.stringify(updated));
+      safeSetItem('t_covai_donors', JSON.stringify(updated));
       window.dispatchEvent(new Event('donorsStorageUpdate'));
       window.dispatchEvent(new CustomEvent('todayscoimbatore:db-updated', { detail: { table: 'donors' } }));
     }
@@ -932,8 +1135,7 @@ export default function AdminPage() {
     setEmergencyAlerts(updated);
     await dbService.saveEmergencyBloodAlerts(updated);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('t_covai_emergency_blood', JSON.stringify(updated));
-      localStorage.setItem('emergency_blood_alerts', JSON.stringify(updated));
+      safeSetItem('t_covai_emergency_blood', JSON.stringify(updated));
       window.dispatchEvent(new Event('emergencyBloodStorageUpdate'));
       window.dispatchEvent(new CustomEvent('todayscoimbatore:db-updated', { detail: { table: 'emergency_blood' } }));
     }
@@ -1088,62 +1290,219 @@ export default function AdminPage() {
     setEvents(updated);
     await dbService.saveEvents(updated);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('t_covai_events', JSON.stringify(updated));
-      localStorage.setItem('events_db', JSON.stringify(updated));
+      safeSetItem('t_covai_events', JSON.stringify(updated));
       window.dispatchEvent(new Event('eventsStorageUpdate'));
       window.dispatchEvent(new CustomEvent('todayscoimbatore:db-updated', { detail: { table: 'events' } }));
     }
   };
 
+  const handleEventImageFileChange = (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean = false) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image size exceeds 10MB limit.');
+      e.target.value = '';
+      return;
+    }
+
+    const validMimes = [
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/webp',
+      'image/avif',
+      'image/gif',
+      'image/svg+xml',
+      'image/bmp',
+    ];
+    if (!validMimes.includes(file.type.toLowerCase())) {
+      alert('Unsupported image format. Allowed: PNG, JPG, JPEG, WEBP, AVIF, GIF, SVG, BMP');
+      e.target.value = '';
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      if (isEdit && editingEvent) {
+        setEditingEvent({ ...editingEvent, posterUrl: base64 });
+      } else {
+        setNewEventPosterUrl(base64);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleCreateEvent = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmittingEvent) return;
     if (!newEventTitle.trim() || !newEventVenue.trim()) return;
-    const nowIso = new Date().toISOString();
-    const created: EventRecord = {
-      id: `evt-${Date.now()}`,
-      title: newEventTitle.trim(),
-      category: newEventCategory,
-      date: newEventDate || getTomorrowDateStr(),
-      time: newEventTime.trim() || '10:00 AM – 06:00 PM',
-      venue: newEventVenue.trim(),
-      mapLink: newEventMapLink.trim() || `https://maps.google.com/?q=${encodeURIComponent(newEventVenue.trim() + ' Coimbatore')}`,
-      posterUrl: newEventPosterUrl.trim() || 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80',
-      videoUrl: newEventVideoUrl.trim() || undefined,
-      description: newEventDesc.trim() || 'Coimbatore public exhibition and community event.',
-      organizer: newEventOrganizer.trim() || 'Coimbatore Event Bureau',
-      status: newEventStatus,
-      featured: newEventFeatured,
-      createdAt: nowIso,
-      updatedAt: nowIso,
-    };
-    const updated = [created, ...events];
-    await syncEventsToDb(updated);
-    setIsAddingEvent(false);
-    setNewEventTitle('');
-    setNewEventVenue('');
-    setNewEventMapLink('');
-    setNewEventPosterUrl('');
-    setNewEventVideoUrl('');
-    setNewEventDesc('');
-    setEventSuccess(`✓ Published event "${created.title}" successfully!`);
-    setTimeout(() => setEventSuccess(''), 4000);
+
+    setIsSubmittingEvent(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const title = newEventTitle.trim();
+      const venue = newEventVenue.trim() || 'Coimbatore';
+      const description = newEventDesc.trim() || 'Coimbatore public exhibition and community event.';
+      const imageUrl = newEventPosterUrl.trim() || 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80';
+      const date = newEventDate || getTomorrowDateStr();
+      const time = newEventTime.trim() || '10:00 AM – 06:00 PM';
+      const organizer = newEventOrganizer.trim() || 'Coimbatore Event Bureau';
+      const mapLink = newEventMapLink.trim() || `https://maps.google.com/?q=${encodeURIComponent(venue + ' Coimbatore')}`;
+      const videoUrl = newEventVideoUrl.trim() || undefined;
+
+      const payload = {
+        title,
+        event_name: title,
+        description,
+        image_url: imageUrl,
+        poster_url: imageUrl,
+        posterUrl: imageUrl,
+        venue,
+        location: venue,
+        event_date: date,
+        event_time: time,
+        date,
+        time,
+        contact_phone: '+91 98765 43210',
+        category: 'EVENT',
+        is_featured: newEventFeatured,
+        featured: newEventFeatured,
+        organizer,
+        mapLink,
+        videoUrl,
+      };
+
+      const res = await fetch('/api/events', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const resJson = await res.json();
+      if (!res.ok || resJson.success === false) {
+        throw new Error(resJson.error || 'Server error inserting event.');
+      }
+
+      const serverRecord = resJson.data;
+      const created: EventRecord = {
+        id: serverRecord?.id || `evt-${Date.now()}`,
+        title,
+        category: 'EVENT',
+        date,
+        time,
+        venue,
+        mapLink,
+        posterUrl: imageUrl,
+        videoUrl,
+        description,
+        organizer,
+        status: newEventStatus,
+        featured: newEventFeatured,
+        createdAt: serverRecord?.created_at || nowIso,
+        updatedAt: serverRecord?.created_at || nowIso,
+      };
+
+      const updated = [created, ...events];
+      await syncEventsToDb(updated);
+
+      setIsAddingEvent(false);
+      setNewEventTitle('');
+      setNewEventVenue('');
+      setNewEventMapLink('');
+      setNewEventPosterUrl('');
+      setNewEventVideoUrl('');
+      setNewEventDesc('');
+      setEventSuccess(`✓ Published event "${created.title}" successfully!`);
+      setTimeout(() => setEventSuccess(''), 4000);
+    } catch (err: any) {
+      console.error('Failed to create event:', err);
+      alert('Failed to publish event: ' + (err?.message || 'Unknown server error'));
+    } finally {
+      setIsSubmittingEvent(false);
+    }
   };
 
   const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingEvent) return;
-    const nowIso = new Date().toISOString();
-    const updated = events.map((ev) => (ev.id === editingEvent.id ? { ...editingEvent, updatedAt: nowIso } : ev));
-    await syncEventsToDb(updated);
-    setEditingEvent(null);
-    setEventSuccess(`✓ Updated event "${editingEvent.title}"!`);
-    setTimeout(() => setEventSuccess(''), 4000);
+    if (!editingEvent || isSubmittingEvent) return;
+    setIsSubmittingEvent(true);
+    try {
+      const nowIso = new Date().toISOString();
+      const title = (editingEvent.title || '').trim();
+      const venue = (editingEvent.venue || 'Coimbatore').trim();
+      const description = (editingEvent.description || 'Coimbatore public event.').trim();
+      const imageUrl = (editingEvent.posterUrl || 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80').trim();
+      const date = editingEvent.date || getTomorrowDateStr();
+      const time = (editingEvent.time || '10:00 AM – 06:00 PM').trim();
+
+      const payload = {
+        id: editingEvent.id,
+        title,
+        event_name: title,
+        description,
+        image_url: imageUrl,
+        poster_url: imageUrl,
+        posterUrl: imageUrl,
+        venue,
+        location: venue,
+        event_date: date,
+        event_time: time,
+        date,
+        time,
+        contact_phone: '+91 98765 43210',
+        category: 'EVENT',
+        is_featured: editingEvent.featured || false,
+        featured: editingEvent.featured || false,
+        organizer: editingEvent.organizer || 'Coimbatore Event Bureau',
+        mapLink: editingEvent.mapLink || `https://maps.google.com/?q=${encodeURIComponent(venue + ' Coimbatore')}`,
+        videoUrl: editingEvent.videoUrl || undefined,
+      };
+
+      const res = await fetch('/api/events', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const resJson = await res.json();
+      if (!res.ok || resJson.success === false) {
+        throw new Error(resJson.error || 'Server error updating event.');
+      }
+
+      const updatedRecord: EventRecord = {
+        ...editingEvent,
+        title,
+        venue,
+        description,
+        posterUrl: imageUrl,
+        category: 'EVENT',
+        updatedAt: nowIso,
+      };
+      const updated = events.map((ev) => (ev.id === editingEvent.id ? updatedRecord : ev));
+      await syncEventsToDb(updated);
+
+      setEditingEvent(null);
+      setEventSuccess(`✓ Updated event "${editingEvent.title}"!`);
+      setTimeout(() => setEventSuccess(''), 4000);
+    } catch (err: any) {
+      console.error('Failed to update event:', err);
+      alert('Failed to update event: ' + (err?.message || 'Unknown server error'));
+    } finally {
+      setIsSubmittingEvent(false);
+    }
   };
 
   const handleDeleteEvent = async (id: string, title: string) => {
     if (!confirm(`Delete event "${title}"?`)) return;
     const updated = events.filter((ev) => ev.id !== id);
     await syncEventsToDb(updated);
+    try {
+      await fetch(`/api/events?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    } catch (delErr) {
+      console.warn('API /api/events DELETE notice:', delErr);
+    }
     setEventSuccess(`Deleted event "${title}"`);
     setTimeout(() => setEventSuccess(''), 3000);
   };
@@ -1180,143 +1539,334 @@ export default function AdminPage() {
 
   const dynamicAdminCategoryOptions = useMemo(() => {
     const map = new Map<string, { name: string; slug: string; icon: string }>();
-    DIR_CATEGORY_OPTIONS.forEach((c) => {
-      map.set(c.slug.toLowerCase(), c);
+    // 1. Live categories from Supabase categories table
+    supabaseCategories.forEach((c) => {
+      if (c && c.name?.trim()) {
+        const slug = slugify(c.slug || c.name);
+        map.set(slug, {
+          name: c.name.trim(),
+          slug,
+          icon: c.icon || getCategoryMeta(c.name).fallbackEmoji || '🏢',
+        });
+      }
     });
+    // 2. Add categories present in listings
     directoryListings.forEach((item) => {
       if (item.category?.trim()) {
         const slug = slugify(item.categorySlug || item.category);
         if (!map.has(slug)) {
           const meta = getCategoryMeta(item.category);
           map.set(slug, {
-            name: item.category,
+            name: item.category.trim(),
             slug,
             icon: item.icon || meta.fallbackEmoji || '🏢',
           });
         }
       }
     });
-    return Array.from(map.values());
-  }, [directoryListings]);
+    // 3. Fallback default categories if empty
+    if (map.size === 0) {
+      DIR_CATEGORY_OPTIONS.forEach((c) => {
+        map.set(c.slug.toLowerCase(), c);
+      });
+    }
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [supabaseCategories, directoryListings]);
 
   const handleCreateDirectory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDirName.trim()) return;
+    setIsSubmittingDir(true);
 
-    let finalCategoryName = '';
-    let finalCategorySlug = '';
-    let finalCategoryIcon = '🏢';
+    try {
+      let finalCategoryName = '';
+      let finalCategorySlug = '';
+      let finalCategoryIcon = '🏢';
 
-    if (newDirCategorySlug === '__custom__' && newDirCustomCategory.trim()) {
-      finalCategoryName = newDirCustomCategory.trim();
-      finalCategorySlug = slugify(newDirCustomCategory.trim());
-      const meta = getCategoryMeta(finalCategoryName);
-      finalCategoryIcon = meta.fallbackEmoji || '🏢';
-    } else {
-      const matchedCat =
-        dynamicAdminCategoryOptions.find((c) => c.slug === newDirCategorySlug) ||
-        DIR_CATEGORY_OPTIONS[0];
-      finalCategoryName = matchedCat.name;
-      finalCategorySlug = matchedCat.slug;
-      finalCategoryIcon = matchedCat.icon;
+      if (newDirCategorySlug === '__custom__' && newDirCustomCategory.trim()) {
+        // Step 2a: Trim spaces and auto-generate unique slug
+        finalCategoryName = newDirCustomCategory.trim();
+        finalCategorySlug = slugify(finalCategoryName);
+        const meta = getCategoryMeta(finalCategoryName);
+        finalCategoryIcon = meta.fallbackEmoji || '🏢';
+      } else {
+        const matchedCat =
+          dynamicAdminCategoryOptions.find((c) => c.slug === newDirCategorySlug) ||
+          dynamicAdminCategoryOptions[0] ||
+          DIR_CATEGORY_OPTIONS[0];
+        finalCategoryName = matchedCat.name.trim();
+        finalCategorySlug = matchedCat.slug;
+        finalCategoryIcon = matchedCat.icon;
+      }
+
+      // Step 2b: Safely check if category or slug already exists in categories (case-insensitive)
+      let matchedCategoryInDb = false;
+      try {
+        const { data: existingCats } = await supabase
+          .from('categories')
+          .select('id, name, slug, icon')
+          .or(`slug.ilike.${finalCategorySlug},name.ilike.${finalCategoryName}`)
+          .limit(1);
+
+        if (existingCats && existingCats.length > 0) {
+          matchedCategoryInDb = true;
+          finalCategoryName = existingCats[0].name;
+          finalCategorySlug = existingCats[0].slug;
+          finalCategoryIcon = existingCats[0].icon || finalCategoryIcon;
+        }
+      } catch (checkErr) {
+        console.warn('Category existence check warning:', checkErr);
+      }
+
+      // Step 2c: If it does not exist, insert it into categories table
+      if (!matchedCategoryInDb) {
+        const newCatId = crypto.randomUUID();
+        try {
+          const { data: insertedCat, error: catInsertErr } = await supabase
+            .from('categories')
+            .insert([
+              {
+                id: newCatId,
+                name: finalCategoryName,
+                slug: finalCategorySlug,
+                icon: finalCategoryIcon,
+              },
+            ])
+            .select()
+            .single();
+
+          if (!catInsertErr && insertedCat) {
+            setSupabaseCategories((prev) => [
+              ...prev.filter((c) => c.slug !== finalCategorySlug),
+              insertedCat,
+            ].sort((a, b) => a.name.localeCompare(b.name)));
+          }
+        } catch (catInsertErr) {
+          console.error('Error inserting category into Supabase:', catInsertErr);
+        }
+      }
+
+      const newListingId = crypto.randomUUID();
+
+      // Upload images to Supabase directory-gallery storage
+      const finalImages = await uploadDirectoryImages(newDirImageSlots, newListingId);
+      const coverImage = finalImages[0] || (newDirImageUrl.trim() ? newDirImageUrl.trim() : undefined);
+      if (coverImage && !finalImages.includes(coverImage)) {
+        finalImages.unshift(coverImage);
+      }
+
+      // Step 2d: Insert the business into listings linked with this category
+      const ratingVal = typeof newDirRating === 'number' ? newDirRating : parseFloat(newDirRating) || 4.8;
+      const listingPayload: any = {
+        id: newListingId,
+        title: newDirName.trim(),
+        category: finalCategoryName,
+        phone: newDirPhone.trim() || null,
+        address: newDirAddress.trim() || `${newDirArea.trim()}, Coimbatore`,
+        area: newDirArea.trim() || 'Coimbatore',
+        pincode: null,
+        rating: ratingVal,
+        images: finalImages,
+      };
+
+      const { error: listingErr } = await supabase
+        .from('listings')
+        .insert([listingPayload]);
+
+      if (listingErr) {
+        console.error('Error inserting listing into Supabase:', listingErr);
+      }
+
+      const created: DirectoryListing = {
+        id: newListingId,
+        name: newDirName.trim(),
+        ownerName: newDirOwnerName.trim() || undefined,
+        category: finalCategoryName,
+        categorySlug: finalCategorySlug,
+        icon: finalCategoryIcon,
+        rating: ratingVal,
+        reviewsCount: 0,
+        area: newDirArea.trim() || 'Coimbatore',
+        address: newDirAddress.trim() || `${newDirArea.trim()}, Coimbatore`,
+        phone: newDirPhone.trim() || '+91 422 200 0000',
+        email: newDirEmail.trim() || undefined,
+        website: newDirWebsite.trim() || undefined,
+        timing: undefined,
+        description: newDirDescription.trim() || `${newDirName.trim()} verified business in ${newDirArea.trim()}, Coimbatore.`,
+        featured: newDirFeatured,
+        popular: newDirPopular,
+        verified: newDirVerified,
+        tags: newDirTags ? newDirTags.split(',').map((t) => t.trim()).filter(Boolean) : [finalCategoryName],
+        imageUrl: coverImage,
+        images: finalImages,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Persist to local cache for offline stability
+      await dbService.saveDirectoryCategory({
+        name: created.category,
+        slug: created.categorySlug,
+        icon: created.icon,
+      });
+      await dbService.saveDirectoryListing(created);
+
+      // Re-fetch live listings from Supabase to guarantee real-time synchronization
+      const { data: liveListings } = await supabase
+        .from('listings')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (liveListings && liveListings.length > 0) {
+        setDirectoryListings(liveListings.map((sl: any) => ({
+          id: sl.id,
+          name: sl.title || sl.name || 'Business Listing',
+          category: sl.category || 'General',
+          categorySlug: slugify(sl.category || 'general'),
+          icon: getCategoryMeta(sl.category || '').fallbackEmoji || '🏢',
+          phone: sl.phone || '',
+          address: sl.address || '',
+          area: sl.area || 'Coimbatore',
+          rating: typeof sl.rating === 'number' ? sl.rating : 4.8,
+          reviewsCount: 0,
+          verified: true,
+          featured: false,
+          popular: false,
+          description: sl.description || `${sl.title || sl.name} verified business in ${sl.area || 'Coimbatore'}.`,
+          createdAt: sl.created_at || new Date().toISOString(),
+          images: Array.isArray(sl.images) && sl.images.length > 0
+            ? sl.images
+            : (sl.image_url ? [sl.image_url] : []),
+          imageUrl: (Array.isArray(sl.images) && sl.images[0]) || sl.image_url || undefined,
+          ownerName: sl.owner_name || sl.ownerName || undefined,
+          email: sl.email || undefined,
+          website: sl.website || undefined,
+        })));
+      } else {
+        setDirectoryListings((prev) => [created, ...prev]);
+      }
+
+      setIsAddingDirectory(false);
+
+      // Reset inputs
+      setNewDirName('');
+      setNewDirOwnerName('');
+      setNewDirCategorySlug(dynamicAdminCategoryOptions[0]?.slug || 'hospitals-clinics');
+      setNewDirCustomCategory('');
+      setNewDirArea('');
+      setNewDirAddress('');
+      setNewDirPhone('');
+      setNewDirEmail('');
+      setNewDirWebsite('');
+      setNewDirDescription('');
+      setNewDirTags('');
+      setNewDirImageUrl('');
+      setNewDirImageSlots([]);
+      setDirSuccess(`✓ Successfully added business "${created.name}" to category "${finalCategoryName}"!`);
+      setTimeout(() => setDirSuccess(''), 4000);
+    } catch (err: any) {
+      console.error('Failed to create directory listing:', err);
+      alert('Error creating listing: ' + (err?.message || 'Please try again'));
+    } finally {
+      setIsSubmittingDir(false);
     }
-
-    const created: DirectoryListing = {
-      id: `dir-${Date.now()}`,
-      name: newDirName.trim(),
-      ownerName: newDirOwnerName.trim() || undefined,
-      category: finalCategoryName,
-      categorySlug: finalCategorySlug,
-      icon: finalCategoryIcon,
-      rating: typeof newDirRating === 'number' ? newDirRating : parseFloat(newDirRating) || 4.8,
-      reviewsCount: 0,
-      area: newDirArea.trim() || 'Coimbatore',
-      address: newDirAddress.trim() || `${newDirArea.trim()}, Coimbatore`,
-      phone: newDirPhone.trim() || '+91 422 200 0000',
-      email: newDirEmail.trim() || undefined,
-      website: newDirWebsite.trim() || undefined,
-      timing: newDirTiming.trim() || '09:00 AM – 08:00 PM',
-      description: newDirDescription.trim() || `${newDirName.trim()} verified business in ${newDirArea.trim()}, Coimbatore.`,
-      featured: newDirFeatured,
-      popular: newDirPopular,
-      verified: newDirVerified,
-      tags: newDirTags ? newDirTags.split(',').map((t) => t.trim()).filter(Boolean) : [finalCategoryName],
-      imageUrl: newDirImageUrl.trim() || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=600&q=80',
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    await dbService.saveDirectoryCategory({
-      name: created.category,
-      slug: created.categorySlug,
-      icon: created.icon,
-    });
-    await dbService.saveDirectoryListing(created);
-    setDirectoryListings((prev) => [created, ...prev]);
-    setIsAddingDirectory(false);
-
-    // Reset inputs
-    setNewDirName('');
-    setNewDirOwnerName('');
-    setNewDirCategorySlug(DIR_CATEGORY_OPTIONS[0].slug);
-    setNewDirCustomCategory('');
-    setNewDirArea('');
-    setNewDirAddress('');
-    setNewDirPhone('');
-    setNewDirEmail('');
-    setNewDirWebsite('');
-    setNewDirDescription('');
-    setNewDirTags('');
-    setNewDirImageUrl('');
-    setDirSuccess(`✓ Added business "${created.name}" to directory!`);
-    setTimeout(() => setDirSuccess(''), 4000);
   };
 
   const handleSaveDirectory = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingDirectory) return;
+    setIsSubmittingDir(true);
 
-    let finalCat = editingDirectory.category;
-    let finalSlug = editingDirectory.categorySlug;
-    let finalIcon = editingDirectory.icon;
+    try {
+      let finalCat = editingDirectory.category;
+      let finalSlug = editingDirectory.categorySlug;
+      let finalIcon = editingDirectory.icon;
 
-    if (editingDirCustomCategory.trim()) {
-      finalCat = editingDirCustomCategory.trim();
-      finalSlug = slugify(finalCat);
-      const meta = getCategoryMeta(finalCat);
-      finalIcon = meta.fallbackEmoji || '🏢';
+      if (editingDirCustomCategory.trim()) {
+        finalCat = editingDirCustomCategory.trim();
+        finalSlug = slugify(finalCat);
+        const meta = getCategoryMeta(finalCat);
+        finalIcon = meta.fallbackEmoji || '🏢';
+
+        // Check if custom category exists in Supabase categories
+        const { data: existingCat } = await supabase
+          .from('categories')
+          .select('id, name, slug')
+          .or(`slug.ilike.${finalSlug},name.ilike.${finalCat}`)
+          .limit(1);
+
+        if (!existingCat || existingCat.length === 0) {
+          const newCatId = crypto.randomUUID();
+          await supabase.from('categories').insert([{
+            id: newCatId,
+            name: finalCat,
+            slug: finalSlug,
+            icon: finalIcon,
+          }]);
+          setSupabaseCategories((prev) => [...prev, { id: newCatId, name: finalCat, slug: finalSlug, icon: finalIcon }]);
+        }
+      }
+
+      // Upload newly added images to Supabase directory-gallery storage
+      const finalImages = await uploadDirectoryImages(editingDirImageSlots, editingDirectory.id);
+      const coverImage = finalImages[0] || editingDirectory.imageUrl || undefined;
+
+      const nowIso = new Date().toISOString();
+      const updated: DirectoryListing = {
+        ...editingDirectory,
+        category: finalCat,
+        categorySlug: finalSlug,
+        icon: finalIcon,
+        images: finalImages,
+        imageUrl: coverImage,
+        updatedAt: nowIso,
+      };
+
+      // Update in Supabase listings table
+      await supabase
+        .from('listings')
+        .update({
+          title: updated.name,
+          category: updated.category,
+          phone: updated.phone || null,
+          address: updated.address || null,
+          area: updated.area || null,
+          rating: typeof updated.rating === 'number' ? updated.rating : 4.8,
+          images: finalImages,
+        })
+        .eq('id', updated.id);
+
+      await dbService.saveDirectoryCategory({
+        name: updated.category,
+        slug: updated.categorySlug,
+        icon: updated.icon,
+      });
+      await dbService.updateDirectoryListing(updated.id, updated);
+      setDirectoryListings((prev) =>
+        prev.map((d) => (d.id === updated.id ? updated : d))
+      );
+      setEditingDirectory(null);
+      setEditingDirCustomCategory('');
+      setDirSuccess(`✓ Updated directory record for "${updated.name}"!`);
+      setTimeout(() => setDirSuccess(''), 4000);
+    } catch (err: any) {
+      console.error('Failed to update directory listing:', err);
+    } finally {
+      setIsSubmittingDir(false);
     }
-
-    const nowIso = new Date().toISOString();
-    const updated: DirectoryListing = {
-      ...editingDirectory,
-      category: finalCat,
-      categorySlug: finalSlug,
-      icon: finalIcon,
-      updatedAt: nowIso,
-    };
-
-    await dbService.saveDirectoryCategory({
-      name: updated.category,
-      slug: updated.categorySlug,
-      icon: updated.icon,
-    });
-    await dbService.updateDirectoryListing(updated.id, updated);
-    setDirectoryListings((prev) =>
-      prev.map((d) => (d.id === updated.id ? updated : d))
-    );
-    setEditingDirectory(null);
-    setEditingDirCustomCategory('');
-    setDirSuccess(`✓ Updated directory record for "${updated.name}"!`);
-    setTimeout(() => setDirSuccess(''), 4000);
   };
 
   const handleDeleteDirectory = async (id: string, name: string) => {
     if (!confirm(`Are you sure you want to delete "${name}" from the business directory?`)) return;
-    await dbService.deleteDirectoryListing(id);
-    setDirectoryListings((prev) => prev.filter((d) => d.id !== id));
-    setDirSuccess(`Deleted directory listing "${name}"`);
-    setTimeout(() => setDirSuccess(''), 3000);
+    try {
+      await supabase.from('listings').delete().eq('id', id);
+      await dbService.deleteDirectoryListing(id);
+      setDirectoryListings((prev) => prev.filter((d) => d.id !== id));
+      setDirSuccess(`Deleted directory listing "${name}"`);
+      setTimeout(() => setDirSuccess(''), 3000);
+    } catch (err: any) {
+      console.error('Failed to delete directory listing:', err);
+    }
   };
 
   const handleToggleFeaturedDir = async (id: string) => {
@@ -1413,7 +1963,14 @@ export default function AdminPage() {
   // Create article with bulletproof dual-publishing pipeline
   const handleCreateArticle = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newTitle.trim()) return;
+    const trimmedTitle = newTitle.trim();
+    if (!trimmedTitle) {
+      setArticleError('Headline title is required.');
+      return;
+    }
+
+    setArticleError('');
+    setArticleSuccess('');
 
     try {
       setIsPublishing(true);
@@ -1427,14 +1984,29 @@ export default function AdminPage() {
           ? videoUrl.trim() || (videoFileName ? `local-video://${videoFileName}` : undefined)
           : undefined;
 
-      const wordCount = (newContent || newTitle).trim().split(/\s+/).filter(Boolean).length;
+      const wordCount = (newContent || trimmedTitle).trim().split(/\s+/).filter(Boolean).length;
       const computedReadTime = `${Math.max(1, Math.ceil(wordCount / 130))} min`;
       const nowIso = new Date().toISOString();
       const articleId = Date.now().toString();
 
+      const baseSlug = trimmedTitle
+        .toLowerCase()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_-]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 90)
+        .replace(/-+$/, '');
+      const finalSlug = baseSlug || `story-${Date.now()}`;
+
+      const safeExcerpt = newContent.trim()
+        ? newContent.trim().slice(0, 200)
+        : (trimmedTitle.length > 160 ? trimmedTitle.slice(0, 157) + '...' : trimmedTitle) + ' — Coimbatore hyper-local reporting.';
+      const safeContent = newContent.trim() || safeExcerpt;
+
       const newArticle: Article = {
         id: articleId,
-        title: newTitle.trim(),
+        title: trimmedTitle,
+        slug: finalSlug,
         category: newCategory,
         subCategory: newSubCategory.trim() || newCategory,
         subTag: newSubCategory.trim() || newCategory,
@@ -1446,23 +2018,28 @@ export default function AdminPage() {
         createdAt: nowIso,
         updatedAt: nowIso,
         isExclusive: isExclusive,
+        isSpotlight: isExclusive,
+        is_spotlight: isExclusive,
         status: 'published',
         mediaType: mediaType,
         imageUrl: finalImageUrl,
         image: finalImageUrl,
+        image_url: finalImageUrl || null,
         mediaUrl: mediaType === 'video' ? finalVideoUrl : finalImageUrl,
         videoUrl: finalVideoUrl,
-        videoTitle: newTitle.trim(),
+        videoTitle: trimmedTitle,
         videoDuration: '03:00',
-        excerpt: newContent.trim().slice(0, 180) || `${newTitle.trim()} — Coimbatore hyper-local reporting.`,
-        content: newContent.trim(),
-        highlightStat: 'Breaking Story',
+        excerpt: safeExcerpt,
+        content: safeContent,
+        highlightStat: isExclusive ? 'Spotlight Exclusive' : 'Breaking Story',
         commentsCount: 0,
-        articleHref: `/article/${articleId}`,
+        articleHref: `/article/${finalSlug}`,
+        seoTitle: trimmedTitle.slice(0, 200),
+        metaDescription: safeExcerpt.slice(0, 160),
       };
 
       // 1. Persist directly via universal DatabaseService to Supabase and LocalStorage
-      await dbService.createArticle(newArticle);
+      const persisted = await dbService.createArticle(newArticle);
 
       // 2. Dispatch custom global events for real-time UI refresh across all viewports & tabs
       if (typeof window !== 'undefined') {
@@ -1471,23 +2048,132 @@ export default function AdminPage() {
         window.dispatchEvent(new Event('storage'));
       }
 
-      setArticles((prev) => [newArticle, ...prev.filter((a) => a.id !== newArticle.id)]);
+      const activeRecord = persisted || newArticle;
+      setArticles((prev) => [activeRecord, ...prev.filter((a) => a.id !== activeRecord.id && a.slug !== activeRecord.slug && a.id !== articleId)]);
       setNewTitle('');
       setNewSubCategory('');
       setNewContent('');
       setMediaType('image');
       setImageUrl('');
       setImageFileName('');
+      if (publishFileInputRef.current) {
+        publishFileInputRef.current.value = '';
+      }
       setVideoUrl('');
       setVideoFileName('');
 
       setArticleSuccess('✓ Published successfully! Immediate real-time sync dispatched across all PC & Mobile viewports.');
       setTimeout(() => setArticleSuccess(''), 5000);
       refreshAllData();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Publishing error:', err);
+      setArticleError(err?.message || 'Failed to publish story to database. Please check title and fields.');
+      setTimeout(() => setArticleError(''), 7000);
     } finally {
       setIsPublishing(false);
+    }
+  };
+
+  // Article Selection Handlers
+  const handleToggleArticle = (id: string) => {
+    setSelectedArticleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleToggleSelectAllArticles = () => {
+    const visibleIds = filteredArticles.map((a) => a.id).filter(Boolean);
+    const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedArticleIds.has(id));
+    if (allSelected) {
+      setSelectedArticleIds(new Set());
+    } else {
+      setSelectedArticleIds(new Set(visibleIds));
+    }
+  };
+
+  // Bulk Delete Selected Articles
+  const handleConfirmBulkDeleteArticles = async () => {
+    if (selectedArticleIds.size === 0) return;
+    setIsBulkDeletingArticles(true);
+    setArticleError('');
+    setArticleSuccess('');
+    const idsToDelete = Array.from(selectedArticleIds);
+    let successCount = 0;
+    let failCount = 0;
+
+    try {
+      // 1. Database deletion FIRST
+      try {
+        await supabase.from('news').delete().in('id', idsToDelete);
+      } catch (dbErr) {
+        console.warn('Direct bulk Supabase delete notice:', dbErr);
+      }
+
+      for (const id of idsToDelete) {
+        try {
+          await dbService.deleteArticle(id);
+          successCount++;
+        } catch (err) {
+          console.error(`Failed to delete article ${id}:`, err);
+          failCount++;
+        }
+      }
+
+      // 2. Update UI component React state directly from memory
+      setArticles((prev) => prev.filter((a) => !selectedArticleIds.has(a.id) && (!a.slug || !selectedArticleIds.has(a.slug))));
+      setSelectedArticleIds(new Set());
+      setBulkArticleDeleteModalOpen(false);
+
+      // 3. Safe LocalStorage Sync in Try-Catch
+      try {
+        const raw = localStorage.getItem('t_covai_articles');
+        const existing = raw ? JSON.parse(raw) : null;
+        const currentList = Array.isArray(existing) ? existing : articles;
+        const updatedArticles = currentList.filter((a: any) => !selectedArticleIds.has(a.id) && (!a.slug || !selectedArticleIds.has(a.slug)));
+        const minimalArticles = minimizeArticlesForStorage(updatedArticles);
+
+        try {
+          localStorage.setItem('admin_published_articles', JSON.stringify(minimalArticles));
+        } catch (e) {
+          console.warn('LocalStorage quota exceeded. Skipping local cache update.');
+        }
+
+        try {
+          localStorage.setItem('t_covai_articles', JSON.stringify(minimalArticles));
+        } catch (e) {
+          console.warn('LocalStorage quota exceeded. Skipping local cache update.');
+        }
+
+        purgeLargeOutdatedStorageKeys();
+      } catch (e) {
+        console.warn('LocalStorage quota exceeded. Skipping local cache update.');
+      }
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('newsStorageUpdate'));
+        window.dispatchEvent(new CustomEvent('todayscoimbatore:db-updated', { detail: { table: 'news' } }));
+        window.dispatchEvent(new StorageEvent('storage', { key: 't_covai_articles' }));
+      }
+
+      if (failCount === 0) {
+        setArticleSuccess(`✓ Successfully deleted ${successCount} ${successCount === 1 ? 'story' : 'stories'} permanently from the database.`);
+      } else {
+        setArticleSuccess(`Deleted ${successCount} stories. (${failCount} failed)`);
+      }
+      setTimeout(() => setArticleSuccess(''), 5000);
+      refreshAllData();
+    } catch (err: any) {
+      console.error('Failed to bulk delete articles:', err);
+      setArticleError(err.message || 'Failed to bulk delete articles from database');
+      setTimeout(() => setArticleError(''), 6000);
+    } finally {
+      setIsBulkDeletingArticles(false);
     }
   };
 
@@ -1499,35 +2185,61 @@ export default function AdminPage() {
     setArticleSuccess('');
 
     try {
-      // 1. Perform hard delete on Supabase 'news' table via backend service
+      // 1. Database deletion FIRST via Supabase client & backend service
+      try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+        if (isUuid) {
+          await supabase.from('news').delete().eq('id', id);
+        } else {
+          await supabase.from('news').delete().or(`id.eq.${id},slug.eq.${id}`);
+        }
+      } catch (dbErr) {
+        console.warn('Direct Supabase delete notice:', dbErr);
+      }
+
+      // Hard delete on Supabase 'news' table via backend service
       await dbService.deleteArticle(id);
 
-      // 2. Only upon successful database deletion, purge from local storage & state
-      const existing = JSON.parse(
-        localStorage.getItem('t_covai_articles') ||
-        localStorage.getItem('admin_published_articles') ||
-        localStorage.getItem('publishedArticles') ||
-        localStorage.getItem('news_articles') ||
-        '[]'
-      );
-      const updated = existing.filter((a: any) => a.id !== id && a.slug !== id);
-      localStorage.setItem('t_covai_articles', JSON.stringify(updated));
-      localStorage.setItem('admin_published_articles', JSON.stringify(updated));
-      localStorage.setItem('publishedArticles', JSON.stringify(updated));
-      localStorage.setItem('news_articles', JSON.stringify(updated));
-      localStorage.setItem('covai_db_articles', JSON.stringify(updated));
+      // 2. Update UI component React state directly from memory
+      setArticles((prev) => prev.filter((a) => a.id !== id && a.slug !== id));
+      setSelectedArticleIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
 
-      // 3. Dispatch sync events
+      // 3. Wrap LocalStorage Sync in Try-Catch with quota fallback
+      try {
+        const raw = localStorage.getItem('t_covai_articles');
+        const existing = raw ? JSON.parse(raw) : null;
+        const currentList = Array.isArray(existing) ? existing : articles;
+        const updatedArticles = currentList.filter((a: any) => a.id !== id && a.slug !== id);
+        const minimalArticles = minimizeArticlesForStorage(updatedArticles);
+
+        try {
+          localStorage.setItem('admin_published_articles', JSON.stringify(minimalArticles));
+        } catch (e) {
+          console.warn('LocalStorage quota exceeded. Skipping local cache update.');
+        }
+
+        try {
+          localStorage.setItem('t_covai_articles', JSON.stringify(minimalArticles));
+        } catch (e) {
+          console.warn('LocalStorage quota exceeded. Skipping local cache update.');
+        }
+
+        purgeLargeOutdatedStorageKeys();
+      } catch (e) {
+        console.warn('LocalStorage quota exceeded. Skipping local cache update.');
+      }
+
+      // 4. Dispatch sync events
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new Event('newsStorageUpdate'));
         window.dispatchEvent(new CustomEvent('todayscoimbatore:db-updated', { detail: { table: 'news' } }));
-        window.dispatchEvent(new StorageEvent('storage', { key: 't_covai_articles', newValue: JSON.stringify(updated) }));
-        window.dispatchEvent(new StorageEvent('storage', { key: 'admin_published_articles', newValue: JSON.stringify(updated) }));
-        window.dispatchEvent(new StorageEvent('storage', { key: 'publishedArticles', newValue: JSON.stringify(updated) }));
-        window.dispatchEvent(new StorageEvent('storage', { key: 'news_articles', newValue: JSON.stringify(updated) }));
+        window.dispatchEvent(new StorageEvent('storage', { key: 't_covai_articles' }));
       }
 
-      setArticles((prev) => prev.filter((a) => a.id !== id && a.slug !== id));
       setArticleSuccess('Article permanently deleted from Supabase database.');
       setTimeout(() => setArticleSuccess(''), 4000);
       refreshAllData();
@@ -1547,8 +2259,10 @@ export default function AdminPage() {
 
     const editWordCount = (editingArticle.content || editingArticle.excerpt || editingArticle.title).trim().split(/\s+/).filter(Boolean).length;
     const editReadTime = editingArticle.readTime || `${Math.max(1, Math.ceil(editWordCount / 130))} min`;
-    const resolvedImg = editingArticle.imageUrl || (editingArticle as any).image || (editingArticle as any).mediaUrl;
-    const finalImg = resolvedImg && typeof resolvedImg === 'string' && resolvedImg.trim() !== '' ? resolvedImg.trim() : undefined;
+    const resolvedImg = editingArticle.imageUrl || (editingArticle as any).image || editingArticle.image_url;
+    const finalImg = resolvedImg && typeof resolvedImg === 'string' && resolvedImg.trim() !== '' && resolvedImg.trim() !== 'null' && resolvedImg.trim() !== 'undefined'
+      ? resolvedImg.trim()
+      : undefined;
 
     const nowIso = new Date().toISOString();
     const updated: Article = {
@@ -1556,45 +2270,56 @@ export default function AdminPage() {
       updatedAt: nowIso,
       createdAt: editingArticle.createdAt || nowIso,
       publishedAt: nowIso,
-      isExclusive: !!editingArticle.isExclusive,
+      isExclusive: !!(editingArticle.isExclusive || editingArticle.isSpotlight || editingArticle.is_spotlight),
+      isSpotlight: !!(editingArticle.isExclusive || editingArticle.isSpotlight || editingArticle.is_spotlight),
+      is_spotlight: !!(editingArticle.isExclusive || editingArticle.isSpotlight || editingArticle.is_spotlight),
       mediaType: editingArticle.mediaType === 'video' ? 'video' : 'image',
-      imageUrl: editingArticle.mediaType === 'image' ? finalImg : editingArticle.imageUrl,
-      image: editingArticle.mediaType === 'image' ? finalImg : (editingArticle as any).image,
+      imageUrl: editingArticle.mediaType === 'image' ? finalImg : undefined,
+      image: editingArticle.mediaType === 'image' ? finalImg : undefined,
+      image_url: editingArticle.mediaType === 'image' ? (finalImg || null) : null,
       mediaUrl: editingArticle.mediaType === 'video' ? (editingArticle.videoUrl || (editingArticle as any).mediaUrl) : finalImg,
       videoUrl: editingArticle.mediaType === 'video' ? editingArticle.videoUrl : undefined,
       subTag: editingArticle.subCategory || editingArticle.category,
       readTime: editReadTime,
-      highlightStat: editingArticle.isExclusive ? 'Spotlight Exclusive' : (editingArticle.highlightStat || 'Breaking Story'),
+      highlightStat: (editingArticle.isExclusive || editingArticle.isSpotlight || editingArticle.is_spotlight) ? 'Spotlight Exclusive' : (editingArticle.highlightStat || 'Breaking Story'),
     };
 
-    // 1. LocalStorage immediate update
-    const existing = JSON.parse(
-      localStorage.getItem('t_covai_articles') ||
-      localStorage.getItem('admin_published_articles') ||
-      localStorage.getItem('publishedArticles') ||
-      localStorage.getItem('news_articles') ||
-      '[]'
-    );
-    const updatedList = existing.map((a: any) => (a.id === updated.id ? updated : a));
-    localStorage.setItem('t_covai_articles', JSON.stringify(updatedList));
-    localStorage.setItem('admin_published_articles', JSON.stringify(updatedList));
-    localStorage.setItem('publishedArticles', JSON.stringify(updatedList));
-    localStorage.setItem('news_articles', JSON.stringify(updatedList));
-    localStorage.setItem('covai_db_articles', JSON.stringify(updatedList));
-
-    // 2. Dispatch events
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('newsStorageUpdate'));
-      window.dispatchEvent(new CustomEvent('todayscoimbatore:db-updated', { detail: { table: 'articles' } }));
-      window.dispatchEvent(new StorageEvent('storage', { key: 't_covai_articles', newValue: JSON.stringify(updatedList) }));
-      window.dispatchEvent(new StorageEvent('storage', { key: 'admin_published_articles', newValue: JSON.stringify(updatedList) }));
-      window.dispatchEvent(new StorageEvent('storage', { key: 'publishedArticles', newValue: JSON.stringify(updatedList) }));
-      window.dispatchEvent(new StorageEvent('storage', { key: 'news_articles', newValue: JSON.stringify(updatedList) }));
-    }
-
+    // 1. Database-first update
     await dbService.updateArticle(editingArticle.id, updated);
     setArticles((prev) => prev.map((a) => (a.id === editingArticle.id ? updated : a)));
     setEditingArticle(null);
+
+    // 2. Safe LocalStorage Sync in Try-Catch
+    try {
+      const raw = localStorage.getItem('t_covai_articles');
+      const existing = raw ? JSON.parse(raw) : null;
+      const currentList = Array.isArray(existing) ? existing : articles;
+      const updatedList = currentList.map((a: any) => (a.id === updated.id ? updated : a));
+      const minimalArticles = minimizeArticlesForStorage(updatedList);
+
+      try {
+        localStorage.setItem('admin_published_articles', JSON.stringify(minimalArticles));
+      } catch (e) {
+        console.warn('LocalStorage quota exceeded. Skipping local cache update.');
+      }
+
+      try {
+        localStorage.setItem('t_covai_articles', JSON.stringify(minimalArticles));
+      } catch (e) {
+        console.warn('LocalStorage quota exceeded. Skipping local cache update.');
+      }
+
+      purgeLargeOutdatedStorageKeys();
+    } catch (e) {
+      console.warn('LocalStorage quota exceeded. Skipping local cache update.');
+    }
+
+    // 3. Dispatch events
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('newsStorageUpdate'));
+      window.dispatchEvent(new CustomEvent('todayscoimbatore:db-updated', { detail: { table: 'articles' } }));
+      window.dispatchEvent(new StorageEvent('storage', { key: 't_covai_articles' }));
+    }
 
     setArticleSuccess('✓ Story changes updated in production database!');
     setTimeout(() => setArticleSuccess(''), 4000);
@@ -1709,6 +2434,10 @@ export default function AdminPage() {
   // ---------------------------------------------------------------------------
   const handleSlideImageUpload = async (file: File, slideIndex: number) => {
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert(`File "${file.name}" exceeds the maximum allowed size of 5MB.`);
+      return;
+    }
 
     try {
       const fileExt = file.name.split('.').pop();
@@ -1749,24 +2478,65 @@ export default function AdminPage() {
     <div className="min-h-screen bg-[#fcfbf7] text-[#1a1a1a] font-sans antialiased">
       {/* Top Admin Navigation Header */}
       <header className="bg-[#153d3b] text-white border-b border-[#0d4d4d] sticky top-0 z-40 shadow-md">
-        <div className="max-w-[1440px] mx-auto px-4 md:px-6 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Link href="/" className="inline-flex items-center">
+        <div className="max-w-[1440px] mx-auto px-3 sm:px-4 md:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            {/* Mobile Hamburger Button (Only on Mobile) */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden p-1.5 sm:p-2 -ml-1 text-emerald-100 hover:text-white hover:bg-[#0f2e2d] active:bg-[#0d2827] rounded-lg transition-colors flex items-center justify-center cursor-pointer shrink-0"
+              aria-label={mobileMenuOpen ? 'Close CMS Menu' : 'Open CMS Menu'}
+            >
+              {mobileMenuOpen ? (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              ) : (
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              )}
+            </button>
+
+            {/* Logo */}
+            <Link href="/" className="inline-flex items-center shrink-0">
               <Image
                 src="/logo-dark.png"
                 alt="Today's Coimbatore"
-                width={200}
-                height={55}
-                className="h-10 md:h-11 w-auto object-contain"
+                width={180}
+                height={50}
+                className="h-8 sm:h-9 md:h-11 w-auto object-contain"
               />
             </Link>
-            <span className="bg-[#0f2e2d] text-emerald-300 text-[10px] font-extrabold px-2 py-0.5 rounded border border-[#1f5956] uppercase tracking-wider">
+
+            {/* Admin CMS Badge */}
+            <span className="hidden xs:inline-block bg-[#0f2e2d] text-emerald-300 text-[9px] sm:text-[10px] font-extrabold px-1.5 sm:px-2 py-0.5 rounded border border-[#1f5956] uppercase tracking-wider shrink-0">
               ADMIN CMS
             </span>
           </div>
 
           {/* User Controls & Logout */}
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
+            {/* Quick Mobile "Publish" Button (Only on Mobile) */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('articles');
+                setMobileMenuOpen(false);
+                setTimeout(() => {
+                  const formEl = document.getElementById('publish-article-form');
+                  if (formEl) {
+                    formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }
+                }, 100);
+              }}
+              className="lg:hidden bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white px-2.5 py-1.5 rounded-lg text-xs font-black shadow-xs flex items-center gap-1 cursor-pointer transition-all border border-emerald-400/40 shrink-0 whitespace-nowrap"
+              title="Quick Publish Story"
+            >
+              <span className="text-sm leading-none font-bold">✍️</span>
+              <span className="font-bold text-[11px] sm:text-xs">Publish</span>
+            </button>
+
             <span className="hidden sm:inline text-xs text-emerald-200 font-mono">
               Admin Session (Master Key)
             </span>
@@ -1781,24 +2551,375 @@ export default function AdminPage() {
               </svg>
             </Link>
 
+            {/* Logout Button (never wraps) */}
             <button
               onClick={handleLogout}
-              className="bg-[#0f2e2d] hover:bg-red-900/80 text-stone-200 hover:text-white px-3 py-1.5 rounded-lg text-xs font-bold border border-[#1f5956] transition-colors flex items-center gap-1.5 cursor-pointer"
+              className="bg-[#0f2e2d] hover:bg-red-900/80 text-stone-200 hover:text-white px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-bold border border-[#1f5956] transition-colors flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap"
             >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
-              <span>Logout</span>
+              <span className="whitespace-nowrap">Logout</span>
             </button>
           </div>
         </div>
       </header>
 
+      {/* Mobile Off-Canvas Navigation Drawer (Only on Mobile) */}
+      {mobileMenuOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs lg:hidden animate-in fade-in duration-200"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      <div
+        className={`fixed top-0 left-0 bottom-0 w-[85%] max-w-sm bg-white z-50 lg:hidden shadow-2xl flex flex-col transition-transform duration-300 ease-in-out ${
+          mobileMenuOpen ? 'translate-x-0' : '-translate-x-full pointer-events-none'
+        }`}
+      >
+        {/* Mobile Drawer Header */}
+        <div className="p-4 bg-[#153d3b] text-white flex items-center justify-between border-b border-[#0d4d4d] shrink-0">
+          <div className="flex items-center gap-2.5">
+            <Image
+              src="/logo-dark.png"
+              alt="Today's Coimbatore"
+              width={140}
+              height={38}
+              className="h-8 w-auto object-contain"
+            />
+            <span className="bg-[#0f2e2d] text-emerald-300 text-[10px] font-extrabold px-1.5 py-0.5 rounded border border-[#1f5956] uppercase">
+              CMS
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(false)}
+            className="p-1.5 rounded-lg text-stone-300 hover:text-white hover:bg-[#0f2e2d] active:bg-[#0d2827] cursor-pointer"
+            aria-label="Close navigation menu"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Prominent Quick "Publish Story" CTA inside drawer */}
+        <div className="p-3 bg-gradient-to-r from-emerald-50 to-teal-50 border-b border-emerald-100 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('articles');
+              setMobileMenuOpen(false);
+              setTimeout(() => {
+                const formEl = document.getElementById('publish-article-form');
+                if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 120);
+            }}
+            className="w-full bg-emerald-700 hover:bg-emerald-800 active:scale-98 text-white px-3.5 py-3 rounded-xl font-black text-xs sm:text-sm shadow-sm flex items-center justify-between gap-2 cursor-pointer transition-all"
+          >
+            <span className="flex items-center gap-2">
+              <span className="text-base">✍️</span>
+              <span>Publish New Story</span>
+            </span>
+            <span className="text-[10px] font-extrabold bg-white/20 text-white px-2 py-0.5 rounded-full uppercase tracking-wider">
+              Quick Post
+            </span>
+          </button>
+        </div>
+
+        {/* Scrollable Navigation Sections */}
+        <div className="flex-1 overflow-y-auto p-3.5 space-y-4">
+          <div>
+            <div className="text-[10px] font-black uppercase tracking-wider text-stone-400 px-2 py-1 mb-1">
+              CMS Modules
+            </div>
+            
+            <nav className="space-y-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('supabase');
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-black transition-all cursor-pointer ${
+                  activeTab === 'supabase'
+                    ? 'bg-emerald-700 text-white shadow-md ring-2 ring-emerald-500 font-black'
+                    : 'text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200'
+                }`}
+              >
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="text-emerald-400 font-black shrink-0 text-base">⚡</span>
+                  <span className="whitespace-nowrap font-black truncate">Supabase SQL Studio</span>
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-500 text-white px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap">
+                  LIVE DB
+                </span>
+              </button>
+
+              <Link
+                href="/admin/review"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-black transition-all bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs group"
+              >
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="text-amber-600 font-black shrink-0 text-base">✨</span>
+                  <span className="whitespace-nowrap font-black truncate">AI Draft Review</span>
+                </span>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-amber-500 text-white px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap">
+                  PORTAL ↗
+                </span>
+              </Link>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('articles');
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all cursor-pointer ${
+                  activeTab === 'articles'
+                    ? 'bg-[#153d3b] text-white shadow-md font-bold'
+                    : 'text-stone-700 hover:bg-[#f3ede2] hover:text-[#153d3b]'
+                }`}
+              >
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="shrink-0">📰</span>
+                  <span className="whitespace-nowrap truncate">Stories &amp; Articles</span>
+                </span>
+                <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
+                  activeTab === 'articles' ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-600'
+                }`}>
+                  {articles.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('outages');
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all cursor-pointer ${
+                  activeTab === 'outages'
+                    ? 'bg-[#153d3b] text-white shadow-md font-bold'
+                    : 'text-stone-700 hover:bg-[#f3ede2] hover:text-[#153d3b]'
+                }`}
+              >
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="shrink-0">⚡</span>
+                  <span className="whitespace-nowrap truncate">Power Outages</span>
+                </span>
+                <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
+                  activeTab === 'outages' ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-600'
+                }`}>
+                  {outages.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('ads');
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all cursor-pointer ${
+                  activeTab === 'ads'
+                    ? 'bg-[#153d3b] text-white shadow-md font-bold'
+                    : 'text-stone-700 hover:bg-[#f3ede2] hover:text-[#153d3b]'
+                }`}
+              >
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="shrink-0">📢</span>
+                  <span className="whitespace-nowrap truncate">Native Ads</span>
+                </span>
+                <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
+                  activeTab === 'ads' ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-600'
+                }`}>
+                  {ads.filter((a) => a.active).length}/{ads.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('blood');
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all cursor-pointer ${
+                  activeTab === 'blood'
+                    ? 'bg-red-700 text-white shadow-md font-bold'
+                    : 'text-stone-700 hover:bg-red-50 hover:text-red-700'
+                }`}
+              >
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="shrink-0">🩸</span>
+                  <span className="whitespace-nowrap truncate">Blood Donor 24/7</span>
+                </span>
+                <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
+                  activeTab === 'blood' ? 'bg-white/25 text-white' : 'bg-red-100 text-red-700'
+                }`}>
+                  {donors.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('events');
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all cursor-pointer ${
+                  activeTab === 'events'
+                    ? 'bg-[#153d3b] text-white shadow-md font-bold'
+                    : 'text-stone-700 hover:bg-[#f3ede2] hover:text-[#153d3b]'
+                }`}
+              >
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="shrink-0">📅</span>
+                  <span className="whitespace-nowrap truncate">Events &amp; Expos</span>
+                </span>
+                <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
+                  activeTab === 'events' ? 'bg-white/20 text-white' : 'bg-stone-100 text-stone-600'
+                }`}>
+                  {events.length}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('directory');
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all cursor-pointer ${
+                  activeTab === 'directory'
+                    ? 'bg-[#153d3b] text-white shadow-md font-bold'
+                    : 'text-stone-700 hover:bg-[#f3ede2] hover:text-[#153d3b]'
+                }`}
+              >
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="shrink-0">📁</span>
+                  <span className="whitespace-nowrap truncate">Directory</span>
+                </span>
+                <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
+                  activeTab === 'directory' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-800'
+                }`}>
+                  {directoryListings.length} Listings
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('verifications');
+                  setMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all cursor-pointer ${
+                  activeTab === 'verifications'
+                    ? 'bg-emerald-800 text-white shadow-md font-bold'
+                    : 'text-stone-700 hover:bg-emerald-50 hover:text-emerald-800'
+                }`}
+              >
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="shrink-0">🔑</span>
+                  <span className="whitespace-nowrap truncate">User Verifications</span>
+                </span>
+                <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
+                  activeTab === 'verifications' ? 'bg-white/25 text-white' : 'bg-emerald-100 text-emerald-800'
+                }`}>
+                  {verificationsList.length}
+                </span>
+              </button>
+
+              <Link
+                href="/admin/widgets"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2.5 rounded-xl text-xs md:text-sm font-semibold transition-all cursor-pointer text-stone-700 hover:bg-emerald-50 hover:text-emerald-900 border border-emerald-100/80 shadow-2xs"
+              >
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="shrink-0 text-base">⚙️</span>
+                  <span className="whitespace-nowrap font-bold text-emerald-900 truncate">Widgets Manager</span>
+                </span>
+                <span className="shrink-0 text-[10px] font-mono font-black px-2 py-0.5 rounded-full bg-emerald-600 text-white uppercase tracking-tight whitespace-nowrap">
+                  4 Active
+                </span>
+              </Link>
+            </nav>
+          </div>
+
+          <div className="pt-3 border-t border-stone-200">
+            <div className="text-[10px] font-black uppercase tracking-wider text-stone-400 px-2 py-1 mb-1">
+              Admin Shortcuts
+            </div>
+            <div className="space-y-1">
+              <Link
+                href="/admin/contact-enquiries"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-medium text-stone-700 hover:bg-[#f3ede2] hover:text-[#153d3b] transition-all"
+              >
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="shrink-0">✉️</span>
+                  <span className="whitespace-nowrap truncate">Contact Enquiries</span>
+                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {unreadEnquiriesCount > 0 ? (
+                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap bg-rose-500 text-white shadow-2xs flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                      {unreadEnquiriesCount} New
+                    </span>
+                  ) : totalActiveEnquiriesCount > 0 ? (
+                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap bg-stone-100 text-stone-600">
+                      {totalActiveEnquiriesCount}
+                    </span>
+                  ) : null}
+                  <span className="text-stone-400 text-xs">&rarr;</span>
+                </div>
+              </Link>
+
+              <Link
+                href="/admin/about-us"
+                onClick={() => setMobileMenuOpen(false)}
+                className="w-full flex items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl text-xs md:text-sm font-medium text-stone-700 hover:bg-[#f3ede2] hover:text-[#153d3b] transition-all"
+              >
+                <span className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="shrink-0">⚙️</span>
+                  <span className="whitespace-nowrap truncate">Social &amp; About Us</span>
+                </span>
+                <span className="text-stone-400 text-xs shrink-0">&rarr;</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* Drawer Footer */}
+        <div className="p-3 border-t border-stone-200 bg-stone-50 shrink-0 flex items-center justify-between text-xs font-bold">
+          <Link
+            href="/"
+            onClick={() => setMobileMenuOpen(false)}
+            className="text-stone-600 hover:text-emerald-700 flex items-center gap-1 py-1"
+          >
+            <span>&larr;</span>
+            <span>Public Site</span>
+          </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="text-red-600 hover:text-red-800 flex items-center gap-1 py-1 cursor-pointer"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+            </svg>
+            <span>Logout</span>
+          </button>
+        </div>
+      </div>
+
       {/* Main Workspace: 2-Column Sidebar + Dynamic Content Layout */}
       <div className="flex-1 flex flex-col lg:flex-row w-full min-h-[calc(100vh-64px)]">
         
-        {/* 1. Left Vertical Sidebar Navigation */}
-        <aside className="w-full lg:w-80 bg-white border-r border-stone-200 p-4 space-y-4 flex-shrink-0 lg:sticky lg:top-16 lg:h-[calc(100vh-64px)] lg:overflow-y-auto shadow-2xs">
+        {/* 1. Left Vertical Sidebar Navigation (Hidden on Mobile, Permanent on Desktop) */}
+        <aside className="hidden lg:block w-80 bg-white border-r border-stone-200 p-4 space-y-4 shrink-0 lg:sticky lg:top-16 lg:h-[calc(100vh-64px)] lg:overflow-y-auto shadow-2xs">
           
           <div>
             <div className="text-[10px] font-black uppercase tracking-wider text-stone-400 px-3 py-1.5 mb-1">
@@ -2008,15 +3129,16 @@ export default function AdminPage() {
                   <span className="whitespace-nowrap truncate">Contact Enquiries</span>
                 </span>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <span
-                    className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap ${
-                      pendingEnquiriesCount > 0
-                        ? 'bg-rose-500 text-white shadow-2xs'
-                        : 'bg-stone-100 text-stone-500'
-                    }`}
-                  >
-                    {pendingEnquiriesCount}
-                  </span>
+                  {unreadEnquiriesCount > 0 ? (
+                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap bg-rose-500 text-white shadow-2xs flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping" />
+                      {unreadEnquiriesCount} New
+                    </span>
+                  ) : totalActiveEnquiriesCount > 0 ? (
+                    <span className="text-[11px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap bg-stone-100 text-stone-600">
+                      {totalActiveEnquiriesCount}
+                    </span>
+                  ) : null}
                   <span className="text-stone-400 text-xs">&rarr;</span>
                 </div>
               </Link>
@@ -2036,10 +3158,100 @@ export default function AdminPage() {
         </aside>
 
         {/* 2. Right Dynamic Content Panel */}
-        <main className="flex-1 p-4 md:p-6 lg:p-8 min-w-0 space-y-6 overflow-y-auto">
+        <main className="flex-1 p-3.5 sm:p-4 md:p-6 lg:p-8 min-w-0 space-y-4 sm:space-y-6 overflow-y-auto">
           
+          {/* Mobile Top Context & Fast Module Switcher (Only on Mobile) */}
+          <div className="lg:hidden bg-white border border-stone-200 rounded-2xl p-3.5 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[10px] font-black uppercase tracking-wider text-stone-400 shrink-0">Managing:</span>
+                <span className="text-xs sm:text-sm font-black text-[#153d3b] truncate">
+                  {activeTab === 'supabase' && '⚡ Supabase SQL Studio'}
+                  {activeTab === 'articles' && `📰 Stories & Articles (${articles.length})`}
+                  {activeTab === 'outages' && `⚡ Power Outages (${outages.length})`}
+                  {activeTab === 'ads' && `📢 Native Ads (${ads.length})`}
+                  {activeTab === 'blood' && `🩸 Blood Donors (${donors.length})`}
+                  {activeTab === 'events' && `📅 Events & Expos (${events.length})`}
+                  {activeTab === 'directory' && `📁 Directory (${directoryListings.length})`}
+                  {activeTab === 'verifications' && `🔑 Verifications (${verificationsList.length})`}
+                  {activeTab === 'reviews' && `★ Reviews (${reviewsList.length})`}
+                  {activeTab === 'explorer' && '🧭 DB Explorer'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(true)}
+                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-black px-2.5 py-1.5 rounded-lg border border-emerald-200 shrink-0 flex items-center gap-1 cursor-pointer transition-colors shadow-2xs active:scale-95"
+              >
+                <span>☰ Modules</span>
+              </button>
+            </div>
+
+            {/* Fast 1-Tap Horizontal Module Switching Pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5 text-xs -mx-1 px-1">
+              {[
+                { id: 'articles', label: '📰 Stories', count: articles.length },
+                { id: 'supabase', label: '⚡ Studio' },
+                { id: 'outages', label: '⚡ Outages', count: outages.length },
+                { id: 'ads', label: '📢 Ads', count: ads.length },
+                { id: 'blood', label: '🩸 Blood', count: donors.length },
+                { id: 'events', label: '📅 Events', count: events.length },
+                { id: 'directory', label: '📁 Directory', count: directoryListings.length },
+                { id: 'verifications', label: '🔑 Verifications', count: verificationsList.length },
+              ].map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => setActiveTab(item.id as any)}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-xs shrink-0 whitespace-nowrap transition-all cursor-pointer ${
+                    activeTab === item.id
+                      ? 'bg-[#153d3b] text-white shadow-xs font-black'
+                      : 'bg-stone-100 text-stone-700 hover:bg-stone-200 active:bg-stone-300'
+                  }`}
+                >
+                  <span>{item.label}</span>
+                  {item.count !== undefined && (
+                    <span className={`ml-1.5 text-[10px] font-mono px-1.5 py-0.5 rounded-full ${
+                      activeTab === item.id ? 'bg-white/20 text-white font-black' : 'bg-stone-200 text-stone-600'
+                    }`}>
+                      {item.count}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* If on articles tab, provide a prominent quick Jump button */}
+            {activeTab === 'articles' && (
+              <div className="pt-2 border-t border-stone-100 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const formEl = document.getElementById('publish-article-form');
+                    if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white py-2 px-3 rounded-xl font-black text-xs flex items-center justify-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+                >
+                  <span>✍️ Jump to Publish Form</span>
+                  <span>&darr;</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const listEl = document.getElementById('stories-table-view');
+                    if (listEl) listEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
+                  className="bg-stone-100 hover:bg-stone-200 active:scale-98 text-stone-800 py-2 px-3 rounded-xl font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer"
+                >
+                  <span>View Stories ({articles.length})</span>
+                  <span>&darr;</span>
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Top Summary Metric Cards (Compact single-row / responsive grid) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5">
             <div className="bg-white border border-stone-200 rounded-xl p-3 shadow-2xs">
               <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500 whitespace-nowrap block truncate">
                 Articles
@@ -2137,6 +3349,9 @@ export default function AdminPage() {
             </div>
           </div>
 
+          {/* Covai Pulse Daily Poll Analytics Live Card */}
+          <PollAnalytics />
+
         {/* ------------------------------------------------------------------ */}
         {/* TAB 0: SUPABASE SQL DATABASE STUDIO (FULL CRUD EXCEL / GRID VIEW)  */}
         {/* ------------------------------------------------------------------ */}
@@ -2149,7 +3364,7 @@ export default function AdminPage() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             
             {/* Create New Story Form */}
-            <div className="lg:col-span-5 bg-white border border-stone-200 rounded-2xl p-5 sm:p-6 shadow-xs">
+            <div id="publish-article-form" className="lg:col-span-5 bg-white border border-stone-200 rounded-2xl p-4 sm:p-6 shadow-xs scroll-mt-20">
               <h2 className="text-base font-black text-[#1a1a1a] mb-1">
                 Publish New Covai Story
               </h2>
@@ -2171,17 +3386,31 @@ export default function AdminPage() {
 
               <form onSubmit={handleCreateArticle} className="space-y-4 text-xs">
                 <div>
-                  <label className="block font-bold text-stone-700 mb-1 uppercase tracking-wider text-[11px]">
-                    Headline Title *
-                  </label>
-                  <input
-                    type="text"
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block font-bold text-stone-700 uppercase tracking-wider text-[11px]">
+                      Headline Title *
+                    </label>
+                    <span className="text-[10px] text-stone-500 font-semibold">
+                      {newTitle.trim() ? `${newTitle.trim().split(/\s+/).filter(Boolean).length} words • ${newTitle.length} chars` : 'Full news headline'}
+                    </span>
+                  </div>
+                  <textarea
                     required
-                    placeholder="e.g. Coimbatore Western Bypass Phase-2 tenders opened..."
+                    rows={3}
+                    placeholder="e.g. Coimbatore Western Bypass Phase-2 tenders opened with ₹1,200 crore budget allocation across major junctions..."
                     value={newTitle}
                     onChange={(e) => setNewTitle(e.target.value)}
-                    className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-[#1a1a1a] font-semibold focus:outline-none focus:ring-2 focus:ring-[#153d3b]"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                        e.preventDefault();
+                        handleCreateArticle(e as any);
+                      }
+                    }}
+                    className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3.5 py-2.5 text-[#1a1a1a] font-semibold text-xs sm:text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-[#153d3b] resize-y min-h-[76px] transition-all placeholder:text-stone-400"
                   />
+                  <p className="text-[10px] text-stone-400 mt-1">
+                    Auto-wrapping headline box fits any title length comfortably. Press Ctrl+Enter to publish quickly.
+                  </p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -2199,9 +3428,8 @@ export default function AdminPage() {
                       <option value="BUSINESS">BUSINESS</option>
                       <option value="TECH">TECH</option>
                       <option value="INFRASTRUCTURE">INFRASTRUCTURE</option>
-                      <option value="EVENTS">EVENTS</option>
-                      <option value="SPORTS">SPORTS</option>
                       <option value="CEO">CEO</option>
+                      <option value="SPORTS">SPORTS</option>
                       <option value="EDUCATION">EDUCATION</option>
                       <option value="E-PAPER">E-PAPER</option>
                     </select>
@@ -2296,8 +3524,9 @@ export default function AdminPage() {
                         className="relative border-2 border-dashed rounded-xl p-4 text-center cursor-pointer bg-white border-stone-300 hover:border-stone-400"
                       >
                         <input
+                          ref={publishFileInputRef}
                           type="file"
-                          accept="image/*,.png,.jpg,.jpeg,.webp"
+                          accept="image/png,image/jpeg,image/jpg,image/webp,image/avif"
                           onChange={(e) => {
                             if (e.target.files && e.target.files[0]) {
                               handleImageFileChange(e.target.files[0]);
@@ -2306,13 +3535,27 @@ export default function AdminPage() {
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                         />
                         <p className="text-xs font-bold text-stone-800">
-                          Drag &amp; drop photo here, or <span className="text-[#e54b3c] underline">Browse (.jpg, .jpeg, .png, .webp)</span>
+                          Drag &amp; drop photo here, or <span className="text-[#e54b3c] underline">Browse files</span>
+                        </p>
+                        <p className="text-[11px] text-stone-500 mt-1 font-medium">
+                          Supported: PNG, JPG, JPEG, WEBP, AVIF (Max Size: 5MB per image)
                         </p>
                       </div>
 
                       {imageUrl && (
-                        <div className="relative rounded-xl overflow-hidden border border-stone-300 bg-stone-900 shadow-sm">
-                          <img src={imageUrl} alt="Asset Preview" className="w-full h-32 object-cover" />
+                        <div className="relative mt-3 w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-900 group">
+                          <img 
+                            src={imageUrl} 
+                            alt="Preview" 
+                            className="h-48 w-full object-cover transition-opacity duration-200 group-hover:opacity-90"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleRemovePublishImage}
+                            className="absolute top-2 right-2 flex items-center gap-1.5 rounded-lg bg-red-600/90 hover:bg-red-600 text-white px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur-sm transition-all hover:scale-105 active:scale-95 cursor-pointer z-20"
+                          >
+                            Remove Photo
+                          </button>
                         </div>
                       )}
 
@@ -2353,8 +3596,8 @@ export default function AdminPage() {
                     onChange={(e) => setIsExclusive(e.target.checked)}
                     className="rounded border-stone-300 text-[#e54b3c] focus:ring-[#e54b3c]"
                   />
-                  <label htmlFor="exclusiveCheck" className="font-bold text-stone-700">
-                    Mark as Breaking / Spotlight Hero Exclusive
+                  <label htmlFor="exclusiveCheck" className="font-bold text-stone-700 cursor-pointer">
+                    ★ Pin to Breaking Spotlight / Hero Carousel
                   </label>
                 </div>
 
@@ -2369,7 +3612,7 @@ export default function AdminPage() {
             </div>
 
             {/* Published Stories Table with Explicit Category Filter, Metrics & Edit / Delete */}
-            <div className="lg:col-span-7 bg-white border border-stone-200 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col space-y-4">
+            <div id="stories-table-view" className="lg:col-span-7 bg-white border border-stone-200 rounded-2xl p-4 sm:p-6 shadow-xs flex flex-col space-y-4 scroll-mt-20">
               
               {/* Header */}
               <div>
@@ -2404,35 +3647,61 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Horizontal Category Filter Button Bar */}
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 pt-0.5 border-b border-stone-200">
-                {ADMIN_FILTER_CATEGORIES.map((cat) => {
-                  const count = getCategoryCount(cat);
-                  const isSelected = selectedCategoryFilter === cat;
-                  return (
-                    <button
-                      key={cat}
-                      type="button"
-                      onClick={() => setSelectedCategoryFilter(cat)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
-                        isSelected
-                          ? 'bg-[#153d3b] text-white shadow-xs'
-                          : 'bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200'
-                      }`}
-                    >
-                      <span>{cat}</span>
-                      <span
-                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-black ${
+              {/* Responsive Horizontal Category Filter Bar */}
+              <div className="relative flex items-center w-full border-b border-stone-200 pb-1 pt-0.5">
+                {/* Left Scroll Button (Desktop) */}
+                <button
+                  type="button"
+                  onClick={() => scrollCategories('left')}
+                  aria-label="Scroll categories left"
+                  className="hidden sm:flex items-center justify-center w-7 h-7 rounded-full bg-white shadow-xs border border-stone-300 text-stone-700 hover:bg-stone-100 hover:text-stone-900 shrink-0 mr-1.5 cursor-pointer transition-colors z-10"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+
+                {/* Filter bar container */}
+                <div
+                  ref={categoryScrollRef}
+                  className="flex items-center gap-2 overflow-x-auto scrollbar-none scroll-smooth py-1 px-1 max-w-full flex-1"
+                >
+                  {ADMIN_FILTER_CATEGORIES.map((cat) => {
+                    const count = getCategoryCount(cat);
+                    const isSelected = selectedCategoryFilter === cat;
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setSelectedCategoryFilter(cat)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
                           isSelected
-                            ? 'bg-white/20 text-white'
-                            : 'bg-stone-200 text-stone-600'
+                            ? 'bg-[#153d3b] text-white shadow-xs'
+                            : 'bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-200'
                         }`}
                       >
-                        {count}
-                      </span>
-                    </button>
-                  );
-                })}
+                        <span>{cat}</span>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-black ${
+                            isSelected
+                              ? 'bg-white/20 text-white'
+                              : 'bg-stone-200 text-stone-600'
+                          }`}
+                        >
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Right Scroll Button (Desktop) */}
+                <button
+                  type="button"
+                  onClick={() => scrollCategories('right')}
+                  aria-label="Scroll categories right"
+                  className="hidden sm:flex items-center justify-center w-7 h-7 rounded-full bg-white shadow-xs border border-stone-300 text-stone-700 hover:bg-stone-100 hover:text-stone-900 shrink-0 ml-1.5 cursor-pointer transition-colors z-10"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
               </div>
 
               {/* Strict Dynamic List Filtering */}
@@ -2447,62 +3716,129 @@ export default function AdminPage() {
                     {articleError}
                   </div>
                 )}
+                {/* Multi-Selection / Bulk Action Bar */}
+                {filteredArticles.length > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 px-3.5 bg-stone-100 border border-stone-200 rounded-xl text-xs">
+                    <div className="flex items-center gap-2.5">
+                      <label className="flex items-center gap-2 font-bold text-stone-700 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={
+                            filteredArticles.length > 0 &&
+                            filteredArticles.every((item) => selectedArticleIds.has(item.id))
+                          }
+                          onChange={handleToggleSelectAllArticles}
+                          className="w-4 h-4 rounded border-stone-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600"
+                        />
+                        <span>
+                          Select All{' '}
+                          <span className="text-stone-400 font-normal">({filteredArticles.length})</span>
+                        </span>
+                      </label>
+
+                      {selectedArticleIds.size > 0 && (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-black bg-red-100 text-red-700 border border-red-200">
+                          {selectedArticleIds.size} selected
+                        </span>
+                      )}
+                    </div>
+
+                    {selectedArticleIds.size > 0 && (
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedArticleIds(new Set())}
+                          className="px-2.5 py-1 text-[11px] font-bold text-stone-600 hover:text-stone-900 cursor-pointer rounded hover:bg-stone-200/60 transition-colors"
+                        >
+                          Deselect All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setBulkArticleDeleteModalOpen(true)}
+                          disabled={isBulkDeletingArticles}
+                          className="flex items-center gap-1.5 px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg font-bold text-xs shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+                        >
+                          <span>🗑️</span>
+                          <span>Delete Selected ({selectedArticleIds.size})</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {filteredArticles.length > 0 ? (
                   filteredArticles.map((item) => {
                     const hasVideo = Boolean(item.videoUrl && item.videoUrl.trim() !== '');
                     const hasImage = Boolean((item.imageUrl && item.imageUrl.trim() !== '') || ((item as any).image && (item as any).image.trim() !== ''));
+                    const isSelected = selectedArticleIds.has(item.id);
 
                     return (
                       <div
                         key={item.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border border-stone-200 bg-[#fcfbf7] gap-3 hover:border-stone-300 transition-colors"
+                        className={`flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-xl border gap-3 transition-colors ${
+                          isSelected
+                            ? 'bg-red-50/60 border-red-300 shadow-2xs'
+                            : 'bg-[#fcfbf7] border-stone-200 hover:border-stone-300'
+                        }`}
                       >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center gap-2 text-[10px] font-bold uppercase mb-1 flex-wrap">
-                            <span className="px-2 py-0.5 rounded bg-stone-200 text-stone-800 font-extrabold">
-                              {item.category}
-                            </span>
-                            {item.subCategory && (
-                              <span className="text-[#e54b3c]">{item.subCategory}</span>
-                            )}
-                            {hasVideo ? (
-                              <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-extrabold flex items-center gap-1">
-                                <span>🎥 Video</span>
-                              </span>
-                            ) : hasImage ? (
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-extrabold flex items-center gap-1">
-                                <span>📷 Image</span>
-                              </span>
-                            ) : null}
-                            {item.isExclusive && (
-                              <span className="px-2 py-0.5 rounded bg-red-600 text-white font-black flex items-center gap-1 shadow-xs">
-                                <span>★ SPOTLIGHT EXCLUSIVE</span>
-                              </span>
-                            )}
-                            {item.updatedAt && (!item.createdAt || Math.abs(new Date(item.updatedAt).getTime() - new Date(item.createdAt).getTime()) > 3000) ? (
-                              <span className="text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded font-black flex items-center gap-1 shadow-2xs">
-                                <span>✏️ UPDATED {formatRelativeTime(item.updatedAt)}</span>
-                              </span>
-                            ) : (
-                              <span className="text-stone-500 font-bold">• {formatRelativeTime(item.createdAt || item.publishedAt)}</span>
-                            )}
+                        <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                          <div className="pt-0.5 sm:pt-0 shrink-0">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleArticle(item.id)}
+                              aria-label={`Select article: ${item.title}`}
+                              className="w-4 h-4 rounded border-stone-300 text-red-600 focus:ring-red-500 cursor-pointer accent-red-600"
+                            />
                           </div>
-                          <Link
-                            href={`/article/${item.id}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs sm:text-sm font-bold text-[#1a1a1a] hover:text-[#e54b3c] hover:underline line-clamp-2 leading-snug block transition-colors"
-                            title="Open live article in new tab"
-                          >
-                            {item.title} <span className="text-[10px] font-normal text-stone-400">↗</span>
-                          </Link>
-                          <div className="text-[11px] text-stone-500 mt-1">
-                            By {item.author || 'Editorial Bureau'}
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 text-[10px] font-bold uppercase mb-1 flex-wrap">
+                              <span className="px-2 py-0.5 rounded bg-stone-200 text-stone-800 font-extrabold">
+                                {item.category}
+                              </span>
+                              {item.subCategory && (
+                                <span className="text-[#e54b3c]">{item.subCategory}</span>
+                              )}
+                              {hasVideo ? (
+                                <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-extrabold flex items-center gap-1">
+                                  <span>🎥 Video</span>
+                                </span>
+                              ) : hasImage ? (
+                                <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-extrabold flex items-center gap-1">
+                                  <span>📷 Image</span>
+                                </span>
+                              ) : null}
+                              {item.isExclusive && (
+                                <span className="px-2 py-0.5 rounded bg-red-600 text-white font-black flex items-center gap-1 shadow-xs">
+                                  <span>★ SPOTLIGHT EXCLUSIVE</span>
+                                </span>
+                              )}
+                              {item.updatedAt && (!item.createdAt || Math.abs(new Date(item.updatedAt).getTime() - new Date(item.createdAt).getTime()) > 3000) ? (
+                                <span className="text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded font-black flex items-center gap-1 shadow-2xs">
+                                  <span>✏️ UPDATED {formatRelativeTime(item.updatedAt)}</span>
+                                </span>
+                              ) : (
+                                <span className="text-stone-500 font-bold">• {formatRelativeTime(item.createdAt || item.publishedAt)}</span>
+                              )}
+                            </div>
+                            <Link
+                              href={`/article/${item.id}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-xs sm:text-sm font-bold text-[#1a1a1a] hover:text-[#e54b3c] hover:underline line-clamp-2 leading-snug block transition-colors"
+                              title="Open live article in new tab"
+                            >
+                              {item.title} <span className="text-[10px] font-normal text-stone-400">↗</span>
+                            </Link>
+                            <div className="text-[11px] text-stone-500 mt-1">
+                              By {item.author || 'Editorial Bureau'}
+                            </div>
                           </div>
                         </div>
 
                         {/* Explicit Edit & Delete Action Buttons */}
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
                           <button
                             onClick={() => setEditingArticle({ ...item })}
                             className="px-2.5 py-1 rounded bg-stone-200 hover:bg-stone-300 text-stone-800 text-xs font-bold transition-colors cursor-pointer flex items-center gap-1"
@@ -3691,43 +5027,31 @@ export default function AdminPage() {
               </div>
             )}
 
-            {/* Category Filter Tabs */}
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1">
-              {['ALL', 'EXPO', 'TECH', 'CULTURAL', 'SPORTS', 'MUSIC', 'WORKSHOP'].map((cat) => (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setEventCategoryFilter(cat)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold uppercase transition-colors cursor-pointer shrink-0 ${
-                    eventCategoryFilter === cat
-                      ? 'bg-[#153d3b] text-white shadow-xs'
-                      : 'bg-white text-stone-700 hover:bg-[#f3ede2] border border-stone-200'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-
             {/* Events Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {events
-                .filter((ev) => eventCategoryFilter === 'ALL' || ev.category.toUpperCase() === eventCategoryFilter)
-                .map((ev) => {
+              {events.map((ev) => {
                   return (
                     <div
                       key={ev.id}
-                      className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-xs flex flex-col justify-between hover:border-[#153d3b] transition-all"
+                      className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-xs flex flex-col h-full justify-between hover:border-[#153d3b] transition-all"
                     >
                       <div>
                         {/* Media Preview (Conditional Video or Poster) */}
-                        <div className="w-full h-44 bg-slate-900 relative overflow-hidden group">
+                        <div className="relative w-full aspect-[16/9] bg-slate-900/90 overflow-hidden rounded-t-xl flex items-center justify-center group">
                           {ev.posterUrl ? (
-                            <img
-                              src={ev.posterUrl}
-                              alt={ev.title}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
+                            <>
+                              <img
+                                src={ev.posterUrl}
+                                alt=""
+                                aria-hidden="true"
+                                className="absolute inset-0 w-full h-full object-cover blur-sm opacity-35 scale-110 pointer-events-none"
+                              />
+                              <img
+                                src={ev.posterUrl}
+                                alt={ev.title}
+                                className="relative z-10 w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 p-1"
+                              />
+                            </>
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-3xl text-stone-600">
                               🎟️
@@ -3910,124 +5234,170 @@ export default function AdminPage() {
 
             {/* Directory Listings Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {directoryListings
-                .filter((item) => {
-                  const matchCat =
-                    dirCategoryFilter === 'ALL' ||
-                    (item.categorySlug && item.categorySlug.toLowerCase().replace(/[^a-z0-9]/g, '') === dirCategoryFilter.toLowerCase().replace(/[^a-z0-9]/g, '')) ||
-                    (item.category && item.category.toLowerCase().replace(/[^a-z0-9]/g, '') === dirCategoryFilter.toLowerCase().replace(/[^a-z0-9]/g, ''));
-                  const matchQuery =
-                    !dirSearchQuery ||
-                    item.name.toLowerCase().includes(dirSearchQuery.toLowerCase()) ||
-                    item.area.toLowerCase().includes(dirSearchQuery.toLowerCase()) ||
-                    item.category.toLowerCase().includes(dirSearchQuery.toLowerCase()) ||
-                    item.phone.includes(dirSearchQuery);
-                  return matchCat && matchQuery;
-                })
-                .map((listing) => (
+              {isDirLoading ? (
+                Array.from({ length: 3 }).map((_, i) => (
                   <div
-                    key={listing.id}
-                    className="bg-white border border-stone-200 rounded-2xl p-4 shadow-xs flex flex-col justify-between hover:border-red-400 transition-all space-y-3"
+                    key={`dir-skeleton-${i}`}
+                    className="bg-white border border-stone-200 rounded-2xl p-4 shadow-xs flex flex-col justify-between animate-pulse space-y-3"
                   >
                     <div className="space-y-2.5">
-                      {/* Image Thumbnail & Badges */}
-                      <div className="relative h-36 w-full rounded-xl overflow-hidden bg-slate-900 border border-stone-200">
-                        <img
-                          src={listing.imageUrl || getCategoryFallbackImage(listing.category, listing.categorySlug)}
-                          alt={listing.name}
-                          className="w-full h-full object-cover"
-                          loading="lazy"
-                        />
-                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-black uppercase shadow-xs">
-                          {listing.category}
-                        </span>
-                        <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 text-white text-[10px] font-black">
-                          📍 {listing.area}
-                        </span>
-                      </div>
+                      <div className="h-36 w-full rounded-xl bg-stone-200" />
+                      <div className="h-4 w-3/4 bg-stone-200 rounded" />
+                      <div className="h-3 w-1/2 bg-stone-200 rounded" />
+                      <div className="h-3 w-full bg-stone-200 rounded" />
+                    </div>
+                    <div className="pt-3 border-t border-stone-200 h-8 bg-stone-100 rounded" />
+                  </div>
+                ))
+              ) : (
+                (() => {
+                  const filtered = directoryListings.filter((item) => {
+                    const matchCat =
+                      dirCategoryFilter === 'ALL' ||
+                      (item.categorySlug && item.categorySlug.toLowerCase().replace(/[^a-z0-9]/g, '') === dirCategoryFilter.toLowerCase().replace(/[^a-z0-9]/g, '')) ||
+                      (item.category && item.category.toLowerCase().replace(/[^a-z0-9]/g, '') === dirCategoryFilter.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                    const matchQuery =
+                      !dirSearchQuery ||
+                      item.name.toLowerCase().includes(dirSearchQuery.toLowerCase()) ||
+                      item.area.toLowerCase().includes(dirSearchQuery.toLowerCase()) ||
+                      item.category.toLowerCase().includes(dirSearchQuery.toLowerCase()) ||
+                      item.phone.includes(dirSearchQuery);
+                    return matchCat && matchQuery;
+                  });
 
-                      {/* Header Info */}
-                      <div>
-                        <div className="flex items-center justify-between text-xs mb-1">
-                          <span className="font-extrabold text-amber-500 flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
-                            <span>⭐</span>
-                            <span className="text-stone-900 font-black">{listing.rating ? Number(listing.rating).toFixed(1) : '4.8'}</span>
-                            <span className="text-amber-800 font-bold text-[10px] uppercase tracking-tight">Rating</span>
+                  if (filtered.length === 0) {
+                    return (
+                      <div className="col-span-full bg-white border border-stone-200 rounded-2xl p-12 text-center shadow-xs">
+                        <div className="text-4xl mb-3">📂</div>
+                        <h4 className="text-base font-black text-stone-800">No Business Listings Found</h4>
+                        <p className="text-xs text-stone-500 mt-1 max-w-sm mx-auto">
+                          {dirSearchQuery || dirCategoryFilter !== 'ALL'
+                            ? 'No listings match your current search or category filter. Try clearing filters.'
+                            : 'There are no listings in the Supabase database yet. Click "+ Add Business Listing" above to publish your first verified business.'}
+                        </p>
+                      </div>
+                    );
+                  }
+
+                  return filtered.map((listing) => (
+                    <div
+                      key={listing.id}
+                      className="bg-white border border-stone-200 rounded-2xl p-4 shadow-xs flex flex-col justify-between hover:border-red-400 transition-all space-y-3"
+                    >
+                      <div className="space-y-2.5">
+                        {/* Image Thumbnail & Badges */}
+                        <div className="relative h-36 w-full rounded-xl overflow-hidden bg-slate-900 border border-stone-200">
+                          <img
+                            src={listing.imageUrl || getCategoryFallbackImage(listing.category, listing.categorySlug)}
+                            alt={listing.name}
+                            className="w-full h-full object-cover"
+                            loading="lazy"
+                          />
+                          <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-black uppercase shadow-xs max-w-[70%] truncate">
+                            {listing.category}
                           </span>
-                          <span className="text-[11px] font-bold text-stone-500">{listing.area}</span>
+                          <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/80 text-white text-[10px] font-black max-w-[50%] truncate">
+                            📍 {listing.area}
+                          </span>
                         </div>
 
-                        <h3 className="text-sm font-black text-stone-900 leading-snug">
-                          {listing.name}
-                        </h3>
+                        {/* Header Info */}
+                        <div>
+                          <div className="flex items-center justify-between text-xs mb-1 gap-2">
+                            <span className="font-extrabold text-amber-500 flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md shrink-0">
+                              <span>⭐</span>
+                              <span className="text-stone-900 font-black">{listing.rating ? Number(listing.rating).toFixed(1) : '4.8'}</span>
+                              <span className="text-amber-800 font-bold text-[10px] uppercase tracking-tight">Rating</span>
+                            </span>
+                            <span className="text-[11px] font-bold text-stone-500 truncate text-right">{listing.area}</span>
+                          </div>
+
+                          <h3 className="text-sm font-black text-stone-900 leading-snug line-clamp-1 break-words">
+                            {listing.name}
+                          </h3>
+                        </div>
+
+                        <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed break-words">
+                          {listing.description}
+                        </p>
+
+                        <div className="pt-2 border-t border-stone-100 text-[11px] space-y-1 text-stone-600">
+                          {listing.ownerName && (
+                            <p className="truncate text-stone-800 font-bold flex items-center gap-1">
+                              <span>👤</span>
+                              <span className="truncate">Owner: {listing.ownerName}</span>
+                            </p>
+                          )}
+                          <p className="truncate">📞 {listing.phone}</p>
+                          {listing.email && <p className="truncate">✉️ {listing.email}</p>}
+                          {listing.website && <p className="truncate text-red-600 font-bold">🌐 {listing.website}</p>}
+                          <p className="truncate">📍 {listing.address}</p>
+                        </div>
                       </div>
 
-                      <p className="text-xs text-stone-500 line-clamp-2 leading-relaxed">
-                        {listing.description}
-                      </p>
+                      {/* Controls & Actions */}
+                      <div className="pt-3 border-t border-stone-200 space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <button
+                            type="button"
+                            onClick={() => handleToggleFeaturedDir(listing.id)}
+                            className={`px-2 py-1 rounded-lg font-bold text-[10px] cursor-pointer transition-colors ${
+                              listing.featured
+                                ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                                : 'bg-stone-100 text-stone-600 border border-stone-200'
+                            }`}
+                          >
+                            {listing.featured ? '⭐ Featured: ON' : '☆ Featured: OFF'}
+                          </button>
 
-                      <div className="pt-2 border-t border-stone-100 text-[11px] space-y-1 text-stone-600">
-                        {listing.ownerName && (
-                          <p className="truncate text-stone-800 font-bold flex items-center gap-1">
-                            <span>👤</span>
-                            <span>Owner: {listing.ownerName}</span>
-                          </p>
-                        )}
-                        <p className="truncate">📞 {listing.phone}</p>
-                        {listing.email && <p className="truncate">✉️ {listing.email}</p>}
-                        {listing.website && <p className="truncate text-red-600 font-bold">🌐 {listing.website}</p>}
-                        <p className="truncate">📍 {listing.address}</p>
+                          <button
+                            type="button"
+                            onClick={() => handleTogglePopularDir(listing.id)}
+                            className={`px-2 py-1 rounded-lg font-bold text-[10px] cursor-pointer transition-colors ${
+                              listing.popular
+                                ? 'bg-red-100 text-red-800 border border-red-300'
+                                : 'bg-stone-100 text-stone-600 border border-stone-200'
+                            }`}
+                          >
+                            {listing.popular ? '🔥 Popular: ON' : 'Popular: OFF'}
+                          </button>
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingDirectory(listing);
+                              const rawImgs = (Array.isArray(listing.images) && listing.images.length > 0)
+                                ? listing.images
+                                : (listing.imageUrl ? [listing.imageUrl] : []);
+                              setEditingDirImageSlots(
+                                rawImgs.slice(0, 5).map((url, idx) => ({
+                                  id: `slot-${idx}-${url}`,
+                                  type: 'url',
+                                  previewUrl: url,
+                                  urlValue: url,
+                                }))
+                              );
+                            }}
+                            className="px-3 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold cursor-pointer"
+                          >
+                            ✏️ Edit
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDirectory(listing.id, listing.name)}
+                            className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-red-700 text-xs font-bold cursor-pointer"
+                          >
+                            🗑️ Delete
+                          </button>
+                        </div>
                       </div>
                     </div>
-
-                    {/* Controls & Actions */}
-                    <div className="pt-3 border-t border-stone-200 space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleFeaturedDir(listing.id)}
-                          className={`px-2 py-1 rounded-lg font-bold text-[10px] cursor-pointer transition-colors ${
-                            listing.featured
-                              ? 'bg-amber-100 text-amber-900 border border-amber-300'
-                              : 'bg-stone-100 text-stone-600 border border-stone-200'
-                          }`}
-                        >
-                          {listing.featured ? '⭐ Featured: ON' : '☆ Featured: OFF'}
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleTogglePopularDir(listing.id)}
-                          className={`px-2 py-1 rounded-lg font-bold text-[10px] cursor-pointer transition-colors ${
-                            listing.popular
-                              ? 'bg-red-100 text-red-800 border border-red-300'
-                              : 'bg-stone-100 text-stone-600 border border-stone-200'
-                          }`}
-                        >
-                          {listing.popular ? '🔥 Popular: ON' : 'Popular: OFF'}
-                        </button>
-                      </div>
-
-                      <div className="flex items-center justify-end gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setEditingDirectory(listing)}
-                          className="px-3 py-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold cursor-pointer"
-                        >
-                          ✏️ Edit
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteDirectory(listing.id, listing.name)}
-                          className="px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-red-700 text-xs font-bold cursor-pointer"
-                        >
-                          🗑️ Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  ));
+                })()
+              )}
             </div>
           </div>
         )}
@@ -4904,13 +6274,18 @@ export default function AdminPage() {
 
             <form onSubmit={handleSaveEditArticle} className="p-5 space-y-3.5 overflow-y-auto">
               <div>
-                <label className="block font-bold text-stone-700 mb-1 uppercase text-[10px]">Headline Title</label>
-                <input
-                  type="text"
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block font-bold text-stone-700 uppercase text-[10px]">Headline Title *</label>
+                  <span className="text-[10px] text-stone-500 font-semibold">
+                    {editingArticle.title ? `${editingArticle.title.trim().split(/\s+/).filter(Boolean).length} words` : ''}
+                  </span>
+                </div>
+                <textarea
+                  rows={3}
                   required
                   value={editingArticle.title}
                   onChange={(e) => setEditingArticle({ ...editingArticle, title: e.target.value })}
-                  className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold"
+                  className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold leading-relaxed resize-y min-h-[72px]"
                 />
               </div>
 
@@ -4927,9 +6302,8 @@ export default function AdminPage() {
                     <option value="BUSINESS">BUSINESS</option>
                     <option value="TECH">TECH</option>
                     <option value="INFRASTRUCTURE">INFRASTRUCTURE</option>
-                    <option value="EVENTS">EVENTS</option>
-                    <option value="SPORTS">SPORTS</option>
                     <option value="CEO">CEO</option>
+                    <option value="SPORTS">SPORTS</option>
                     <option value="EDUCATION">EDUCATION</option>
                     <option value="E-PAPER">E-PAPER</option>
                   </select>
@@ -5038,22 +6412,27 @@ export default function AdminPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <div className="relative border border-dashed rounded-xl p-3 text-center cursor-pointer bg-white border-stone-300 hover:border-stone-400">
+                    <div className="relative border-2 border-dashed rounded-xl p-4 text-center cursor-pointer bg-white border-stone-300 hover:border-stone-400">
                       <input
+                        ref={editFileInputRef}
                         type="file"
-                        accept="image/*,.png,.jpg,.jpeg,.webp"
+                        accept="image/png,image/jpeg,image/jpg,image/webp,image/avif"
                         onChange={async (e) => {
                           if (e.target.files && e.target.files[0]) {
                             const file = e.target.files[0];
+                            if (file.size > 5 * 1024 * 1024) {
+                              alert(`File "${file.name}" exceeds the maximum allowed size of 5MB.`);
+                              return;
+                            }
                             if (file.type.startsWith('image/')) {
                               try {
                                 const compressed = await compressImage(file);
-                                setEditingArticle({ ...editingArticle, imageUrl: compressed, image: compressed, mediaUrl: compressed });
+                                setEditingArticle({ ...editingArticle, imageUrl: compressed, image: compressed, mediaUrl: compressed, image_url: compressed });
                               } catch {
                                 const reader = new FileReader();
                                 reader.onload = (ev) => {
                                   if (ev.target?.result) {
-                                    setEditingArticle({ ...editingArticle, imageUrl: ev.target.result as string, image: ev.target.result as string, mediaUrl: ev.target.result as string });
+                                    setEditingArticle({ ...editingArticle, imageUrl: ev.target.result as string, image: ev.target.result as string, mediaUrl: ev.target.result as string, image_url: ev.target.result as string });
                                   }
                                 };
                                 reader.readAsDataURL(file);
@@ -5064,7 +6443,10 @@ export default function AdminPage() {
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                       />
                       <p className="text-xs font-bold text-stone-700">
-                        Upload new photo, or <span className="text-[#e54b3c] underline">Browse (.jpg, .jpeg, .png, .webp)</span>
+                        Upload new photo, or <span className="text-[#e54b3c] underline">Browse files</span>
+                      </p>
+                      <p className="text-[11px] text-stone-500 mt-1 font-medium">
+                        Supported: PNG, JPG, JPEG, WEBP, AVIF (Max Size: 5MB per image)
                       </p>
                     </div>
 
@@ -5073,16 +6455,23 @@ export default function AdminPage() {
                       type="text"
                       placeholder="https://images.unsplash.com/... or data:image/..."
                       value={editingArticle.imageUrl || (editingArticle as any).image || ''}
-                      onChange={(e) => setEditingArticle({ ...editingArticle, imageUrl: e.target.value, image: e.target.value, mediaUrl: e.target.value })}
+                      onChange={(e) => setEditingArticle({ ...editingArticle, imageUrl: e.target.value, image: e.target.value, mediaUrl: e.target.value, image_url: e.target.value || null })}
                       className="w-full bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-mono"
                     />
-                    {(editingArticle.imageUrl || (editingArticle as any).image) && (
-                      <div className="mt-2 relative rounded-lg overflow-hidden border border-stone-300 bg-stone-900 h-24">
+                    {(editingArticle.imageUrl || (editingArticle as any).image || editingArticle.image_url) && (
+                      <div className="relative mt-3 w-full overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-900 group">
                         <img
-                          src={editingArticle.imageUrl || (editingArticle as any).image}
-                          alt="Edit Preview"
-                          className="w-full h-full object-cover"
+                          src={editingArticle.imageUrl || (editingArticle as any).image || editingArticle.image_url || ''}
+                          alt="Preview"
+                          className="h-48 w-full object-cover transition-opacity duration-200 group-hover:opacity-90"
                         />
+                        <button
+                          type="button"
+                          onClick={handleRemoveEditImage}
+                          className="absolute top-2 right-2 flex items-center gap-1.5 rounded-lg bg-red-600/90 hover:bg-red-600 text-white px-3 py-1.5 text-xs font-bold shadow-lg backdrop-blur-sm transition-all hover:scale-105 active:scale-95 cursor-pointer z-20"
+                        >
+                          Remove Photo
+                        </button>
                       </div>
                     )}
                   </div>
@@ -5095,15 +6484,20 @@ export default function AdminPage() {
                   <input
                     type="checkbox"
                     checked={!!editingArticle.isExclusive}
-                    onChange={(e) => setEditingArticle({ ...editingArticle, isExclusive: e.target.checked })}
+                    onChange={(e) => setEditingArticle({
+                      ...editingArticle,
+                      isExclusive: e.target.checked,
+                      isSpotlight: e.target.checked,
+                      is_spotlight: e.target.checked,
+                    })}
                     className="w-4 h-4 text-red-600 rounded cursor-pointer accent-red-600"
                   />
                   <span className="font-bold text-xs text-stone-800">
-                    ★ Mark as Breaking / Spotlight Exclusive (Main Hero Feature)
+                    ★ Pin to Breaking Spotlight / Hero Carousel
                   </span>
                 </label>
                 <span className="text-[10px] font-bold text-red-700 bg-red-100 px-2 py-0.5 rounded">
-                  {editingArticle.isExclusive ? 'Hero Spotlight Active' : 'Standard Feed'}
+                  {editingArticle.isExclusive || editingArticle.isSpotlight ? 'Spotlight Carousel Active' : 'Standard Feed'}
                 </span>
               </div>
 
@@ -5123,6 +6517,50 @@ export default function AdminPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* -------------------------------------------------------------------- */}
+      {/* 5. BULK ARTICLE DELETE CONFIRMATION MODAL                            */}
+      {/* -------------------------------------------------------------------- */}
+      {bulkArticleDeleteModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-stone-200 animate-in fade-in zoom-in-95">
+            <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto mb-4 text-2xl font-bold">
+              ⚠️
+            </div>
+            <h3 className="text-lg font-black text-stone-900 text-center mb-2">
+              Delete {selectedArticleIds.size} {selectedArticleIds.size === 1 ? 'Story' : 'Stories'}?
+            </h3>
+            <p className="text-sm text-stone-600 text-center mb-6 leading-relaxed">
+              Are you sure you want to permanently delete these <span className="font-bold text-stone-900">{selectedArticleIds.size}</span> selected stories from the Supabase production database? This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setBulkArticleDeleteModalOpen(false)}
+                disabled={isBulkDeletingArticles}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-stone-300 text-stone-700 font-bold hover:bg-stone-50 cursor-pointer disabled:opacity-50 text-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBulkDeleteArticles}
+                disabled={isBulkDeletingArticles}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 text-sm shadow-md"
+              >
+                {isBulkDeletingArticles ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  `Delete (${selectedArticleIds.size})`
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -5253,7 +6691,7 @@ export default function AdminPage() {
                       />
                     </div>
 
-                    <div className="p-3 rounded-xl bg-[#f8f6f0] border border-stone-300 space-y-2">
+                    <div className="p-4 rounded-xl bg-[#f8f6f0] border border-stone-300 space-y-2">
                       <div className="flex items-center justify-between flex-wrap gap-1">
                         <label className="block text-xs font-bold text-stone-700 uppercase">
                           Ad Creative Media (Image Upload or URL) *
@@ -5267,7 +6705,7 @@ export default function AdminPage() {
                       <div className="flex flex-col sm:flex-row gap-2">
                         <input
                           type="file"
-                          accept="image/jpeg, image/png, image/webp, image/gif, image/svg+xml"
+                          accept="image/png,image/jpeg,image/jpg,image/webp,image/avif"
                           onChange={(e) => {
                             const file = e.target.files?.[0];
                             if (file) handleSlideImageUpload(file, index);
@@ -5287,6 +6725,9 @@ export default function AdminPage() {
                           className="w-full sm:w-1/2 bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-mono"
                         />
                       </div>
+                      <p className="text-[11px] text-stone-500 font-medium">
+                        Supported: PNG, JPG, JPEG, WEBP, AVIF (Max Size: 5MB per image)
+                      </p>
                       {slide.imageUrl && (
                         <div className="mt-2 flex flex-col items-center justify-center p-3 bg-stone-100/90 rounded-xl border border-stone-200">
                           <span className="text-[10px] font-black text-stone-500 mb-2 uppercase tracking-wider">
@@ -6119,21 +7560,6 @@ export default function AdminPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                  Event Category *
-                </label>
-                <select
-                  value={newEventCategory}
-                  onChange={(e) => setNewEventCategory(e.target.value)}
-                  className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold text-stone-900 cursor-pointer"
-                >
-                  {['EXPO', 'TECH', 'CULTURAL', 'SPORTS', 'MUSIC', 'WORKSHOP', 'BUSINESS'].map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
@@ -6204,32 +7630,57 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                    Poster Image URL (High-Res)
-                  </label>
+              {/* Enhanced All-Format Poster Image Upload & Validation */}
+              <div className="space-y-2 p-3.5 bg-stone-50 border border-stone-200 rounded-xl">
+                <label className="block text-xs font-bold text-stone-700 uppercase">
+                  Event Poster Image
+                </label>
+                <div className="space-y-2">
                   <input
-                    type="url"
-                    placeholder="https://images.unsplash.com/..."
-                    value={newEventPosterUrl}
-                    onChange={(e) => setNewEventPosterUrl(e.target.value)}
-                    className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono text-stone-900"
+                    type="file"
+                    accept="image/png, image/jpeg, image/jpg, image/webp, image/avif, image/gif, image/svg+xml, image/bmp"
+                    onChange={(e) => handleEventImageFileChange(e, false)}
+                    className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono text-stone-900 file:mr-3 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#153d3b] file:text-white hover:file:bg-[#0d4d4d] cursor-pointer"
                   />
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-stone-400 font-bold uppercase shrink-0">Or Image URL:</span>
+                    <input
+                      type="url"
+                      placeholder="https://images.unsplash.com/... or CDN link"
+                      value={newEventPosterUrl}
+                      onChange={(e) => setNewEventPosterUrl(e.target.value)}
+                      className="flex-1 bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-mono text-stone-900"
+                    />
+                  </div>
+                  <p className="text-[10px] text-stone-500 font-medium">
+                    Supported: PNG, JPG, JPEG, WEBP, AVIF, GIF, SVG, BMP (Max Size: 10MB per Image)
+                  </p>
+                  {newEventPosterUrl && (
+                    <div className="relative w-28 h-20 rounded-lg overflow-hidden border border-stone-300 bg-stone-100 shadow-xs">
+                      <img src={newEventPosterUrl} alt="Poster preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setNewEventPosterUrl('')}
+                        className="absolute top-1 right-1 bg-black/75 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] hover:bg-black cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
                 </div>
+              </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                    Promo Video URL (YouTube or MP4)
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://www.youtube.com/watch?v=..."
-                    value={newEventVideoUrl}
-                    onChange={(e) => setNewEventVideoUrl(e.target.value)}
-                    className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono text-stone-900"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                  Promo Video URL (YouTube or MP4)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  value={newEventVideoUrl}
+                  onChange={(e) => setNewEventVideoUrl(e.target.value)}
+                  className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono text-stone-900"
+                />
               </div>
 
               <div>
@@ -6261,15 +7712,26 @@ export default function AdminPage() {
                 <button
                   type="button"
                   onClick={() => setIsAddingEvent(false)}
-                  className="px-4 py-2 rounded-xl bg-stone-200 text-stone-800 font-bold text-xs cursor-pointer"
+                  disabled={isSubmittingEvent}
+                  className="px-4 py-2 rounded-xl bg-stone-200 text-stone-800 font-bold text-xs cursor-pointer disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#153d3b] hover:bg-[#0d4d4d] text-white font-bold text-xs shadow-xs cursor-pointer"
+                  disabled={isSubmittingEvent}
+                  className={`px-4 py-2 rounded-xl bg-[#153d3b] hover:bg-[#0d4d4d] text-white font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1.5 transition-all ${
+                    isSubmittingEvent ? 'opacity-60 cursor-not-allowed' : 'active:scale-95'
+                  }`}
                 >
-                  Publish Event Live
+                  {isSubmittingEvent ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Publishing Event Live...</span>
+                    </>
+                  ) : (
+                    <span>Publish Event Live</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -6316,21 +7778,6 @@ export default function AdminPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                  Event Category *
-                </label>
-                <select
-                  value={editingEvent.category}
-                  onChange={(e) => setEditingEvent({ ...editingEvent, category: e.target.value })}
-                  className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold text-stone-900 cursor-pointer"
-                >
-                  {['EXPO', 'TECH', 'CULTURAL', 'SPORTS', 'MUSIC', 'WORKSHOP', 'BUSINESS'].map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
-
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
@@ -6372,15 +7819,55 @@ export default function AdminPage() {
                 />
               </div>
 
+              {/* Enhanced All-Format Poster Image Upload & Validation */}
+              <div className="space-y-2 p-3.5 bg-stone-50 border border-stone-200 rounded-xl">
+                <label className="block text-xs font-bold text-stone-700 uppercase">
+                  Event Poster Image
+                </label>
+                <div className="space-y-2">
+                  <input
+                    type="file"
+                    accept="image/png, image/jpeg, image/jpg, image/webp, image/avif, image/gif, image/svg+xml, image/bmp"
+                    onChange={(e) => handleEventImageFileChange(e, true)}
+                    className="w-full bg-white border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono text-stone-900 file:mr-3 file:py-1 file:px-2.5 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-[#153d3b] file:text-white hover:file:bg-[#0d4d4d] cursor-pointer"
+                  />
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-stone-400 font-bold uppercase shrink-0">Or Image URL:</span>
+                    <input
+                      type="url"
+                      placeholder="https://images.unsplash.com/... or CDN link"
+                      value={editingEvent.posterUrl || ''}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, posterUrl: e.target.value })}
+                      className="flex-1 bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-mono text-stone-900"
+                    />
+                  </div>
+                  <p className="text-[10px] text-stone-500 font-medium">
+                    Supported: PNG, JPG, JPEG, WEBP, AVIF, GIF, SVG, BMP (Max Size: 10MB per Image)
+                  </p>
+                  {editingEvent.posterUrl && (
+                    <div className="relative w-28 h-20 rounded-lg overflow-hidden border border-stone-300 bg-stone-100 shadow-xs">
+                      <img src={editingEvent.posterUrl} alt="Poster preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => setEditingEvent({ ...editingEvent, posterUrl: '' })}
+                        className="absolute top-1 right-1 bg-black/75 text-white rounded-full w-4 h-4 flex items-center justify-center text-[10px] hover:bg-black cursor-pointer"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                    Poster Image URL
+                    Google Maps Link
                   </label>
                   <input
                     type="url"
-                    value={editingEvent.posterUrl || ''}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, posterUrl: e.target.value })}
+                    value={editingEvent.mapLink || ''}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, mapLink: e.target.value })}
                     className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono text-stone-900"
                   />
                 </div>
@@ -6426,15 +7913,26 @@ export default function AdminPage() {
                 <button
                   type="button"
                   onClick={() => setEditingEvent(null)}
-                  className="px-4 py-2 rounded-xl bg-stone-200 text-stone-800 font-bold text-xs cursor-pointer"
+                  disabled={isSubmittingEvent}
+                  className="px-4 py-2 rounded-xl bg-stone-200 text-stone-800 font-bold text-xs cursor-pointer disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#153d3b] hover:bg-[#0d4d4d] text-white font-bold text-xs shadow-xs cursor-pointer"
+                  disabled={isSubmittingEvent}
+                  className={`px-4 py-2 rounded-xl bg-[#153d3b] hover:bg-[#0d4d4d] text-white font-bold text-xs shadow-xs cursor-pointer flex items-center gap-1.5 transition-all ${
+                    isSubmittingEvent ? 'opacity-60 cursor-not-allowed' : 'active:scale-95'
+                  }`}
                 >
-                  Save Event Changes
+                  {isSubmittingEvent ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      <span>Saving Changes...</span>
+                    </>
+                  ) : (
+                    <span>Save Event Changes</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -6617,32 +8115,17 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                    Website URL
-                  </label>
-                  <input
-                    type="url"
-                    placeholder="https://example.com"
-                    value={newDirWebsite}
-                    onChange={(e) => setNewDirWebsite(e.target.value)}
-                    className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono text-stone-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                    Working Timings
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="09:00 AM – 08:30 PM (Daily)"
-                    value={newDirTiming}
-                    onChange={(e) => setNewDirTiming(e.target.value)}
-                    className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs text-stone-900 font-bold"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                  Website URL
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://example.com"
+                  value={newDirWebsite}
+                  onChange={(e) => setNewDirWebsite(e.target.value)}
+                  className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono text-stone-900"
+                />
               </div>
 
               <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-300 text-amber-950 space-y-2">
@@ -6671,18 +8154,13 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                  Photo / Banner Image URL
-                </label>
-                <input
-                  type="url"
-                  placeholder="https://images.unsplash.com/..."
-                  value={newDirImageUrl}
-                  onChange={(e) => setNewDirImageUrl(e.target.value)}
-                  className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono text-stone-900"
-                />
-              </div>
+              <DirectoryImageManager
+                key="add-dir-images"
+                initialImages={[]}
+                onChange={setNewDirImageSlots}
+                listingId="new"
+                disabled={isSubmittingDir}
+              />
 
               <div>
                 <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
@@ -6746,15 +8224,24 @@ export default function AdminPage() {
                 <button
                   type="button"
                   onClick={() => setIsAddingDirectory(false)}
-                  className="px-4 py-2 rounded-xl bg-stone-200 text-stone-800 font-bold text-xs cursor-pointer"
+                  disabled={isSubmittingDir}
+                  className="px-4 py-2 rounded-xl bg-stone-200 text-stone-800 font-bold text-xs cursor-pointer disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs cursor-pointer"
+                  disabled={isSubmittingDir}
+                  className="px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  Publish Listing
+                  {isSubmittingDir ? (
+                    <>
+                      <span className="inline-block animate-spin">⏳</span>
+                      <span>Publishing...</span>
+                    </>
+                  ) : (
+                    <span>Publish Listing</span>
+                  )}
                 </button>
               </div>
             </form>
@@ -6949,30 +8436,16 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                    Website URL
-                  </label>
-                  <input
-                    type="url"
-                    value={editingDirectory.website || ''}
-                    onChange={(e) => setEditingDirectory({ ...editingDirectory, website: e.target.value })}
-                    className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono text-stone-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                    Working Timings
-                  </label>
-                  <input
-                    type="text"
-                    value={editingDirectory.timing || ''}
-                    onChange={(e) => setEditingDirectory({ ...editingDirectory, timing: e.target.value })}
-                    className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs text-stone-900 font-bold"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                  Website URL
+                </label>
+                <input
+                  type="url"
+                  value={editingDirectory.website || ''}
+                  onChange={(e) => setEditingDirectory({ ...editingDirectory, website: e.target.value })}
+                  className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono text-stone-900"
+                />
               </div>
 
               <div className="p-4 rounded-xl bg-amber-50/80 border border-amber-300 text-amber-950 space-y-2">
@@ -7006,17 +8479,17 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
-                  Photo / Banner Image URL
-                </label>
-                <input
-                  type="url"
-                  value={editingDirectory.imageUrl || ''}
-                  onChange={(e) => setEditingDirectory({ ...editingDirectory, imageUrl: e.target.value })}
-                  className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono text-stone-900"
-                />
-              </div>
+              <DirectoryImageManager
+                key={`edit-dir-images-${editingDirectory.id}`}
+                initialImages={
+                  (Array.isArray(editingDirectory.images) && editingDirectory.images.length > 0)
+                    ? editingDirectory.images
+                    : (editingDirectory.imageUrl ? [editingDirectory.imageUrl] : [])
+                }
+                onChange={setEditingDirImageSlots}
+                listingId={editingDirectory.id}
+                disabled={isSubmittingDir}
+              />
 
               <div>
                 <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
@@ -7066,15 +8539,24 @@ export default function AdminPage() {
                 <button
                   type="button"
                   onClick={() => setEditingDirectory(null)}
-                  className="px-4 py-2 rounded-xl bg-stone-200 text-stone-800 font-bold text-xs cursor-pointer"
+                  disabled={isSubmittingDir}
+                  className="px-4 py-2 rounded-xl bg-stone-200 text-stone-800 font-bold text-xs cursor-pointer disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-xl bg-[#153d3b] hover:bg-[#0d4d4d] text-white font-bold text-xs shadow-xs cursor-pointer"
+                  disabled={isSubmittingDir}
+                  className="px-4 py-2 rounded-xl bg-[#153d3b] hover:bg-[#0d4d4d] text-white font-bold text-xs shadow-xs cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  Save Directory Changes
+                  {isSubmittingDir ? (
+                    <>
+                      <span className="inline-block animate-spin">⏳</span>
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <span>Save Directory Changes</span>
+                  )}
                 </button>
               </div>
             </form>

@@ -11,6 +11,8 @@ export interface SupabaseListing {
   pincode?: string | null;
   rating?: number | null;
   created_at?: string;
+  images?: string[] | null;
+  image_url?: string | null;
 }
 
 export interface SupabaseCategory {
@@ -108,6 +110,8 @@ export const supabaseAdminService = {
         pincode: (l as any).pincode || null,
         rating: l.rating || 4.5,
         created_at: l.createdAt,
+        images: l.images || (l.imageUrl ? [l.imageUrl] : []),
+        image_url: l.imageUrl || (l.images && l.images[0]) || null,
       }));
     }
     return data || [];

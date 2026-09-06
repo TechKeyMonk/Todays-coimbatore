@@ -1,177 +1,302 @@
-﻿'use client';
+'use client';
 
 import React, { useState, useEffect } from 'react';
-import dbService from '../../services/db';
-import { BarChart3, CheckCircle2 } from 'lucide-react';
+import { BarChart3 } from 'lucide-react';
 
-interface PollData {
-  id: string;
-  question: string;
-  category: string;
-  yesVotes: number;
-  noVotes: number;
-  totalVotes: number;
-  yesPercent: number;
-  noPercent: number;
+export interface PollData {
+  id?: string;
+  question?: string;
+  category?: string;
+  yesVotes?: number;
+  noVotes?: number;
+  totalVotes?: number;
+  yesPercent?: number;
+  noPercent?: number;
+  lastReset?: string;
 }
 
-export default function PollWidget() {
-  const [poll, setPoll] = useState<PollData>({
-    id: 'poll-daily-1',
-    question: 'Will Coimbatore Metro Rail Phase-1 significantly ease Avinashi Road traffic?',
-    category: 'INFRASTRUCTURE & CIVIC',
-    yesVotes: 0,
-    noVotes: 0,
-    totalVotes: 0,
-    yesPercent: 0,
-    noPercent: 0,
+export interface PollWidgetProps {
+  pollData?: PollData;
+}
+
+export default function PollWidget({ pollData }: PollWidgetProps) {
+  const [question, setQuestion] = useState(
+    pollData?.question || 'Will Coimbatore Metro Rail Phase-1 significantly ease Avinashi Road traffic congestion?'
+  );
+  const [pollId, setPollId] = useState(pollData?.id || 'poll-coimbatore-metro-1');
+  const [voted, setVoted] = useState(false);
+  const [selectedOption, setSelectedOption] = useState<'yes' | 'no' | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [counts, setCounts] = useState({
+    yes: pollData?.yesVotes ?? 0,
+    no: pollData?.noVotes ?? 0,
   });
 
-  const [hasVoted, setHasVoted] = useState(false);
-  const [userChoice, setUserChoice] = useState<'yes' | 'no' | null>(null);
+  const totalVotes = counts.yes + counts.no;
+  const yesPercent = totalVotes > 0 ? Math.round((counts.yes / totalVotes) * 100) : 0;
+  const noPercent = totalVotes > 0 ? Math.round((counts.no / totalVotes) * 100) : 0;
 
   useEffect(() => {
     let isMounted = true;
 
-    // Check if user already voted in this session/device
-    const storedVote = localStorage.getItem('covai_pulse_vote_active');
-    if (storedVote) {
-      setHasVoted(true);
-      setUserChoice(storedVote as 'yes' | 'no');
-    }
+    // Purge legacy fake vote key
+    try {
+      localStorage.removeItem('covai_pulse_vote_active');
+    } catch {}
 
     const fetchLivePoll = async () => {
       try {
-        const res = await fetch('/api/widgets/poll');
+        const res = await fetch('/api/widgets/poll', { cache: 'no-store' });
         if (res.ok) {
           const json = await res.json();
           if (isMounted && json.data) {
-            setPoll(json.data);
-          }
-        }
-      } catch (e) {
-        // Fallback: auto-generate poll question from latest published DB story
-        try {
-          const articles = await dbService.getArticles();
-          if (articles && articles.length > 0) {
-            const topStory = articles[0];
-            if (isMounted && topStory.title) {
-              setPoll((prev) => ({
-                ...prev,
-                question: `Do you support: "${topStory.title.slice(0, 65)}..."?`,
-                category: topStory.category || 'COMMUNITY POLL',
-              }));
+            const p = json.data;
+            if (p.question) setQuestion(p.question);
+            const activeId = p.id || 'poll-coimbatore-metro-1';
+            setPollId(activeId);
+
+            const yes = typeof p.yesVotes === 'number' ? p.yesVotes : 0;
+            const no = typeof p.noVotes === 'number' ? p.noVotes : 0;
+            setCounts({ yes, no });
+
+            // Check if current user has voted on THIS active poll
+            const specificKey = `covai_pulse_vote_${activeId}`;
+            const stored = localStorage.getItem(specificKey);
+
+            if (yes === 0 && no === 0) {
+              // Poll is completely fresh or reset by admin -> Unvote so buttons are active!
+              try {
+                localStorage.removeItem(specificKey);
+                localStorage.removeItem('covai_pulse_vote_active');
+              } catch {}
+              setVoted(false);
+              setSelectedOption(null);
+            } else if (stored) {
+              try {
+                const parsed = JSON.parse(stored);
+                const voteTime = parsed.votedAt ? new Date(parsed.votedAt).getTime() : 0;
+                const resetTime = p.lastReset ? new Date(p.lastReset).getTime() : 0;
+
+                if (resetTime > 0 && voteTime < resetTime) {
+                  // Poll was reset after user voted
+                  localStorage.removeItem(specificKey);
+                  setVoted(false);
+                  setSelectedOption(null);
+                } else if (parsed.option === 'yes' || parsed.option === 'no') {
+                  setVoted(true);
+                  setSelectedOption(parsed.option);
+                }
+              } catch {
+                setVoted(false);
+                setSelectedOption(null);
+              }
+            } else {
+              setVoted(false);
+              setSelectedOption(null);
             }
           }
-        } catch {}
+        }
+      } catch (err) {
+        console.warn('PollWidget fetch error:', err);
       }
     };
 
     fetchLivePoll();
-    const interval = setInterval(fetchLivePoll, 60000);
+    const interval = setInterval(fetchLivePoll, 15000);
+
+    const handleVoteSync = (e: any) => {
+      if (!isMounted) return;
+      if (e.detail?.reset) {
+        setCounts({ yes: 0, no: 0 });
+        setVoted(false);
+        setSelectedOption(null);
+        try {
+          localStorage.removeItem(`covai_pulse_vote_${pollId}`);
+          localStorage.removeItem('covai_pulse_vote_active');
+        } catch {}
+      } else if (e.detail?.counts) {
+        setCounts(e.detail.counts);
+      } else {
+        fetchLivePoll();
+      }
+    };
+
+    window.addEventListener('covai-poll-update', handleVoteSync as EventListener);
 
     return () => {
       isMounted = false;
       clearInterval(interval);
+      window.removeEventListener('covai-poll-update', handleVoteSync as EventListener);
     };
-  }, []);
+  }, [pollId]);
 
-  const handleVote = async (choice: 'yes' | 'no') => {
-    if (hasVoted) return;
+  const handleVote = async (option: 'yes' | 'no') => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
 
-    setUserChoice(choice);
-    setHasVoted(true);
-    localStorage.setItem('covai_pulse_vote_active', choice);
+    setSelectedOption(option);
+    setVoted(true);
 
+    const updatedCounts = {
+      ...counts,
+      [option]: (counts[option] || 0) + 1,
+    };
+    setCounts(updatedCounts);
+
+    const specificKey = `covai_pulse_vote_${pollId}`;
     try {
-      const res = await fetch('/api/widgets/poll', {
+      localStorage.setItem(
+        specificKey,
+        JSON.stringify({ option, votedAt: new Date().toISOString(), pollId })
+      );
+      localStorage.removeItem('covai_pulse_vote_active');
+    } catch {}
+
+    // Broadcast update event across all open widgets and tabs
+    try {
+      window.dispatchEvent(
+        new CustomEvent('covai-poll-update', {
+          detail: { option, counts: updatedCounts, pollId },
+        })
+      );
+    } catch {}
+
+    // API Call to register real live vote in Supabase backend
+    try {
+      const res = await fetch('/api/poll/vote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ vote: choice }),
+        body: JSON.stringify({ pollId, option }),
       });
+
       if (res.ok) {
         const json = await res.json();
-        if (json.data) {
-          setPoll(json.data);
+        if (json.data && typeof json.data.yesVotes === 'number') {
+          setCounts({
+            yes: json.data.yesVotes,
+            no: json.data.noVotes,
+          });
         }
       }
-    } catch (err) {
-      // Local optimistic update
-      setPoll((prev) => {
-        const newYes = choice === 'yes' ? prev.yesVotes + 1 : prev.yesVotes;
-        const newNo = choice === 'no' ? prev.noVotes + 1 : prev.noVotes;
-        const total = newYes + newNo;
-        return {
-          ...prev,
-          yesVotes: newYes,
-          noVotes: newNo,
-          totalVotes: total,
-          yesPercent: total > 0 ? Math.round((newYes / total) * 100) : 0,
-          noPercent: total > 0 ? Math.round((newNo / total) * 100) : 0,
-        };
-      });
+    } catch (e) {
+      console.error('Failed to cast vote', e);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  const handleClearVote = () => {
+    try {
+      localStorage.removeItem(`covai_pulse_vote_${pollId}`);
+      localStorage.removeItem('covai_pulse_vote_active');
+    } catch {}
+    setVoted(false);
+    setSelectedOption(null);
+  };
+
   return (
-    <div className="w-full bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 rounded-xl p-3 shadow-xs space-y-2 shrink-0 select-none">
-      {/* Header */}
-      <div className="flex items-center justify-between text-[11px] font-extrabold border-b border-stone-100 dark:border-slate-800 pb-1.5">
-        <span className="text-red-600 dark:text-red-500 uppercase tracking-wider font-black flex items-center gap-1.5">
-          <BarChart3 className="w-3.5 h-3.5" />
-          <span>COVAI PULSE</span>
+    <div className="rounded-xl border border-stone-200 bg-white p-2.5 shadow-xs dark:border-stone-800 dark:bg-slate-900 min-w-0 select-none overflow-hidden">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-[10px] sm:text-[11px] font-extrabold uppercase text-red-600 tracking-wider flex items-center gap-1.5 truncate min-w-0">
+          <BarChart3 className="w-3.5 h-3.5 shrink-0" />
+          <span className="truncate">COVAI PULSE POLL</span>
         </span>
-        <span className="text-[9px] text-stone-500 dark:text-gray-400 font-bold px-1.5 py-0.5 rounded bg-stone-100 dark:bg-slate-800">
-          DAILY POLL
+        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+          <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+          LIVE
         </span>
       </div>
 
-      {/* Question */}
-      <p className="text-[11px] font-bold text-stone-800 dark:text-gray-200 leading-snug">
-        {poll.question}
-      </p>
+      <h4 className="text-xs font-bold text-gray-900 dark:text-white leading-snug mb-2.5 line-clamp-3">
+        {question}
+      </h4>
 
-      {/* Voting Actions or Results */}
-      {hasVoted ? (
-        <div className="space-y-1.5 pt-1">
-          <div className="flex items-center justify-between text-[10px] font-bold text-stone-600 dark:text-gray-400">
-            <span className={userChoice === 'yes' ? 'text-emerald-600 font-black' : ''}>YES ({poll.yesPercent}%)</span>
-            <span className={userChoice === 'no' ? 'text-red-600 font-black' : ''}>NO ({poll.noPercent}%)</span>
-          </div>
-
-          <div className="w-full h-2 rounded-full overflow-hidden bg-stone-200 dark:bg-slate-700 flex">
-            <div style={{ width: `${poll.yesPercent}%` }} className="bg-emerald-500 h-full transition-all duration-500" />
-            <div style={{ width: `${poll.noPercent}%` }} className="bg-red-500 h-full transition-all duration-500" />
-          </div>
-
-          <div className="flex items-center justify-between text-[9px] text-stone-400 font-bold pt-0.5">
-            <span className="inline-flex items-center gap-1 text-emerald-600 font-bold">
-              <CheckCircle2 className="w-3 h-3" />
-              <span>Voted</span>
+      {!voted ? (
+        /* Interactive Voting Buttons (Visible for unvoted visitors) */
+        <div className="grid grid-cols-2 gap-2 my-3">
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={() => handleVote('yes')}
+            className="flex items-center justify-center py-2 px-3 rounded-xl border-2 border-emerald-500 bg-emerald-50/50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/50 text-emerald-700 dark:text-emerald-400 font-extrabold text-xs active:scale-95 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+          >
+            <span className="flex items-center gap-1.5">
+              <span>👍</span>
+              <span>YES</span>
             </span>
-            <span>{poll.totalVotes.toLocaleString()} {poll.totalVotes === 1 ? 'vote' : 'votes'} cast</span>
-          </div>
+          </button>
+          <button
+            type="button"
+            disabled={isSubmitting}
+            onClick={() => handleVote('no')}
+            className="flex items-center justify-center py-2 px-3 rounded-xl border-2 border-red-500 bg-red-50/50 hover:bg-red-100 dark:bg-red-950/30 dark:hover:bg-red-900/50 text-red-700 dark:text-red-400 font-extrabold text-xs active:scale-95 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+          >
+            <span className="flex items-center gap-1.5">
+              <span>👎</span>
+              <span>NO</span>
+            </span>
+          </button>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-1.5 text-xs font-bold pt-0.5">
-          <button
-            type="button"
-            onClick={() => handleVote('yes')}
-            className="py-1.5 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-600 hover:text-white dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-600 border border-emerald-200/60 dark:border-emerald-800 transition-colors cursor-pointer text-[11px] font-black text-center"
-          >
-            YES {poll.totalVotes > 0 ? `(${poll.yesPercent}%)` : ''}
-          </button>
-          <button
-            type="button"
-            onClick={() => handleVote('no')}
-            className="py-1.5 rounded-lg bg-stone-100 text-stone-800 hover:bg-red-600 hover:text-white dark:bg-slate-800 dark:text-stone-300 dark:hover:bg-red-600 border border-stone-200 dark:border-slate-700 transition-colors cursor-pointer text-[11px] font-black text-center"
-          >
-            NO {poll.totalVotes > 0 ? `(${poll.noPercent}%)` : ''}
-          </button>
+        /* Post-Vote Percentage Results Display */
+        <div className="space-y-2.5 my-3">
+          <div>
+            <div className="flex justify-between text-xs font-bold mb-1">
+              <span className={`text-emerald-600 ${selectedOption === 'yes' ? 'font-black' : ''}`}>
+                YES ({yesPercent}%)
+              </span>
+              <span className="text-gray-500 dark:text-gray-400">{counts.yes} {counts.yes === 1 ? 'vote' : 'votes'}</span>
+            </div>
+            <div className="h-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-emerald-500 transition-all duration-500 rounded-full"
+                style={{ width: `${yesPercent}%` }}
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex justify-between text-xs font-bold mb-1">
+              <span className={`text-red-600 ${selectedOption === 'no' ? 'font-black' : ''}`}>
+                NO ({noPercent}%)
+              </span>
+              <span className="text-gray-500 dark:text-gray-400">{counts.no} {counts.no === 1 ? 'vote' : 'votes'}</span>
+            </div>
+            <div className="h-2 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-red-500 transition-all duration-500 rounded-full"
+                style={{ width: `${noPercent}%` }}
+              />
+            </div>
+          </div>
         </div>
       )}
+
+      <div className="flex items-center justify-between text-[10px] text-gray-400 dark:text-gray-500 mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+        <div className="flex items-center gap-1.5">
+          <span>
+            {voted ? (
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                ✓ Voted ({selectedOption?.toUpperCase()})
+              </span>
+            ) : (
+              'Tap YES or NO to vote'
+            )}
+          </span>
+          {voted && (
+            <button
+              type="button"
+              onClick={handleClearVote}
+              className="text-[10px] text-blue-500 hover:text-blue-700 underline cursor-pointer ml-1"
+            >
+              Change
+            </button>
+          )}
+        </div>
+        <span>{totalVotes.toLocaleString()} {totalVotes === 1 ? 'vote cast' : 'votes cast'}</span>
+      </div>
     </div>
   );
 }
 
-export { PollWidget };
+export { PollWidget, PollWidget as CovaiPulsePoll, PollWidget as DailyPoll };

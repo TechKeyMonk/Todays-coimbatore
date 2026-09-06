@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { saveCurrentScrollPosition } from './ScrollRestoration';
 import ShareModal from './ShareModal';
-import { Play, Video, Headphones, ArrowRight } from 'lucide-react';
+import { Play, Video, ArrowRight } from 'lucide-react';
 import { formatRelativeTime } from '../services/db';
 
 export interface NewsCardProps {
@@ -129,18 +129,16 @@ export const NewsCard: React.FC<NewsCardProps> = ({
 
   return (
     <>
-      <article
-        className={`group rounded-2xl bg-white dark:bg-slate-900 ${
+      <div
+        className={`flex flex-col justify-between rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900 h-full min-w-0 ${
           isSpotlightExclusive
-            ? 'border-2 border-red-600 shadow-md ring-2 ring-red-600/20'
-            : 'border border-stone-200 dark:border-slate-800 shadow-xs'
-        } overflow-hidden hover:shadow-lg hover:border-red-500 transition-all duration-300 flex flex-col justify-between h-full w-full min-w-full max-w-full box-border ${className}`}
+            ? 'ring-2 ring-red-600/20 border-red-500'
+            : ''
+        } ${className}`}
       >
-        {/* ------------------------------------------------------------------ */}
-        {/* 1. IMAGE CONTAINER (STRICTLY OPTIONAL - ONLY IF EXPLICIT IMAGE)    */}
-        {/* ------------------------------------------------------------------ */}
+        {/* Conditional Image Rendering - ONLY show if real image exists */}
         {hasImage && validImageUrl ? (
-          <div className="relative h-[180px] sm:h-[200px] w-full min-w-full overflow-hidden bg-slate-950 shrink-0">
+          <div className="relative mb-3 aspect-[16/9] w-full overflow-hidden rounded-xl border border-gray-100 dark:border-gray-800 bg-slate-950 shrink-0">
             <Link href={targetHref} onClick={scrollToTop} className="block w-full h-full">
               <img
                 src={optimizedImgSrc}
@@ -150,22 +148,15 @@ export const NewsCard: React.FC<NewsCardProps> = ({
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               />
             </Link>
-
-            {/* Small Dynamic Category / Spotlight Badge (Floating top-3 left-3) */}
-            <div className="absolute top-3 left-3 z-10 pointer-events-none flex items-center gap-1.5 flex-wrap">
-              {isSpotlightExclusive ? (
-                <span className="font-black text-[10px] sm:text-xs px-2.5 py-0.5 rounded-md uppercase tracking-wider shadow-md bg-red-600 text-white flex items-center gap-1 border border-red-400">
-                  <span>★</span>
-                  <span>BREAKING SPOTLIGHT</span>
-                </span>
-              ) : (
-                <span
-                  className={`font-black text-[10px] sm:text-xs px-2.5 py-0.5 rounded-md uppercase tracking-wider shadow-sm ${getBadgeColor()}`}
-                >
-                  {normCategory}
-                </span>
-              )}
-            </div>
+            {isSpotlightExclusive ? (
+              <span className="absolute left-2 top-2 rounded bg-red-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white backdrop-blur-xs">
+                BREAKING SPOTLIGHT
+              </span>
+            ) : normCategory ? (
+              <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white backdrop-blur-xs">
+                {normCategory}
+              </span>
+            ) : null}
 
             {/* Video Play Trigger Pill */}
             {hasValidVideo && onOpenVideo && (
@@ -179,99 +170,82 @@ export const NewsCard: React.FC<NewsCardProps> = ({
               </button>
             )}
           </div>
-        ) : null}
+        ) : (
+          /* Clean Category Badge Header when Image is Missing */
+          normCategory && (
+            <div className="mb-2">
+              <span
+                className={`inline-block rounded-md px-2.5 py-1 text-[10px] font-bold uppercase ${
+                  isSpotlightExclusive
+                    ? 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300'
+                    : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                }`}
+              >
+                {isSpotlightExclusive ? '★ BREAKING SPOTLIGHT' : normCategory}
+              </span>
+            </div>
+          )
+        )}
 
-        {/* ------------------------------------------------------------------ */}
-        {/* 2. CONTENT CONTAINER (BOTTOM: Solid Background, p-3.5 sm:p-4, High Contrast) */}
-        {/* ------------------------------------------------------------------ */}
-        <div className="bg-white dark:bg-slate-900 p-3.5 sm:p-4 w-full min-w-full flex flex-col justify-between flex-1 box-border break-words whitespace-normal">
-          
+        {/* Article Text Content */}
+        <div className="flex flex-1 flex-col justify-between min-w-0">
           <div>
-            {/* If no top image, show category badge inline with metadata */}
-            {!hasImage && (
-              <div className="mb-2 flex items-center gap-2 flex-wrap">
-                {isSpotlightExclusive ? (
-                  <span className="font-black text-[10px] sm:text-xs px-2.5 py-0.5 rounded-md uppercase tracking-wider shadow-xs bg-red-600 text-white flex items-center gap-1 border border-red-400">
-                    <span>★</span>
-                    <span>BREAKING SPOTLIGHT</span>
-                  </span>
-                ) : (
-                  <span
-                    className={`font-black text-[10px] sm:text-xs px-2.5 py-0.5 rounded-md uppercase tracking-wider shadow-xs ${getBadgeColor()}`}
-                  >
-                    {normCategory}
-                  </span>
-                )}
-              </div>
-            )}
-
-            {/* Metadata Row: Relative Time & Author */}
-            <div className="flex items-center justify-between text-[11px] text-stone-700 dark:text-stone-300 font-bold uppercase tracking-wider mb-2">
-              <span>{author || 'Covai Bureau'}</span>
-              <span>{formatRelativeTime(timeAgo)}</span>
+            <div className="mb-2 flex items-center justify-between text-xs text-gray-400">
+              <span>{author || 'Editorial Bureau'}</span>
+              <time>{formatRelativeTime(timeAgo)}</time>
             </div>
 
-            {/* Headline Title */}
             <Link href={targetHref} onClick={scrollToTop} className="block group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors">
-              <h3 className="font-bold text-base md:text-lg text-slate-950 dark:text-gray-100 line-clamp-2 break-words whitespace-normal leading-snug">
+              <h3 className="line-clamp-2 text-sm sm:text-base font-bold text-gray-900 dark:text-white leading-snug min-w-0">
                 {title}
               </h3>
             </Link>
 
-            {/* Description */}
             {excerpt && (
-              <p className="text-xs md:text-sm text-slate-800 dark:text-slate-200 line-clamp-3 break-words whitespace-normal mt-2 leading-relaxed font-medium">
+              <p className="mt-1.5 line-clamp-3 text-xs text-gray-500 dark:text-gray-400 leading-normal min-w-0">
                 {excerpt}
               </p>
             )}
           </div>
 
-          {/* ------------------------------------------------------------------ */}
-          {/* 3. FOOTER BAR: Read Article + Media Action + Modern Share Button   */}
-          {/* ------------------------------------------------------------------ */}
-          <div className="flex items-center justify-between gap-2 mt-4 pt-2 border-t border-stone-200 dark:border-slate-800">
+          {/* Bottom Actions */}
+          <div className="mt-4 flex items-center justify-between pt-3 border-t border-gray-100 dark:border-gray-800">
             <Link
               href={targetHref}
               onClick={scrollToTop}
-              className="inline-flex items-center gap-1 text-xs md:text-sm font-black text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 transition-colors min-h-[36px] touch-manipulation"
+              className="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1"
             >
-              <span>Read Article</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              <span>Read Full</span>
+              <ArrowRight className="w-3 h-3" />
             </Link>
 
             <div className="flex items-center gap-1.5 shrink-0">
-              {/* Media Action: Watch Video OR Listen badge */}
-              {hasValidVideo && onOpenVideo ? (
+              {hasValidVideo && onOpenVideo && (
                 <button
                   type="button"
                   onClick={handleVideoClick}
-                  className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-stone-100 hover:bg-red-600 text-stone-900 hover:text-white dark:bg-slate-800 dark:text-gray-200 dark:hover:bg-red-600 dark:hover:text-white text-[11px] font-extrabold border border-stone-200 dark:border-slate-700 transition-colors cursor-pointer shrink-0 min-h-[32px] touch-manipulation"
+                  className="text-[11px] font-medium text-gray-500 bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-md flex items-center gap-1 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors cursor-pointer"
                 >
-                  <Video className="w-3.5 h-3.5" />
-                  <span>Watch</span>
+                  <Video className="w-3 h-3 text-red-500" />
+                  <span>Watch Video</span>
                 </button>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 font-extrabold text-[11px] border border-emerald-200 dark:border-emerald-800 shrink-0">
-                  <Headphones className="w-3 h-3 text-emerald-600" />
-                  <span>{listenMinutes}m</span>
-                </span>
               )}
 
               {/* Share Trigger Button */}
               <button
                 type="button"
                 onClick={handleShareClick}
-                aria-label="Share article"
-                className="p-1.5 rounded-lg bg-stone-100 hover:bg-stone-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-stone-700 dark:text-gray-300 transition-colors cursor-pointer shrink-0 min-h-[32px] min-w-[32px] flex items-center justify-center touch-manipulation"
+                aria-label="Share story"
+                className="p-1.5 rounded-md bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300 transition-colors cursor-pointer"
               >
-                <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
+                <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
                   <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z" />
                 </svg>
               </button>
             </div>
           </div>
         </div>
-      </article>
+      </div>
 
       {/* Share Modal Dialog */}
       <ShareModal

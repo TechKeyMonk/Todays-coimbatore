@@ -9,11 +9,12 @@ import Footer from '../components/Footer';
 import AdSlider from '../components/AdSlider';
 import AdBanner from './components/AdBanner';
 import ELI5SummaryPlugin from '../components/news/ELI5SummaryPlugin';
-import MobileBottomBanner from '../components/MobileBottomBanner';
 import AiSummary from '../components/AiSummary';
 import AudioReader from '../components/AudioReader';
 import VideoPlayer from '../components/VideoPlayer';
 import NewsCard from '../components/NewsCard';
+import BreakingSpotlight, { SpotlightArticle } from '../components/BreakingSpotlight';
+import SubHeroSpotlight from '../components/SubHeroSpotlight';
 import ShareModal from '../components/ShareModal';
 import UniversalSideLayout from '../components/UniversalSideLayout';
 import { saveCurrentScrollPosition } from '../components/ScrollRestoration';
@@ -92,7 +93,7 @@ const TOP_STORIES_CARDS: NewsCardItem[] = [
     readTime: '3 min',
     author: 'Infra Bureau',
     excerpt: 'With 284 out of 306 spans successfully launched, the corridor from Uppilipalayam to Goldwins enters its final surfacing phase.',
-    imageUrl: 'https://images.unsplash.com/photo-1545459720-aac8509eb02c?auto=format&fit=crop&w=800&q=80',
+    imageUrl: undefined,
     videoTitle: 'Avinashi Road Elevated Corridor Drone Fly-Through',
     videoDuration: '02:15',
     articleHref: '#trending-full',
@@ -732,6 +733,22 @@ export default function HomePage() {
     return timeB - timeA;
   });
 
+  const sanitizeArticleImageUrl = (url?: string | null): string | undefined => {
+    if (!url || typeof url !== 'string') return undefined;
+    const trimmed = url.trim();
+    if (
+      trimmed === '' ||
+      trimmed === 'null' ||
+      trimmed === 'undefined' ||
+      trimmed.startsWith('local-video://') ||
+      trimmed.includes('youtube.com') ||
+      trimmed.includes('youtu.be')
+    ) {
+      return undefined;
+    }
+    return trimmed;
+  };
+
   // Map DB articles dynamically to Top Stories sorted with exclusive items leading
   const topStoriesData = sortedDbArticles.map((a) => ({
     id: a.id,
@@ -753,12 +770,46 @@ export default function HomePage() {
     author: a.author || 'Editorial Bureau',
     excerpt: a.excerpt || a.content?.slice(0, 180) || '',
     mediaType: a.mediaType || 'image',
-    imageUrl: a.imageUrl || (a as any).image || (a as any).mediaUrl,
+    imageUrl: sanitizeArticleImageUrl(a.imageUrl) || sanitizeArticleImageUrl((a as any).image) || sanitizeArticleImageUrl((a as any).mediaUrl),
     videoTitle: a.videoTitle || a.title,
     videoDuration: a.videoDuration || '02:30',
     videoUrl: a.videoUrl,
     articleHref: `/article/${a.id}`,
     highlightStat: a.highlightStat || (a.isExclusive ? 'Spotlight Exclusive' : undefined),
+  }));
+
+  // Dynamic Breaking Spotlight Multi-Article Carousel Feed
+  const allSpotlightArticles = sortedDbArticles.filter((a) =>
+    Boolean(
+      a.isExclusive ||
+      a.isSpotlight ||
+      a.is_spotlight ||
+      a.highlightStat === 'Spotlight Exclusive' ||
+      a.category?.toUpperCase() === 'BREAKING SPOTLIGHT' ||
+      a.subCategory?.toUpperCase() === 'BREAKING SPOTLIGHT' ||
+      (Array.isArray(a.tags) && a.tags.some((t) => t.toLowerCase().includes('spotlight'))) ||
+      (typeof a.keywords === 'string' && (a.keywords.includes('__EXCLUSIVE__') || a.keywords.includes('__SPOTLIGHT__')))
+    )
+  );
+
+  const spotlightCarouselArticles: SpotlightArticle[] = (allSpotlightArticles.length > 0
+    ? allSpotlightArticles
+    : sortedDbArticles.slice(0, 4)
+  ).map((a) => ({
+    id: a.id,
+    title: a.title,
+    slug: a.slug || a.id,
+    imageUrl: sanitizeArticleImageUrl(a.imageUrl) || sanitizeArticleImageUrl((a as any).image) || sanitizeArticleImageUrl((a as any).mediaUrl),
+    author: a.author || 'Editorial Bureau',
+    publishedAt: a.publishedAt || a.createdAt || 'RECENT',
+    createdAt: a.createdAt,
+    updatedAt: a.updatedAt,
+    category: a.category || 'COVAI SPOTLIGHTS',
+    subCategory: a.subCategory,
+    tags: a.tags || (a.isExclusive ? ['Spotlight Exclusive'] : undefined),
+    videoUrl: a.videoUrl,
+    mediaType: a.mediaType,
+    excerpt: a.excerpt || a.content?.slice(0, 160),
   }));
 
   const latestHeroArticle = sortedDbArticles.find((a) => a.isExclusive) || sortedDbArticles[0];
@@ -768,18 +819,36 @@ export default function HomePage() {
   
   // Dynamic Sub Hero Articles (Top featured secondary stories from Supabase)
   const remainingStories = [...remainingExclusives, ...nonExclusives];
-  const subHeroArticle = remainingStories[0] || null;
-  const subHeroSecondary = remainingStories[1] || null;
-  const dynamicChronicleStories = remainingStories.slice(2, 5);
 
-  const DEFAULT_SUB_HERO_IMAGE = 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=800&q=80';
+  // 2nd latest active story from Supabase news array (news[1] or fallback to latest un-featured story)
+  const secondarySpotlightArticle = (sortedDbArticles.length > 1 ? sortedDbArticles[1] : null) || nonExclusives[0] || remainingStories[0] || null;
+
+  const FALLBACK_SECONDARY_ARTICLE: Partial<Article> = {
+    id: 'kovai-tech-infra',
+    slug: 'kovai-tech-infra-updates',
+    title: 'Kovai Tech & Infra Updates: Flyover Corridors & SaaS Hub Expansions Accelerate',
+    excerpt: 'District administration and civic engineering cells confirm on-schedule infrastructure works across Avinashi Road and Saravanampatti IT corridor.',
+    category: 'INFRASTRUCTURE',
+    createdAt: '2026-09-05T09:00:00.000Z',
+    author: 'Civic Infrastructure Desk',
+  };
+
+  const activeSecondaryArticle = secondarySpotlightArticle || FALLBACK_SECONDARY_ARTICLE;
+  const secondaryArticleHref = `/news/${activeSecondaryArticle.slug || activeSecondaryArticle.id || 'kovai-tech-infra-updates'}`;
+
+  // For Right Column Sub Hero: pick first remaining story that isn't the secondary spotlight (if available)
+  const subHeroCandidates = remainingStories.filter((s) => s.id !== activeSecondaryArticle?.id);
+  const subHeroArticle = subHeroCandidates[0] || remainingStories[0] || null;
+  const subHeroSecondary = subHeroCandidates[1] || remainingStories[1] || null;
+  const dynamicChronicleStories = (subHeroCandidates.length > 0 ? subHeroCandidates : remainingStories).slice(2, 5);
+
   const subHeroImageUrl = (subHeroArticle?.imageUrl && typeof subHeroArticle.imageUrl === 'string' && subHeroArticle.imageUrl.trim() !== '' && subHeroArticle.imageUrl.trim() !== 'null' && subHeroArticle.imageUrl.trim() !== 'undefined')
     ? subHeroArticle.imageUrl.trim()
     : ((subHeroArticle as any)?.image && typeof (subHeroArticle as any).image === 'string' && (subHeroArticle as any).image.trim() !== '' && (subHeroArticle as any).image.trim() !== 'null' && (subHeroArticle as any).image.trim() !== 'undefined')
     ? (subHeroArticle as any).image.trim()
     : ((subHeroArticle as any)?.mediaUrl && typeof (subHeroArticle as any).mediaUrl === 'string' && (subHeroArticle as any).mediaUrl.trim() !== '' && !(subHeroArticle as any).mediaUrl.includes('youtube'))
     ? (subHeroArticle as any).mediaUrl.trim()
-    : DEFAULT_SUB_HERO_IMAGE;
+    : null;
 
   const isHeroVideo = Boolean(
     latestHeroArticle?.mediaType === 'video' &&
@@ -820,11 +889,9 @@ export default function HomePage() {
     footerValue: 'Covai Report',
     footerIsCall: false,
     mediaType: a.mediaType || 'image',
-    imageUrl: a.imageUrl || (a as any).image || (a as any).mediaUrl,
+    imageUrl: sanitizeArticleImageUrl(a.imageUrl) || sanitizeArticleImageUrl((a as any).image) || sanitizeArticleImageUrl((a as any).mediaUrl),
     videoUrl: a.videoUrl,
   }));
-
-  const DEFAULT_INFRA_IMAGE = 'https://images.unsplash.com/photo-1545459720-aac8509eb02c?auto=format&fit=crop&w=800&q=80';
 
   const infraArticles = getArticlesByCategory('infrastructure');
   const infraData: NewsCardItem[] = infraArticles.map((a) => ({
@@ -837,20 +904,18 @@ export default function HomePage() {
     author: a.author || 'Infra Bureau',
     excerpt: a.excerpt || a.content?.slice(0, 180) || '',
     mediaType: a.mediaType || 'image',
-    imageUrl: (a.imageUrl && typeof a.imageUrl === 'string' && a.imageUrl.trim() !== '')
-      ? a.imageUrl.trim()
-      : ((a as any).image && typeof (a as any).image === 'string' && (a as any).image.trim() !== '')
-      ? (a as any).image.trim()
-      : DEFAULT_INFRA_IMAGE,
+    imageUrl:
+      a.imageUrl && typeof a.imageUrl === 'string' && a.imageUrl.trim() !== '' && a.imageUrl.trim() !== 'null' && a.imageUrl.trim() !== 'undefined'
+        ? a.imageUrl.trim()
+        : (a as any).image && typeof (a as any).image === 'string' && (a as any).image.trim() !== '' && (a as any).image.trim() !== 'null' && (a as any).image.trim() !== 'undefined'
+        ? (a as any).image.trim()
+        : undefined,
     videoTitle: a.videoTitle || a.title,
     videoDuration: a.videoDuration || '02:30',
     videoUrl: a.videoUrl,
     articleHref: `/article/${a.id}`,
     highlightStat: a.highlightStat,
   }));
-
-  const DEFAULT_BUSINESS_IMAGE = 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&q=80';
-  const DEFAULT_CEO_IMAGE = 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&w=800&q=80';
 
   const businessArticles = getArticlesByCategory('business');
   const businessData: NewsCardItem[] = businessArticles.map((a) => ({
@@ -863,11 +928,12 @@ export default function HomePage() {
     author: a.author || 'Industrial Bureau',
     excerpt: a.excerpt || a.content?.slice(0, 180) || '',
     mediaType: a.mediaType || 'image',
-    imageUrl: (a.imageUrl && typeof a.imageUrl === 'string' && a.imageUrl.trim() !== '')
-      ? a.imageUrl.trim()
-      : ((a as any).image && typeof (a as any).image === 'string' && (a as any).image.trim() !== '')
-      ? (a as any).image.trim()
-      : DEFAULT_BUSINESS_IMAGE,
+    imageUrl:
+      a.imageUrl && typeof a.imageUrl === 'string' && a.imageUrl.trim() !== '' && a.imageUrl.trim() !== 'null' && a.imageUrl.trim() !== 'undefined'
+        ? a.imageUrl.trim()
+        : (a as any).image && typeof (a as any).image === 'string' && (a as any).image.trim() !== '' && (a as any).image.trim() !== 'null' && (a as any).image.trim() !== 'undefined'
+        ? (a as any).image.trim()
+        : undefined,
     videoTitle: a.videoTitle || a.title,
     videoDuration: a.videoDuration || '03:00',
     videoUrl: a.videoUrl,
@@ -883,11 +949,12 @@ export default function HomePage() {
     company: 'Enterprise Leader',
     quote: a.excerpt || a.title,
     mediaType: a.mediaType || 'image',
-    imageUrl: (a.imageUrl && typeof a.imageUrl === 'string' && a.imageUrl.trim() !== '')
-      ? a.imageUrl.trim()
-      : ((a as any).image && typeof (a as any).image === 'string' && (a as any).image.trim() !== '')
-      ? (a as any).image.trim()
-      : DEFAULT_CEO_IMAGE,
+    imageUrl:
+      a.imageUrl && typeof a.imageUrl === 'string' && a.imageUrl.trim() !== '' && a.imageUrl.trim() !== 'null' && a.imageUrl.trim() !== 'undefined'
+        ? a.imageUrl.trim()
+        : (a as any).image && typeof (a as any).image === 'string' && (a as any).image.trim() !== '' && (a as any).image.trim() !== 'null' && (a as any).image.trim() !== 'undefined'
+        ? (a as any).image.trim()
+        : undefined,
     videoDuration: a.videoDuration || '03:00',
     videoUrl: a.videoUrl,
     articleHref: `/article/${a.id}`,
@@ -906,7 +973,7 @@ export default function HomePage() {
     author: a.author || 'Spotlight Desk',
     excerpt: a.excerpt || a.content?.slice(0, 180) || '',
     mediaType: a.mediaType || 'image',
-    imageUrl: a.imageUrl || (a as any).image || (a as any).mediaUrl,
+    imageUrl: sanitizeArticleImageUrl(a.imageUrl) || sanitizeArticleImageUrl((a as any).image) || sanitizeArticleImageUrl((a as any).mediaUrl),
     videoTitle: a.videoTitle || a.title,
     videoDuration: a.videoDuration || '02:30',
     videoUrl: a.videoUrl,
@@ -927,427 +994,127 @@ export default function HomePage() {
   const sidebarTopAd = getAd('RIGHT_SIDEBAR_TOP') || getAd('slot-sidebar-rect-1');
 
   return (
-    <div className="w-full max-w-full bg-[#fcfbf7] dark:bg-slate-950 text-[#111111] dark:text-gray-100 font-sans antialiased selection:bg-red-600 selection:text-white transition-colors duration-200 box-border relative pb-20 md:pb-0">
+    <div className="w-full max-w-full bg-[#fcfbf7] dark:bg-slate-950 text-[#111111] dark:text-gray-100 font-sans antialiased selection:bg-red-600 selection:text-white transition-colors duration-200 box-border relative pb-20 md:pb-0 min-w-0 overflow-hidden">
       {/* ==================================================================== */}
       {/* 2. UNIVERSAL SIDEBAR LAYOUT (STICKY LOCKED 3-COLUMN STRUCTURE)        */}
       {/* ==================================================================== */}
-      <UniversalSideLayout pageType="home" className="mt-0 pt-0 border-t-0 space-y-0" style={{ marginTop: 0, paddingTop: 0, borderTop: 'none' }}>
+      <UniversalSideLayout pageType="home" className="mt-0 pt-0 border-t-0 space-y-0 w-full min-w-0 overflow-hidden" style={{ marginTop: 0, paddingTop: 0, borderTop: 'none' }}>
         {/* ZERO-GAP EDITORIAL & ADVERTISEMENT ARCHITECTURE */}
-        <div className="w-full max-w-full mx-auto space-y-6 box-border mt-0 pt-0 border-t-0" style={{ marginTop: 0, paddingTop: 0 }}>
+        <div className="w-full max-w-full mx-auto space-y-6 box-border mt-0 pt-0 border-t-0 min-w-0 overflow-hidden" style={{ marginTop: 0, paddingTop: 0 }}>
         
         {/* ------------------------------------------------------------------ */}
-        {/* SECTION 1: HERO & BREAKING SPOTLIGHT (FULL CENTRAL EXPANSION)       */}
+        {/* SECTION 1: HERO & BREAKING SPOTLIGHT AUTO-SLIDING CAROUSEL          */}
         {/* ------------------------------------------------------------------ */}
-        <div className="space-y-3 w-full max-w-full pr-0 mr-0 box-border mt-0 pt-0 border-t-0" style={{ marginTop: 0, paddingTop: 0 }}>
-              <div className="border-b border-stone-300 dark:border-slate-800 pb-1 flex items-center justify-between mt-0 pt-0">
-                <h2 className="text-sm font-extrabold uppercase tracking-widest text-[#111111] dark:text-gray-100 flex items-center gap-1.5">
-                  <span className="text-red-600 dark:text-red-500 font-black">★</span>
-                  {latestHeroArticle?.isExclusive ? 'BREAKING SPOTLIGHT' : 'TOP HEADLINE STORY'}
-                </h2>
-                <div className="flex items-center gap-2 text-xs text-[#444444] dark:text-gray-400 font-bold">
-                  <span className="text-red-600 dark:text-red-400 font-black">Multi-Media Edition</span>
-                </div>
-              </div>
-
-              {/* MAIN HERO FEATURED STORY (ONLY WHEN ARTICLES EXIST) */}
-              {latestHeroArticle ? (
-                <article
-                  id="climate-tech"
-                  className="group rounded-2xl border border-stone-300 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden shadow-xs hover:border-stone-400 dark:hover:border-slate-700 transition-all duration-300 w-full max-w-full box-border"
-                >
-                  {/* Full Image Banner / Embedded Video Player */}
-                  <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden bg-[#0d4d4d]">
-                    {isHeroVideo ? (
-                      heroVideoPlaying ? (
-                        <div className="relative w-full h-full bg-slate-950 flex flex-col justify-between animate-in fade-in duration-200">
-                          <div className="flex items-center justify-between p-2.5 bg-black/80 z-20">
-                            <span className="inline-flex items-center gap-1.5 text-white font-black text-xs px-2.5 py-1 rounded-full border border-white/20">
-                              <span className="h-2 w-2 rounded-full bg-red-500 animate-ping inline-block" />
-                              <span>4K YOUTUBE / STREAM</span>
-                            </span>
-                            <button
-                              onClick={() => setHeroVideoPlaying(false)}
-                              className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded cursor-pointer"
-                            >
-                              ✕ Close Video
-                            </button>
-                          </div>
-
-                          <div className="flex-1 w-full h-full min-h-0">
-                            <VideoPlayer
-                              url={latestHeroArticle.videoUrl!}
-                              title={latestHeroArticle.title || 'Coimbatore Video Stream'}
-                              autoplay={true}
-                              className="w-full h-full"
-                            />
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <img
-                            src={heroImageUrl || DEFAULT_HERO_IMAGE}
-                            alt={latestHeroArticle.title}
-                            loading="eager"
-                            decoding="async"
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent z-10" />
-
-                          {/* Top Badges */}
-                          <div className="absolute top-4 left-4 z-20 flex items-center gap-2">
-                            <span className="bg-red-600 text-white font-black text-xs px-3 py-1 rounded-md shadow-sm tracking-wider uppercase">
-                              {latestHeroArticle.isExclusive ? 'COVAI SPOTLIGHTS' : 'TOP STORY'}
-                            </span>
-                            <span className="bg-red-700 text-white font-black text-xs px-2.5 py-1 rounded shadow-sm uppercase">
-                              {latestHeroArticle.subCategory || latestHeroArticle.category || 'SPECIAL REPORT'}
-                            </span>
-                          </div>
-
-                          {/* Play Button Overlay (ONLY FOR VIDEO STORIES) */}
-                          <button
-                            onClick={() => setHeroVideoPlaying(true)}
-                            aria-label="Play Hero Video"
-                            className="absolute inset-0 m-auto w-16 h-16 rounded-full bg-red-600 hover:bg-red-700 text-white shadow-2xl flex items-center justify-center z-20 hover:scale-110 transition-transform cursor-pointer"
-                          >
-                            <svg className="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24">
-                              <path d="M8 5v14l11-7z" />
-                            </svg>
-                          </button>
-
-                          {/* Headline Overlay */}
-                          <div className="absolute bottom-3 left-3 right-3 sm:bottom-6 sm:left-6 sm:right-6 z-20">
-                            <Link href={`/article/${latestHeroArticle.id}`}>
-                              <h1 className="text-lg sm:text-2xl md:text-4xl font-black tracking-tight leading-snug sm:leading-[1.15] text-white drop-shadow-md group-hover:text-emerald-200 transition-colors cursor-pointer break-words line-clamp-3 sm:line-clamp-none">
-                                {latestHeroArticle.title}
-                              </h1>
-                            </Link>
-                          </div>
-                        </>
-                      )
-                    ) : (
-                      /* PURE IMAGE HERO STORY (NO RED PLAY BUTTON) */
-                      <Link href={`/article/${latestHeroArticle.id}`} className="block w-full h-full relative">
-                        <img
-                          src={heroImageUrl || DEFAULT_HERO_IMAGE}
-                          alt={latestHeroArticle.title}
-                          loading="eager"
-                          decoding="async"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 rounded-xl"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/35 to-transparent z-10" />
-
-                        {/* Top Badges */}
-                        <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 flex items-center gap-1.5 sm:gap-2">
-                          <span className="bg-red-600 text-white font-black text-[10px] sm:text-xs px-2 sm:px-3 py-0.5 sm:py-1 rounded-md shadow-sm tracking-wider uppercase">
-                            {latestHeroArticle.isExclusive ? 'COVAI SPOTLIGHTS' : 'TOP STORY'}
-                          </span>
-                          <span className="bg-red-700 text-white font-black text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 sm:py-1 rounded shadow-sm uppercase">
-                            {latestHeroArticle.subCategory || latestHeroArticle.category || 'SPECIAL REPORT'}
-                          </span>
-                        </div>
-
-                        {/* Headline Overlay */}
-                        <div className="absolute bottom-3 left-3 right-3 sm:bottom-6 sm:left-6 sm:right-6 z-20">
-                          <h1 className="text-lg sm:text-2xl md:text-4xl font-black tracking-tight leading-snug sm:leading-[1.15] text-white drop-shadow-md group-hover:text-emerald-200 transition-colors break-words line-clamp-3 sm:line-clamp-none">
-                            {latestHeroArticle.title}
-                          </h1>
-                        </div>
-                      </Link>
-                    )}
-                  </div>
-
-                  {/* Excerpt, On-Demand AI & Audio */}
-                  <div className="p-3 sm:p-6 w-full max-w-full box-border break-words">
-                    <div className="flex items-center gap-2.5 text-xs sm:text-sm text-[#444444] dark:text-gray-400 mb-3 font-bold uppercase">
-                      <span className="font-black text-[#111111] dark:text-gray-100">By {latestHeroArticle.author || 'Editorial Bureau'}</span>
-                      <span>•</span>
-                      <span>{formatRelativeTime(latestHeroArticle.updatedAt || latestHeroArticle.createdAt || latestHeroArticle.publishedAt)}</span>
-                    </div>
-
-                    {latestHeroArticle.excerpt && (
-                      <p className="text-sm sm:text-base text-[#222222] dark:text-gray-300 leading-relaxed font-medium break-words">
-                        {latestHeroArticle.excerpt}
-                      </p>
-                    )}
-
-                    {/* Female Voice AI Audio Reader */}
-                    <AudioReader
-                      title={latestHeroArticle.title}
-                      textToRead={latestHeroArticle.content || latestHeroArticle.excerpt || latestHeroArticle.title}
-                    />
-
-                    {/* Universal On-Demand AI Summarizer */}
-                    <AiSummary
-                      title={latestHeroArticle.title}
-                      excerpt={latestHeroArticle.excerpt}
-                      content={latestHeroArticle.content}
-                    />
-
-                    {/* Dual Action Buttons */}
-                    <div className="mt-4 pt-3.5 border-t border-stone-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm font-bold">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                          href={`/article/${latestHeroArticle.id}`}
-                          className="inline-flex items-center justify-center min-h-[44px] px-4 py-2.5 rounded-lg bg-[#0d4d4d] hover:bg-[#153d3b] dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white font-black shadow-xs transition-colors touch-manipulation"
-                        >
-                          <span>📖 Read Article</span>
-                        </Link>
-                        {isHeroVideo && (
-                          <button
-                            onClick={() => setHeroVideoPlaying(!heroVideoPlaying)}
-                            className="inline-flex items-center justify-center min-h-[44px] px-3.5 py-2.5 rounded-lg bg-[#f3ede2] hover:bg-stone-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-[#111111] dark:text-gray-200 border border-stone-300 dark:border-slate-700 font-black transition-colors touch-manipulation cursor-pointer"
-                          >
-                            <span>🎥 {heroVideoPlaying ? 'Stop Video' : `Watch Video (${latestHeroArticle.videoDuration || '03:00'})`}</span>
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const heroUrl = typeof window !== 'undefined' ? `${window.location.origin}/article/${latestHeroArticle.id}` : `https://todayscoimbatore.com/article/${latestHeroArticle.id}`;
-                            if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
-                              navigator.share({
-                                title: latestHeroArticle.title || "Today's Coimbatore",
-                                url: heroUrl,
-                              }).catch(() => {
-                                setIsHeroShareOpen(true);
-                              });
-                            } else {
-                              setIsHeroShareOpen(true);
-                            }
-                          }}
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-black transition-transform active:scale-95 shadow-xs cursor-pointer min-h-[44px] touch-manipulation"
-                        >
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                          </svg>
-                          <span>Share Story</span>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Dynamic Content Fill: LOCAL CHRONICLE FEED • QUICK NEWS DIGEST */}
-                    {dynamicChronicleStories.length > 0 && (
-                      <div className="mt-5 pt-4 border-t border-stone-200 dark:border-slate-800 space-y-3">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-red-600 animate-ping inline-block" />
-                            <h3 className="text-xs font-black uppercase tracking-wider text-[#111111] dark:text-gray-100">
-                              LOCAL CHRONICLE FEED • QUICK NEWS DIGEST
-                            </h3>
-                          </div>
-                          <span className="text-[10px] font-bold text-stone-500 dark:text-gray-400 font-mono">
-                            Updated Live
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {dynamicChronicleStories.map((item) => {
-                            const rawImg = item.imageUrl || (item as any).image || (item as any).mediaUrl;
-                            const hasImg = Boolean(rawImg && typeof rawImg === 'string' && rawImg.trim() !== '' && rawImg.trim() !== 'null' && rawImg.trim() !== 'undefined');
-                            return (
-                              <Link
-                                key={item.id}
-                                href={`/article/${item.id}`}
-                                className="flex items-start gap-3 p-2.5 rounded-xl bg-[#f8f6f0] dark:bg-slate-800/60 hover:bg-stone-200/70 dark:hover:bg-slate-800 border border-stone-200 dark:border-slate-700 transition-all duration-200 group/item"
-                              >
-                                {hasImg ? (
-                                  <div className="w-[60px] h-[60px] rounded-lg overflow-hidden shrink-0 bg-slate-900 border border-stone-300 dark:border-slate-700">
-                                    <img
-                                      src={rawImg}
-                                      alt={item.title}
-                                      className="w-full h-full object-cover group-hover/item:scale-105 transition-transform duration-200"
-                                    />
-                                  </div>
-                                ) : null}
-                                <div className="min-w-0 flex-1 flex flex-col justify-between h-[60px]">
-                                  <div className="flex items-center justify-between text-[10px] font-bold uppercase">
-                                    <span className={item.isExclusive ? 'text-red-700 font-black' : 'text-red-600 dark:text-red-400 font-black'}>
-                                      {item.isExclusive ? '★ SPOTLIGHT' : item.category}
-                                    </span>
-                                    <span className="text-stone-500 dark:text-gray-400 font-mono text-[9px]">
-                                      {formatRelativeTime(item.updatedAt || item.createdAt || item.publishedAt)}
-                                    </span>
-                                  </div>
-                                  <h4 className="text-xs font-bold text-[#111111] dark:text-gray-100 line-clamp-2 leading-tight group-hover/item:text-red-600 dark:group-hover/item:text-red-400 transition-colors">
-                                    {item.title}
-                                  </h4>
-                                </div>
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </article>
-              ) : (
-                /* CLEAN USER-FACING STANDBY MESSAGE (NO ADMIN LINKS) */
-                <div className="rounded-2xl border border-stone-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-8 sm:p-12 text-center flex flex-col items-center justify-center space-y-3 shadow-xs">
-                  <div className="w-14 h-14 rounded-2xl bg-stone-100 dark:bg-slate-800 text-stone-500 dark:text-stone-400 flex items-center justify-center text-2xl shadow-inner border border-stone-200 dark:border-slate-700">
-                    📰
-                  </div>
-                  <div className="space-y-1 max-w-md">
-                    <h3 className="text-base sm:text-lg font-black text-[#111111] dark:text-gray-100">
-                      No articles posted yet!
-                    </h3>
-                    <p className="text-xs font-medium text-[#555555] dark:text-gray-400 leading-relaxed">
-                      Today&apos;s Coimbatore live news updates, breaking reports, and city bulletins will appear here as soon as they are published.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+        <BreakingSpotlight
+          articles={spotlightCarouselArticles}
+          onOpenVideo={openVideoModal}
+        />
 
             {/* EDITORIAL TIMELINE & DYNAMIC SUB HERO SECTION GRID */}
-            <div className={`grid grid-cols-1 ${subHeroArticle ? 'lg:grid-cols-2' : 'max-w-3xl'} gap-4 w-full max-w-full my-4 items-stretch`}>
-              {/* PALE SAND CONTAINER ("THE TIMELINE") */}
-              <div className="rounded-2xl border border-[#dcd5c7] dark:border-slate-800 bg-[#f3ede2] dark:bg-slate-900 p-4 sm:p-5 shadow-xs w-full max-w-full box-border break-words flex flex-col justify-between">
-                <div>
-                  <div className="border-b border-[#dcd5c7] dark:border-slate-800 pb-2.5 mb-3">
-                    <span className="text-xs font-black uppercase tracking-wider text-red-600 dark:text-red-400 block mb-0.5">
-                      THE TIMELINE
-                    </span>
-                    <h3 className="text-lg font-extrabold leading-tight text-[#111111] dark:text-gray-100 break-words">
-                      How Covai became a maker city
-                    </h3>
+            <div className={`grid grid-cols-1 ${subHeroArticle ? 'lg:grid-cols-2' : 'w-full'} gap-4 w-full max-w-full my-4 items-stretch min-w-0 overflow-hidden`}>
+              {/* HERO LEFT COLUMN: VERTICAL FLEX STACK (TIMELINE + SECONDARY SPOTLIGHT) */}
+              <div className="flex flex-col gap-3.5 h-full w-full min-w-0 overflow-hidden">
+                {/* 1. COMPACT "THE TIMELINE" CARD */}
+                <div className="p-3.5 bg-amber-50/60 dark:bg-slate-900/60 border border-amber-200/50 dark:border-slate-800 rounded-2xl shadow-xs w-full max-w-full box-border break-words flex flex-col justify-between">
+                  <div>
+                    <div className="border-b border-amber-200/60 dark:border-slate-800 pb-2 mb-2.5">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-red-600 dark:text-red-400 block mb-0.5">
+                        THE TIMELINE
+                      </span>
+                      <h3 className="text-base font-extrabold leading-tight text-[#111111] dark:text-gray-100 break-words">
+                        How Covai became a maker city
+                      </h3>
+                    </div>
+
+                    <div className="space-y-2 text-xs">
+                      <div className="border-b border-amber-200/40 dark:border-slate-800/80 pb-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-[#333333] dark:text-gray-300 block mb-0.5">
+                          1930s • TEXTILE REVOLUTION
+                        </span>
+                        <p className="text-xs font-medium text-[#333333] dark:text-gray-400 leading-relaxed break-words">
+                          Stanes & G.D. Naidu pioneer indigenous textile machinery and motor manufacturing in Peelamedu.
+                        </p>
+                      </div>
+
+                      <div className="border-b border-amber-200/40 dark:border-slate-800/80 pb-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-[#333333] dark:text-gray-300 block mb-0.5">
+                          1970s • PUMP & FOUNDRY CAPITAL
+                        </span>
+                        <p className="text-xs font-medium text-[#333333] dark:text-gray-400 leading-relaxed break-words">
+                          Coimbatore supplies over 60% of India’s agricultural pumpsets and cast-iron subassemblies.
+                        </p>
+                      </div>
+
+                      <div>
+                        <span className="text-[10px] font-black uppercase tracking-wider text-[#333333] dark:text-gray-300 block mb-0.5">
+                          2026 • SAAS & EV HUB
+                        </span>
+                        <p className="text-xs font-medium text-[#333333] dark:text-gray-400 leading-relaxed break-words">
+                          Over 140 DeepTech & EV startups scale globally from Coimbatore without shifting to metros.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. DYNAMIC SECONDARY ARTICLE SLOT */}
+                <div className="w-full bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-3.5 shadow-sm hover:shadow-md transition-all flex flex-col justify-between min-h-[140px]">
+                  <div>
+                    {/* Badge Header: ⚡ KOVAI SPOTLIGHT + publication time/date */}
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 border border-red-200/60 dark:border-red-900">
+                        <span>⚡</span>
+                        <span>KOVAI SPOTLIGHT</span>
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 font-mono">
+                        {formatRelativeTime(activeSecondaryArticle.updatedAt || activeSecondaryArticle.createdAt || activeSecondaryArticle.publishedAt)}
+                      </span>
+                    </div>
+
+                    {/* Title */}
+                    <Link
+                      href={secondaryArticleHref}
+                      className="block group"
+                    >
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-gray-100 group-hover:text-red-600 dark:group-hover:text-red-400 line-clamp-2 cursor-pointer transition-colors leading-snug">
+                        {activeSecondaryArticle.title || 'Coimbatore Live Spotlight Updates'}
+                      </h4>
+                    </Link>
+
+                    {/* Excerpt / Summary */}
+                    <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-2 mt-1 leading-relaxed">
+                      {activeSecondaryArticle.excerpt || 'Verified local updates, civic infrastructure reports, and industrial developments from Coimbatore.'}
+                    </p>
                   </div>
 
-                  <div className="space-y-3 text-xs">
-                    <div className="border-b border-[#dcd5c7] dark:border-slate-800 pb-2.5">
-                      <span className="text-xs font-black uppercase tracking-wider text-[#333333] dark:text-gray-300 block mb-0.5">1930s • TEXTILE REVOLUTION</span>
-                      <p className="text-xs font-medium text-[#222222] dark:text-gray-400 leading-relaxed break-words">
-                        Stanes & G.D. Naidu pioneer indigenous textile machinery and motor manufacturing in Peelamedu.
-                      </p>
-                    </div>
-
-                    <div className="border-b border-[#dcd5c7] dark:border-slate-800 pb-2.5">
-                      <span className="text-xs font-black uppercase tracking-wider text-[#333333] dark:text-gray-300 block mb-0.5">1970s • PUMP & FOUNDRY CAPITAL</span>
-                      <p className="text-xs font-medium text-[#222222] dark:text-gray-400 leading-relaxed break-words">
-                        Coimbatore supplies over 60% of India’s agricultural pumpsets and cast-iron subassemblies.
-                      </p>
-                    </div>
-
-                    <div>
-                      <span className="text-xs font-black uppercase tracking-wider text-[#333333] dark:text-gray-300 block mb-0.5">2026 • SAAS & EV HUB</span>
-                      <p className="text-xs font-medium text-[#222222] dark:text-gray-400 leading-relaxed break-words">
-                        Over 140 DeepTech & EV startups scale globally from Coimbatore without shifting to metros.
-                      </p>
-                    </div>
+                  {/* Footer CTA: Category tag + Read Story → link */}
+                  <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between text-xs">
+                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      {activeSecondaryArticle.category || 'NEWS'}
+                    </span>
+                    <Link
+                      href={secondaryArticleHref}
+                      className="inline-flex items-center gap-1 font-black text-xs text-[#0d4d4d] dark:text-emerald-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
+                    >
+                      <span>Read Story</span>
+                      <span>&rarr;</span>
+                    </Link>
                   </div>
                 </div>
               </div>
 
               {/* DYNAMIC SUB HERO SECTION (FETCHED DIRECTLY FROM SUPABASE DATABASE) */}
               {subHeroArticle && (
-                <div className="rounded-2xl border border-stone-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-5 shadow-xs w-full max-w-full box-border break-words flex flex-col justify-between hover:border-stone-400 dark:hover:border-slate-700 transition-all duration-300 group">
-                  <div className="space-y-3">
-                    <div className="border-b border-stone-200 dark:border-slate-800 pb-2.5 flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-red-600 animate-ping inline-block" />
-                        <h3 className="text-xs font-black uppercase tracking-wider text-[#111111] dark:text-gray-100 flex items-center gap-1.5">
-                          <span className="text-red-600 dark:text-red-500 font-black">⚡</span>
-                          SUB HERO SPOTLIGHT
-                        </h3>
-                      </div>
-                      <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded bg-red-50 dark:bg-red-950/60 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900">
-                        {subHeroArticle.isExclusive ? '★ SPOTLIGHT' : (subHeroArticle.category || 'FEATURED')}
-                      </span>
-                    </div>
-
-                    {/* Image / Media Container */}
-                    <div className="relative aspect-[16/9] w-full rounded-xl overflow-hidden bg-slate-900 border border-stone-200 dark:border-slate-800">
-                      <Link href={`/article/${subHeroArticle.id}`} className="block w-full h-full">
-                        <img
-                          src={subHeroImageUrl}
-                          alt={subHeroArticle.title}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      </Link>
-                      {subHeroArticle.subCategory && (
-                        <span className="absolute top-2.5 left-2.5 px-2 py-0.5 rounded-md bg-black/80 text-white text-[10px] font-black uppercase tracking-wider border border-white/20">
-                          {subHeroArticle.subCategory}
-                        </span>
-                      )}
-                      {subHeroArticle.highlightStat && (
-                        <span className="absolute bottom-2.5 right-2.5 px-2.5 py-0.5 rounded-md bg-emerald-700 text-white text-[10px] font-black uppercase tracking-wide shadow-md">
-                          {subHeroArticle.highlightStat}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Metadata line */}
-                    <div className="flex items-center justify-between text-xs text-[#444444] dark:text-gray-400 font-bold">
-                      <span className="font-black text-[#111111] dark:text-gray-100">
-                        By {subHeroArticle.author || 'Editorial Bureau'}
-                      </span>
-                      <span>{formatRelativeTime(subHeroArticle.updatedAt || subHeroArticle.createdAt || subHeroArticle.publishedAt)}</span>
-                    </div>
-
-                    {/* Headline */}
-                    <Link href={`/article/${subHeroArticle.id}`} className="block">
-                      <h4 className="text-base sm:text-lg font-bold text-[#111111] dark:text-white leading-snug group-hover:text-red-600 dark:group-hover:text-red-400 transition-colors line-clamp-2">
-                        {subHeroArticle.title}
-                      </h4>
-                    </Link>
-
-                    {/* Excerpt */}
-                    {subHeroArticle.excerpt && (
-                      <p className="text-xs text-[#333333] dark:text-gray-300 line-clamp-2 leading-relaxed font-medium">
-                        {subHeroArticle.excerpt}
-                      </p>
-                    )}
-
-                    {/* Secondary Sub Hero Mini Link (if available) */}
-                    {subHeroSecondary && (
-                      <div className="mt-2 pt-2.5 border-t border-stone-200 dark:border-slate-800">
-                        <Link
-                          href={`/article/${subHeroSecondary.id}`}
-                          className="flex items-center justify-between gap-2 text-xs font-bold text-[#222222] dark:text-gray-200 hover:text-red-600 dark:hover:text-red-400 transition-colors group/sec"
-                        >
-                          <span className="line-clamp-1 flex-1">
-                            <span className="text-red-600 font-black mr-1.5">▸ Also Trending:</span>
-                            {subHeroSecondary.title}
-                          </span>
-                          <span className="text-[10px] font-bold text-stone-500 shrink-0 font-mono">
-                            {formatRelativeTime(subHeroSecondary.updatedAt || subHeroSecondary.createdAt || subHeroSecondary.publishedAt)}
-                          </span>
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Footer Action */}
-                  <div className="mt-3.5 pt-3 border-t border-stone-200 dark:border-slate-800 flex items-center justify-between text-xs font-bold gap-2">
-                    <Link
-                      href={`/article/${subHeroArticle.id}`}
-                      className="min-h-[44px] inline-flex items-center text-[#0d4d4d] dark:text-emerald-400 hover:underline font-black touch-manipulation"
-                    >
-                      <span>📖 Read Full Story &rarr;</span>
-                    </Link>
-                    {subHeroArticle.mediaType === 'video' || subHeroArticle.videoUrl ? (
-                      <button
-                        onClick={() =>
-                          openVideoModal({
-                            title: subHeroArticle.title,
-                            category: subHeroArticle.category,
-                            duration: subHeroArticle.videoDuration || '02:30',
-                            quality: '1080p HD',
-                            location: 'Coimbatore, Tamil Nadu',
-                            caption: subHeroArticle.excerpt || subHeroArticle.title,
-                          })
-                        }
-                        className="min-h-[44px] inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-[#f3ede2] dark:bg-slate-800 text-[#111111] dark:text-gray-200 hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white font-black transition-colors touch-manipulation cursor-pointer"
-                      >
-                        🎥 Watch Video
-                      </button>
-                    ) : null}
-                  </div>
-                </div>
+                <SubHeroSpotlight
+                  article={{
+                    ...subHeroArticle,
+                    imageUrl: subHeroImageUrl,
+                    trendingTitle: subHeroSecondary?.title,
+                    trendingHref: subHeroSecondary ? `/article/${subHeroSecondary.id}` : undefined,
+                    trendingTime: subHeroSecondary ? formatRelativeTime(subHeroSecondary.updatedAt || subHeroSecondary.createdAt || subHeroSecondary.publishedAt) : undefined,
+                  }}
+                  onOpenVideo={openVideoModal}
+                />
               )}
             </div>
 
@@ -1612,26 +1379,36 @@ export default function HomePage() {
                   className="w-full max-w-full h-full flex flex-col justify-between group rounded-xl border border-stone-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 hover:border-stone-400 dark:hover:border-slate-700 transition-all shadow-xs box-border break-words"
                 >
                   <div>
-                    {/* Thumbnail Image & Video Badge */}
-                    <div className="relative w-full h-48 rounded-lg overflow-hidden bg-slate-900 mb-3 border border-stone-200 dark:border-slate-800">
-                      <Link href={cardTargetHref} onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })} className="block w-full h-full">
-                        <img
-                          src={card.imageUrl || DEFAULT_INFRA_IMAGE}
-                          alt={card.title}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </Link>
-                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/80 text-white text-[10px] font-black uppercase">
-                        {card.category}
-                      </span>
-                      {card.highlightStat && (
-                        <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-emerald-700 text-white text-[10px] font-black">
-                          {card.highlightStat}
+                    {/* Thumbnail Image & Video Badge - ONLY if real image exists */}
+                    {card.imageUrl && card.imageUrl.trim() !== '' ? (
+                      <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-slate-900 mb-3 border border-gray-100 dark:border-gray-800">
+                        <Link href={cardTargetHref} onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })} className="block w-full h-full">
+                          <img
+                            src={card.imageUrl}
+                            alt={card.title}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        </Link>
+                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/70 text-white text-[9px] font-bold uppercase tracking-wider backdrop-blur-xs">
+                          {card.category}
                         </span>
-                      )}
-                    </div>
+                        {card.highlightStat && (
+                          <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded bg-emerald-700 text-white text-[10px] font-black">
+                            {card.highlightStat}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      card.category && (
+                        <div className="mb-2">
+                          <span className="inline-block rounded-md bg-gray-100 dark:bg-gray-800 px-2.5 py-1 text-[10px] font-bold uppercase text-gray-700 dark:text-gray-300">
+                            {card.category}
+                          </span>
+                        </div>
+                      )
+                    )}
 
                     <div className="flex items-center justify-between text-xs text-[#444444] dark:text-gray-400 mb-1 font-bold">
                       <span className="text-[#111111] dark:text-gray-100 font-black">{card.author}</span>
@@ -1658,7 +1435,7 @@ export default function HomePage() {
                     >
                       📖 Read Full
                     </Link>
-                    {hasCardVideo ? (
+                    {hasCardVideo && (
                       <button
                         onClick={() =>
                           openVideoModal({
@@ -1674,11 +1451,6 @@ export default function HomePage() {
                       >
                         🎥 Watch Video
                       </button>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 font-extrabold text-[11px] border border-emerald-200 dark:border-emerald-800 shrink-0">
-                        <span>🎧</span>
-                        <span>{cardListenMins} Min Listen</span>
-                      </span>
                     )}
                   </div>
                 </article>
@@ -1754,25 +1526,36 @@ export default function HomePage() {
                   className="w-full max-w-full h-full flex flex-col justify-between group rounded-xl border border-stone-300 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 hover:border-stone-400 dark:hover:border-slate-700 transition-all shadow-xs box-border break-words"
                 >
                   <div>
-                    <div className="relative w-full h-48 rounded-lg overflow-hidden bg-slate-900 mb-3 border border-stone-200 dark:border-slate-800">
-                      <Link href={cardTargetHref} onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })} className="block w-full h-full">
-                        <img
-                          src={card.imageUrl || DEFAULT_BUSINESS_IMAGE}
-                          alt={card.title}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </Link>
-                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/80 text-white text-[10px] font-black uppercase">
-                        {card.category}
-                      </span>
-                      {card.highlightStat && (
-                        <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-emerald-700 text-white text-[10px] font-black">
-                          {card.highlightStat}
+                    {/* Thumbnail Image & Video Badge - ONLY if real image exists */}
+                    {card.imageUrl && card.imageUrl.trim() !== '' ? (
+                      <div className="relative w-full aspect-[16/9] rounded-xl overflow-hidden bg-slate-900 mb-3 border border-gray-100 dark:border-gray-800">
+                        <Link href={cardTargetHref} onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })} className="block w-full h-full">
+                          <img
+                            src={card.imageUrl}
+                            alt={card.title}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        </Link>
+                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/70 text-white text-[9px] font-bold uppercase tracking-wider backdrop-blur-xs">
+                          {card.category}
                         </span>
-                      )}
-                    </div>
+                        {card.highlightStat && (
+                          <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-emerald-700 text-white text-[10px] font-black">
+                            {card.highlightStat}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      card.category && (
+                        <div className="mb-2">
+                          <span className="inline-block rounded-md bg-gray-100 dark:bg-gray-800 px-2.5 py-1 text-[10px] font-bold uppercase text-gray-700 dark:text-gray-300">
+                            {card.category}
+                          </span>
+                        </div>
+                      )
+                    )}
 
                     <div className="flex items-center justify-between text-xs mb-1 font-bold text-[#444444] dark:text-gray-400">
                       <span className="text-[#111111] dark:text-gray-100 font-black">{card.author}</span>
@@ -1798,7 +1581,7 @@ export default function HomePage() {
                     >
                       📖 Read Full
                     </Link>
-                    {hasCardVideo ? (
+                    {hasCardVideo && (
                       <button
                         onClick={() =>
                           openVideoModal({
@@ -1814,11 +1597,6 @@ export default function HomePage() {
                       >
                         🎥 Watch Video
                       </button>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 font-extrabold text-[11px] border border-emerald-200 dark:border-emerald-800 shrink-0">
-                        <span>🎧</span>
-                        <span>{cardListenMins} Min Listen</span>
-                      </span>
                     )}
                   </div>
                 </article>
@@ -1884,20 +1662,28 @@ export default function HomePage() {
                 >
                   <div>
                     {/* Profile Avatar / Video Thumbnail */}
-                    <div className="relative w-full h-48 rounded-xl overflow-hidden border border-stone-300 dark:border-slate-700 bg-slate-900 mb-3">
-                      <Link href={profileTargetHref} onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })} className="block w-full h-full">
-                        <img
-                          src={profile.imageUrl || DEFAULT_CEO_IMAGE}
-                          alt={profile.name}
-                          loading="lazy"
-                          decoding="async"
-                          className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
-                        />
-                      </Link>
-                      <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/80 text-red-400 text-[10px] font-black uppercase tracking-wider">
-                        {profile.timeAgo}
-                      </span>
-                    </div>
+                    {profile.imageUrl && profile.imageUrl.trim() !== '' ? (
+                      <div className="relative w-full h-48 rounded-xl overflow-hidden border border-stone-300 dark:border-slate-700 bg-slate-900 mb-3">
+                        <Link href={profileTargetHref} onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })} className="block w-full h-full">
+                          <img
+                            src={profile.imageUrl}
+                            alt={profile.name}
+                            loading="lazy"
+                            decoding="async"
+                            className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                          />
+                        </Link>
+                        <span className="absolute top-2 left-2 px-2 py-0.5 rounded bg-black/80 text-red-400 text-[10px] font-black uppercase tracking-wider">
+                          {profile.timeAgo}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="mb-3">
+                        <span className="inline-block rounded-md bg-stone-100 dark:bg-slate-800 px-2.5 py-1 text-[10px] font-bold uppercase text-stone-700 dark:text-stone-300">
+                          {profile.timeAgo || 'CEO Spotlight'}
+                        </span>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between text-xs mb-1">
                       <span className="font-black text-[#0d4d4d] dark:text-emerald-400 text-xs sm:text-sm">{profile.name}</span>
@@ -2017,10 +1803,7 @@ export default function HomePage() {
         </div>
       )}
 
-      {/* -------------------------------------------------------------------- */}
-      {/* 6. MOBILE-ONLY FLOATING BOTTOM BANNER AD                             */}
-      {/* -------------------------------------------------------------------- */}
-      <MobileBottomBanner />
+
 
       {/* Hero Story Universal Share Modal */}
       <ShareModal

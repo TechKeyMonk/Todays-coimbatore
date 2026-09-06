@@ -9,7 +9,6 @@ import AiSummary from '@/components/AiSummary';
 import VideoPlayer from '@/components/VideoPlayer';
 import NewsCard from '@/components/NewsCard';
 import NativeAdBanner from '@/components/ads/NativeAdBanner';
-import MobileBottomBanner from '@/components/MobileBottomBanner';
 import ShareModal from '@/components/ShareModal';
 import UniversalSideLayout from '@/components/UniversalSideLayout';
 import dbService, { Article, AdSlotRecord, INITIAL_ADS_DB } from '@/services/db';
@@ -193,29 +192,29 @@ export default function NewsArticleClient({ slug }: NewsArticleClientProps) {
   const articleImageUrl = (article?.imageUrl && article.imageUrl.trim() !== '') ? article.imageUrl.trim() : undefined;
 
   return (
-    <div className="w-full bg-[#fcfbf7] dark:bg-slate-950 text-[#111111] dark:text-gray-100 font-sans antialiased selection:bg-red-600 selection:text-white transition-colors duration-200 pb-20 md:pb-0">
-      <UniversalSideLayout pageType="article" className="mt-0 pt-0">
-        {/* Breadcrumbs */}
-        <nav className="flex items-center gap-2 text-xs font-bold text-stone-500 dark:text-gray-400 mb-2 uppercase tracking-wider">
-          <Link href="/" className="hover:text-red-600 transition-colors">
-            Home
-          </Link>
-          <span>/</span>
-          <Link href="/news" className="hover:text-red-600 transition-colors">
-            News
-          </Link>
-          <span>/</span>
-          <span className="text-red-600 truncate max-w-[200px]">{article?.category || 'Article'}</span>
-        </nav>
-
+    <div className="w-full min-w-0 text-[#111111] dark:text-gray-100 font-sans antialiased selection:bg-red-600 selection:text-white transition-colors duration-200">
+      <UniversalSideLayout pageType="article" className="mt-0 pt-0 w-full min-w-0">
         {isLoading ? (
-          <div className="py-20 text-center text-stone-400 text-sm font-bold animate-pulse">
+          <div className="w-full flex-1 min-w-0 bg-white dark:bg-gray-900 rounded-2xl p-10 border border-gray-100 dark:border-gray-800 shadow-sm py-20 text-center text-stone-400 text-sm font-bold animate-pulse">
             Loading verified news article...
           </div>
         ) : article ? (
-          <article className="space-y-6 max-w-3xl">
+          <main className="flex-1 w-full min-w-0 bg-white dark:bg-gray-900 rounded-2xl p-5 sm:p-7 border border-gray-100 dark:border-gray-800 shadow-sm flex flex-col justify-between space-y-6">
+            {/* Breadcrumbs */}
+            <nav className="w-full flex items-center gap-2 text-xs font-bold text-stone-500 dark:text-gray-400 uppercase tracking-wider">
+              <Link href="/" className="hover:text-red-600 transition-colors">
+                Home
+              </Link>
+              <span>/</span>
+              <Link href="/news" className="hover:text-red-600 transition-colors">
+                News
+              </Link>
+              <span>/</span>
+              <span className="text-red-600 truncate max-w-[200px]">{article?.category || 'Article'}</span>
+            </nav>
+
             {/* Category & Date Header */}
-            <div className="space-y-2">
+            <div className="w-full space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="bg-red-600 text-white text-[11px] font-black uppercase px-2.5 py-0.5 rounded-md shadow-xs">
                   {article.category || 'COVAI NEWS'}
@@ -229,13 +228,13 @@ export default function NewsArticleClient({ slug }: NewsArticleClientProps) {
                 </span>
               </div>
 
-              <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-stone-900 dark:text-white leading-tight">
+              <h1 className="w-full text-2xl sm:text-3xl md:text-4xl font-black text-stone-900 dark:text-white leading-tight break-words">
                 {article.title}
               </h1>
             </div>
 
             {/* Audio Voice Reader & AI Summarizer */}
-            <div className="space-y-3 p-4 rounded-2xl bg-stone-100/80 dark:bg-slate-900 border border-stone-200 dark:border-slate-800">
+            <div className="w-full space-y-3 p-4 rounded-2xl bg-stone-100/80 dark:bg-slate-900 border border-stone-200 dark:border-slate-800">
               <AudioReader
                 title={article.title}
                 textToRead={fullArticleAudioText}
@@ -260,7 +259,7 @@ export default function NewsArticleClient({ slug }: NewsArticleClientProps) {
             ) : null}
 
             {/* Article Body Content */}
-            <div className="prose dark:prose-invert max-w-none text-stone-800 dark:text-gray-200 text-sm sm:text-base leading-relaxed space-y-4 font-normal">
+            <div className="w-full prose dark:prose-invert max-w-none text-stone-800 dark:text-gray-200 text-sm sm:text-base leading-relaxed space-y-4 font-normal break-words">
               {(article.content || '').split('\n\n').map((para, i) => (
                 <p key={i} className="leading-relaxed">
                   {para}
@@ -269,7 +268,7 @@ export default function NewsArticleClient({ slug }: NewsArticleClientProps) {
             </div>
 
             {/* Social Share Bar */}
-            <div className="pt-6 border-t border-stone-200 dark:border-slate-800 flex items-center justify-between">
+            <div className="w-full pt-6 border-t border-stone-200 dark:border-slate-800 flex items-center justify-between">
               <span className="text-xs font-bold text-stone-500 uppercase tracking-wider">
                 Share this verified Kovai story:
               </span>
@@ -284,25 +283,35 @@ export default function NewsArticleClient({ slug }: NewsArticleClientProps) {
 
             {/* Related News Cards */}
             {relatedArticles.length > 0 && (
-              <div className="pt-8 space-y-4 border-t border-stone-200 dark:border-slate-800">
+              <div className="w-full min-w-0 pt-8 space-y-4 border-t border-stone-200 dark:border-slate-800">
                 <h3 className="text-base sm:text-lg font-black text-stone-900 dark:text-white uppercase tracking-wide">
                   More Stories from Coimbatore
                 </h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="w-full grid grid-cols-1 sm:grid-cols-3 gap-4">
                   {relatedArticles.map((rel) => (
                     <Link
                       key={rel.id}
                       href={rel.slug ? `/news/${rel.slug}` : `/article/${rel.id}`}
-                      className="group bg-white dark:bg-slate-900 rounded-xl border border-stone-200 dark:border-slate-800 p-3 hover:shadow-md transition-all flex flex-col justify-between"
+                      className="group bg-white dark:bg-slate-900 rounded-xl border border-stone-200 dark:border-slate-800 p-3 hover:shadow-md transition-all flex flex-col justify-between min-w-0"
                     >
-                      <div className="space-y-2">
-                        <div className="h-28 rounded-lg overflow-hidden bg-stone-900">
-                          <img
-                            src={rel.imageUrl || articleImageUrl || 'https://images.unsplash.com/photo-1582510003544-4d00b7f74220?auto=format&fit=crop&w=600&q=80'}
-                            alt={rel.title}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                          />
-                        </div>
+                      <div className="space-y-2 min-w-0">
+                        {rel.imageUrl && rel.imageUrl.trim() !== '' ? (
+                          <div className="h-28 rounded-lg overflow-hidden bg-stone-900">
+                            <img
+                              src={rel.imageUrl}
+                              alt={rel.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            />
+                          </div>
+                        ) : (
+                          rel.category && (
+                            <div className="mb-1">
+                              <span className="inline-block rounded-md bg-stone-100 dark:bg-slate-800 px-2 py-0.5 text-[9px] font-bold uppercase text-stone-700 dark:text-stone-300">
+                                {rel.category}
+                              </span>
+                            </div>
+                          )
+                        )}
                         <h4 className="text-xs font-black text-stone-900 dark:text-white group-hover:text-red-600 transition-colors line-clamp-2">
                           {rel.title}
                         </h4>
@@ -315,9 +324,9 @@ export default function NewsArticleClient({ slug }: NewsArticleClientProps) {
                 </div>
               </div>
             )}
-          </article>
+          </main>
         ) : (
-          <div className="py-20 text-center space-y-3">
+          <div className="w-full flex-1 min-w-0 bg-white dark:bg-gray-900 rounded-2xl p-10 border border-gray-100 dark:border-gray-800 shadow-sm py-20 text-center space-y-3">
             <h2 className="text-xl font-bold text-stone-800 dark:text-gray-200">Article not found</h2>
             <p className="text-xs text-stone-500">The requested story could not be found or has been moved.</p>
             <Link
@@ -336,8 +345,6 @@ export default function NewsArticleClient({ slug }: NewsArticleClientProps) {
         title={article?.title || "Today's Coimbatore News"}
         url={currentUrl}
       />
-
-      <MobileBottomBanner />
     </div>
   );
 }

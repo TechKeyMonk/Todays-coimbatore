@@ -3,6 +3,7 @@ import { revalidatePath } from 'next/cache';
 import * as nodeCrypto from 'crypto';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { sendEventSubmissionAlert } from '@/lib/email';
+import { getCategoryConfig, isArticleInCategory, sanitizeCategorySlug } from '@/lib/categories';
 import {
   INITIAL_DATABASE_ARTICLES,
   INITIAL_ADS_DB,
@@ -22,6 +23,8 @@ import {
   AdSlotRecord,
   OutageRecord,
   SocialLinksRecord,
+  mapNewsRowToEvent,
+  mapDedicatedEventToEvent,
 } from '@/services/db';
 
 export const dynamic = 'force-dynamic';
@@ -62,19 +65,39 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
-function toKeywordsArray(input: any, isExclusive?: boolean): string[] | null {
+function toKeywordsArray(input: any, isExclusive?: boolean, isSpotlight?: boolean): string[] | null {
   let arr: string[] = [];
   if (Array.isArray(input)) {
     arr = input.map((k) => String(k).trim()).filter(Boolean);
   } else if (typeof input === 'string') {
     arr = input.split(',').map((k) => k.trim()).filter(Boolean);
   }
-  if (isExclusive && !arr.includes('__EXCLUSIVE__')) {
-    arr.push('__EXCLUSIVE__');
-  } else if (isExclusive === false) {
-    arr = arr.filter((k) => k !== '__EXCLUSIVE__');
+  const flag = isExclusive || isSpotlight;
+  if (flag) {
+    if (!arr.includes('__EXCLUSIVE__')) arr.push('__EXCLUSIVE__');
+    if (!arr.includes('__SPOTLIGHT__')) arr.push('__SPOTLIGHT__');
+  } else if (isExclusive === false || isSpotlight === false) {
+    arr = arr.filter((k) => k !== '__EXCLUSIVE__' && k !== '__SPOTLIGHT__');
   }
   return arr.length > 0 ? arr : null;
+}
+
+// Safely clean up removed/replaced assets from Supabase Storage bucket
+async function cleanupOldStorageImage(oldUrl?: string | null) {
+  if (!oldUrl || typeof oldUrl !== 'string') return;
+  try {
+    if (oldUrl.includes('articles-bucket')) {
+      const parts = oldUrl.split('articles-bucket/');
+      if (parts.length > 1) {
+        const filePath = decodeURIComponent(parts[1].split('?')[0]);
+        if (filePath) {
+          await supabaseAdmin.storage.from('articles-bucket').remove([filePath]);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Storage Cleanup] Non-critical error removing old article asset:', err);
+  }
 }
 
 // Map Supabase news row to Article model
@@ -85,11 +108,19 @@ function mapSupabaseNewsToArticle(row: any): Article {
   const isExclusive = !!(
     row.is_exclusive === true ||
     row.isExclusive === true ||
-    (Array.isArray(row.keywords) && row.keywords.includes('__EXCLUSIVE__')) ||
-    (typeof row.keywords === 'string' && row.keywords.includes('__EXCLUSIVE__'))
+    row.is_spotlight === true ||
+    row.isSpotlight === true ||
+    row.spotlight === 1 ||
+    row.spotlight === true ||
+    (Array.isArray(row.keywords) && (row.keywords.includes('__EXCLUSIVE__') || row.keywords.includes('__SPOTLIGHT__'))) ||
+    (typeof row.keywords === 'string' && (row.keywords.includes('__EXCLUSIVE__') || row.keywords.includes('__SPOTLIGHT__'))) ||
+    row.category?.toUpperCase() === 'BREAKING SPOTLIGHT'
   );
   const videoUrl = row.video_url || (row.media_url && String(row.media_url).includes('youtube') ? row.media_url : undefined);
   const mediaType = (row.media_type || (videoUrl ? 'video' : 'image')) as 'image' | 'video';
+
+  const rawImageUrl = (row.image_url || '').toString().trim();
+  const validImageUrl = rawImageUrl && rawImageUrl !== 'null' && rawImageUrl !== 'undefined' ? rawImageUrl : null;
 
   return {
     id: row.id,
@@ -104,13 +135,16 @@ function mapSupabaseNewsToArticle(row: any): Article {
     createdAt: row.created_at || new Date().toISOString(),
     updatedAt: row.updated_at || row.updatedAt || row.created_at || new Date().toISOString(),
     isExclusive: isExclusive,
+    isSpotlight: isExclusive,
+    is_spotlight: isExclusive,
     status: (row.status || 'published') as 'published' | 'draft' | 'archived',
     sourceUrl: row.source_url || undefined,
     source_url: row.source_url || undefined,
     mediaType: mediaType,
-    imageUrl: row.image_url || undefined,
-    image: row.image_url || undefined,
-    mediaUrl: videoUrl || row.image_url || undefined,
+    imageUrl: validImageUrl || undefined,
+    image: validImageUrl || undefined,
+    image_url: validImageUrl,
+    mediaUrl: videoUrl || validImageUrl || undefined,
     videoUrl: videoUrl,
     excerpt: row.content ? row.content.slice(0, 180).trim() + '...' : 'Coimbatore hyper-local reporting.',
     content: row.content || '',
@@ -187,6 +221,7 @@ export async function GET(request: Request) {
     // 1. Fetch Articles (News)
     if (entity === 'articles' || entity === 'news') {
       const statusParam = searchParams.get('status');
+      const categoryParam = searchParams.get('category');
       let newsQuery = supabaseAdmin.from('news').select('*').order('created_at', { ascending: false });
       if (statusParam === 'draft') {
         newsQuery = newsQuery.eq('status', 'draft');
@@ -196,6 +231,15 @@ export async function GET(request: Request) {
         newsQuery = newsQuery.or('status.eq.published,status.is.null');
       }
 
+      if (categoryParam && categoryParam.toUpperCase() !== 'ALL') {
+        const sanitized = sanitizeCategorySlug(categoryParam);
+        const categoryConfig = getCategoryConfig(sanitized);
+        newsQuery = newsQuery.in('category', categoryConfig.allowedDbCategories);
+      } else {
+        // Exclude EVENTS from general news articles fetch
+        newsQuery = newsQuery.not('category', 'ilike', '%event%');
+      }
+
       const { data, error } = await newsQuery;
 
       if (error) {
@@ -203,7 +247,14 @@ export async function GET(request: Request) {
         return NextResponse.json({ success: true, data: [] });
       }
 
-      const liveArticles = (data || []).map(mapSupabaseNewsToArticle);
+      let liveArticles = (data || []).map(mapSupabaseNewsToArticle);
+
+      if (categoryParam && categoryParam.toUpperCase() !== 'ALL') {
+        liveArticles = liveArticles.filter((art) => isArticleInCategory(art, categoryParam));
+      } else {
+        liveArticles = liveArticles.filter((art) => (art.category || '').toUpperCase().trim() !== 'EVENTS');
+      }
+
       return NextResponse.json({ success: true, data: liveArticles });
     }
 
@@ -269,33 +320,36 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: mappedDonors });
     }
 
-    // 4. Fetch Events
+    // 4. Fetch Events (Merge from news table where category ILIKE %event% and dedicated events table)
     if (entity === 'events') {
-      const { data, error } = await supabaseAdmin
-        .from('events')
-        .select('*')
-        .order('event_date', { ascending: true });
+      try {
+        const [newsRes, eventsRes] = await Promise.all([
+          supabaseAdmin
+            .from('news')
+            .select('*')
+            .ilike('category', '%event%')
+            .order('created_at', { ascending: false }),
+          supabaseAdmin
+            .from('events')
+            .select('*')
+            .order('event_date', { ascending: true }),
+        ]);
 
-      if (error) {
-        console.error('Supabase fetch events error:', error);
+        const mappedNews = (newsRes.data || []).map(mapNewsRowToEvent);
+        const mappedDedicated = (eventsRes.data || []).map(mapDedicatedEventToEvent);
+
+        const mergedEvents = [...mappedNews];
+        for (const d of mappedDedicated) {
+          if (!mergedEvents.some((m) => m.id === d.id || m.title.toLowerCase() === d.title.toLowerCase())) {
+            mergedEvents.push(d);
+          }
+        }
+
+        return NextResponse.json({ success: true, data: mergedEvents });
+      } catch (err: any) {
+        console.error('Supabase fetch events error:', err);
         return NextResponse.json({ success: true, data: [] });
       }
-
-      const mappedEvents: EventRecord[] = (data || []).map((e: any) => ({
-        id: e.id,
-        title: e.event_name || 'Coimbatore Event',
-        date: e.event_date || new Date().toISOString().split('T')[0],
-        time: '10:00 AM - 06:00 PM',
-        venue: e.location || 'Coimbatore',
-        category: 'Expo & Business',
-        description: e.description || '',
-        posterUrl: e.image_url || 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80',
-        featured: true,
-        organizer: 'Coimbatore Event Network',
-        status: 'upcoming',
-      }));
-
-      return NextResponse.json({ success: true, data: mappedEvents });
     }
 
     // 5. Fetch Enquiries
@@ -348,7 +402,11 @@ export async function GET(request: Request) {
     }
 
     const statusParam = searchParams.get('status');
-    let universalNewsQuery = supabaseAdmin.from('news').select('*').order('created_at', { ascending: false });
+    let universalNewsQuery = supabaseAdmin
+      .from('news')
+      .select('*')
+      .not('category', 'ilike', '%event%')
+      .order('created_at', { ascending: false });
     if (statusParam === 'draft') {
       universalNewsQuery = universalNewsQuery.eq('status', 'draft');
     } else if (statusParam !== 'all') {
@@ -386,7 +444,9 @@ export async function GET(request: Request) {
     ]);
 
     // Map and assemble final combined bundle directly from live database
-    const articles = (newsRes.data || []).map(mapSupabaseNewsToArticle);
+    const articles = (newsRes.data || [])
+      .map(mapSupabaseNewsToArticle)
+      .filter((art) => (art.category || '').toUpperCase().trim() !== 'EVENTS');
 
     const listings: DirectoryListing[] = (listingsRes.data || []).map((l: any) => ({
       id: l.id,
@@ -420,19 +480,20 @@ export async function GET(request: Request) {
       registeredDate: 'Recently',
     }));
 
-    const events: EventRecord[] = (eventsRes.data || []).map((e: any) => ({
-      id: e.id,
-      title: e.event_name || 'Coimbatore Event',
-      date: e.event_date || new Date().toISOString().split('T')[0],
-      time: '10:00 AM - 06:00 PM',
-      venue: e.location || 'Coimbatore',
-      category: 'Expo & Business',
-      description: e.description || '',
-      posterUrl: e.image_url || 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80',
-      featured: true,
-      organizer: 'Coimbatore Event Network',
-      status: 'upcoming',
-    }));
+    const dedicatedEvents: EventRecord[] = (eventsRes.data || []).map(mapDedicatedEventToEvent);
+    const newsEventArticles = (newsRes.data || []).filter(
+      (a: any) =>
+        (a.category && a.category.toUpperCase().includes('EVENT')) ||
+        (a.slug && a.slug.includes('event'))
+    );
+    const mappedNewsEvents = newsEventArticles.map(mapNewsRowToEvent);
+
+    const events: EventRecord[] = [...mappedNewsEvents];
+    for (const d of dedicatedEvents) {
+      if (!events.some((e) => e.id === d.id || e.title.toLowerCase() === d.title.toLowerCase())) {
+        events.push(d);
+      }
+    }
 
     const resultData = {
       articles,
@@ -487,19 +548,28 @@ export async function POST(request: Request) {
     if (action === 'create_article') {
       const title = (data?.title || 'Untitled Story').trim();
       const rawSlug = data?.slug || slugify(title) || `story-${Date.now()}`;
-      const slug = rawSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
-      const content = data?.content || data?.excerpt || '';
-      const category = data?.category || 'NEWS';
+      const baseSlug = rawSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '').slice(0, 90).replace(/-+$/, '');
+      const slug = baseSlug || `story-${Date.now()}`;
+      const content = (data?.content || data?.excerpt || title).trim();
+      const rawCategory = (data?.category || 'NEWS').trim();
+      if (rawCategory.toUpperCase() === 'EVENTS') {
+        return NextResponse.json(
+          { error: 'Category "EVENTS" cannot be assigned to general news stories. Please use the Events CMS.' },
+          { status: 400 }
+        );
+      }
+      const category = rawCategory;
       const author = data?.author || 'Editorial Bureau';
-      const imageUrl = data?.imageUrl || data?.image || data?.mediaUrl || null;
-      const seoTitle = data?.seoTitle || title;
-      const metaDescription = data?.metaDescription || data?.excerpt || content.slice(0, 160);
-      const keywords = toKeywordsArray(data?.keywords, data?.isExclusive);
+      const rawImg = (data?.imageUrl || data?.image || data?.image_url || data?.mediaUrl || '').toString().trim();
+      const imageUrl = rawImg && rawImg !== 'null' && rawImg !== 'undefined' ? rawImg : null;
+      const seoTitle = (data?.seoTitle || title).slice(0, 200);
+      const metaDescription = (data?.metaDescription || data?.excerpt || content || title).slice(0, 160);
+      const keywords = toKeywordsArray(data?.keywords, data?.isExclusive, data?.isSpotlight || data?.is_spotlight);
       const ogImageUrl = data?.ogImageUrl || imageUrl;
       const validUuid = toUuid(data?.id || slug);
 
       // Upsert into Supabase `news` table
-      const { data: inserted, error } = await supabaseAdmin
+      let { data: inserted, error } = await supabaseAdmin
         .from('news')
         .upsert(
           [
@@ -515,6 +585,7 @@ export async function POST(request: Request) {
               meta_description: metaDescription,
               keywords,
               og_image_url: ogImageUrl,
+              status: data?.status || 'published',
               created_at: data?.createdAt || new Date().toISOString(),
             },
           ],
@@ -522,6 +593,35 @@ export async function POST(request: Request) {
         )
         .select()
         .single();
+
+      if (error && (error.message?.includes('duplicate key') || error.code === '23505')) {
+        const uniqueSlug = `${slug.slice(0, 75)}-${Date.now()}`;
+        const fallbackRes = await supabaseAdmin
+          .from('news')
+          .insert([
+            {
+              id: validUuid,
+              title,
+              slug: uniqueSlug,
+              category,
+              content,
+              image_url: imageUrl,
+              author,
+              seo_title: seoTitle,
+              meta_description: metaDescription,
+              keywords,
+              og_image_url: ogImageUrl,
+              status: data?.status || 'published',
+              created_at: data?.createdAt || new Date().toISOString(),
+            },
+          ])
+          .select()
+          .single();
+        if (!fallbackRes.error) {
+          inserted = fallbackRes.data;
+          error = null;
+        }
+      }
 
       if (error) {
         console.error('Error inserting article in Supabase:', error);
@@ -588,17 +688,27 @@ export async function POST(request: Request) {
       if (data.status !== undefined) updatePayload.status = data.status;
       if (data.title !== undefined) updatePayload.title = data.title;
       if (data.slug !== undefined) updatePayload.slug = slugify(data.slug);
-      if (data.category !== undefined) updatePayload.category = data.category;
+      if (data.category !== undefined) {
+        const catUpper = String(data.category).trim().toUpperCase();
+        if (catUpper === 'EVENTS') {
+          return NextResponse.json(
+            { error: 'Category "EVENTS" cannot be assigned to general news stories.' },
+            { status: 400 }
+          );
+        }
+        updatePayload.category = data.category;
+      }
       if (data.content !== undefined) updatePayload.content = data.content;
       if (data.author !== undefined) updatePayload.author = data.author;
-      if (data.imageUrl !== undefined || data.image !== undefined || data.mediaUrl !== undefined) {
-        updatePayload.image_url = data.imageUrl || data.image || data.mediaUrl || null;
+      if (data.imageUrl !== undefined || data.image !== undefined || data.image_url !== undefined || data.mediaUrl !== undefined) {
+        const rawImg = (data.imageUrl ?? data.image ?? data.image_url ?? data.mediaUrl ?? '').toString().trim();
+        updatePayload.image_url = rawImg && rawImg !== 'null' && rawImg !== 'undefined' ? rawImg : null;
       }
       if (data.seoTitle !== undefined) updatePayload.seo_title = data.seoTitle;
       if (data.metaDescription !== undefined) updatePayload.meta_description = data.metaDescription;
 
-      if (data.isExclusive !== undefined || data.keywords !== undefined) {
-        updatePayload.keywords = toKeywordsArray(data.keywords, data.isExclusive);
+      if (data.isExclusive !== undefined || data.isSpotlight !== undefined || data.is_spotlight !== undefined || data.keywords !== undefined) {
+        updatePayload.keywords = toKeywordsArray(data.keywords, data.isExclusive, data.isSpotlight || data.is_spotlight);
       }
 
       if (data.ogImageUrl !== undefined) updatePayload.og_image_url = data.ogImageUrl;
@@ -607,6 +717,22 @@ export async function POST(request: Request) {
       updatePayload.created_at = nowIso;
 
       const validUuid = toUuid(articleId);
+
+      // Safe check for existing image to trigger asset cleanup if removed
+      let oldImageUrl: string | null = null;
+      try {
+        const { data: existingRow } = await supabaseAdmin
+          .from('news')
+          .select('image_url')
+          .or(`id.eq.${validUuid},slug.eq.${articleId}`)
+          .maybeSingle();
+        if (existingRow?.image_url) {
+          oldImageUrl = existingRow.image_url;
+        }
+      } catch (e) {
+        console.warn('Could not fetch existing article image_url:', e);
+      }
+
       const { data: updated, error } = await supabaseAdmin
         .from('news')
         .update(updatePayload)
@@ -618,6 +744,10 @@ export async function POST(request: Request) {
         console.error('Error updating article in Supabase:', error);
       }
 
+      if (oldImageUrl && updatePayload.image_url === null && oldImageUrl !== updatePayload.image_url) {
+        await cleanupOldStorageImage(oldImageUrl);
+      }
+
       if (!updated) {
         // Upsert fallback to ensure story is permanently in Supabase
         const upsertRecord = {
@@ -627,7 +757,7 @@ export async function POST(request: Request) {
           category: data.category || 'NEWS',
           content: data.content || data.excerpt || '',
           author: data.author || 'Editorial Bureau',
-          image_url: data.imageUrl || data.image || data.mediaUrl || null,
+          image_url: updatePayload.image_url !== undefined ? updatePayload.image_url : (data.imageUrl || data.image || data.image_url || data.mediaUrl || null),
           keywords: toKeywordsArray(data.keywords, data.isExclusive),
           created_at: data.createdAt || new Date().toISOString(),
         };
@@ -710,18 +840,52 @@ export async function POST(request: Request) {
     // =========================================================================
     if (action === 'create_listing') {
       const validUuid = toUuid(data?.id || data?.title || data?.name);
+      const catName = (data?.category || 'General').trim();
+      const catSlug = slugify(data?.categorySlug || catName);
+
+      // Auto-insert custom category if not already in categories table
+      if (catName) {
+        try {
+          const { data: existingCat } = await supabaseAdmin
+            .from('categories')
+            .select('id, name, slug')
+            .or(`slug.ilike.${catSlug},name.ilike.${catName}`)
+            .limit(1);
+
+          if (!existingCat || existingCat.length === 0) {
+            await supabaseAdmin.from('categories').insert([{
+              id: toUuid(catSlug),
+              name: catName,
+              slug: catSlug,
+              icon: data.icon || '🏢',
+            }]);
+          }
+        } catch (catErr) {
+          console.warn('[content create_listing] Category auto-insert warning:', catErr);
+        }
+      }
+
+      let imagesList: string[] = [];
+      if (Array.isArray(data?.images)) {
+        imagesList = data.images.filter((u: any) => typeof u === 'string' && /^https?:\/\//i.test(u.trim())).slice(0, 5);
+      } else if (data?.imageUrl || data?.image_url || data?.photo_url || data?.photo) {
+        const single = data.imageUrl || data.image_url || data.photo_url || data.photo;
+        if (typeof single === 'string' && /^https?:\/\//i.test(single.trim())) imagesList = [single.trim()];
+      }
+
       const { data: inserted, error } = await supabaseAdmin
         .from('listings')
         .upsert([
           {
             id: validUuid,
             title: data.name || data.title,
-            category: data.category || 'General',
+            category: catName,
             phone: data.phone || null,
             address: data.address || null,
             area: data.area || 'Coimbatore',
             pincode: data.pincode || null,
             rating: typeof data.rating === 'number' ? data.rating : 4.5,
+            images: imagesList,
           },
         ], { onConflict: 'id' })
         .select()
@@ -745,6 +909,16 @@ export async function POST(request: Request) {
       if (data.area !== undefined) updatePayload.area = data.area;
       if (data.pincode !== undefined) updatePayload.pincode = data.pincode;
       if (data.rating !== undefined) updatePayload.rating = data.rating;
+      if (data.images !== undefined) {
+        updatePayload.images = Array.isArray(data.images)
+          ? data.images.filter((u: any) => typeof u === 'string' && /^https?:\/\//i.test(u.trim())).slice(0, 5)
+          : [];
+      } else if (data.imageUrl !== undefined || data.image_url !== undefined) {
+        const single = data.imageUrl || data.image_url;
+        if (typeof single === 'string' && /^https?:\/\//i.test(single.trim())) {
+          updatePayload.images = [single.trim()];
+        }
+      }
 
       const { data: updated, error } = await supabaseAdmin
         .from('listings')
@@ -1108,6 +1282,11 @@ export async function DELETE(request: Request) {
 
     // For enquiries, guard against accidentally deleting system config rows
     if (table === 'enquiries') {
+      if (!isUuid) {
+        // Non-UUID IDs are local/mock IDs (e.g. enq-1); nothing to delete in Supabase
+        return NextResponse.json({ success: true, message: 'Enquiry cleared' });
+      }
+
       const { data: targetRow } = await supabaseAdmin
         .from('enquiries')
         .select('id, user_name')

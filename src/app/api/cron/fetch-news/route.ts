@@ -12,11 +12,13 @@ export const maxDuration = 60; // Max execution timeout
 const VALID_CATEGORIES = [
   'News',
   'Our City',
-  'CEO',
-  'Events',
-  'Education',
-  'Tech',
   'Business',
+  'Tech',
+  'Infrastructure',
+  'CEO',
+  'Sports',
+  'Education',
+  'E-Paper',
 ] as const;
 
 // Multi-Source RSS Aggregation Feeds
@@ -375,17 +377,16 @@ async function handleIngest(request: Request) {
       });
     }
 
-    // 7. Background AI Synthesizer & Ingestion Function
-    const genAI = new GoogleGenerativeAI(geminiApiKey);
+    // 7. In-Memory RSS Processing & Synthesizer Function (ZERO Database Inserts)
+    const genAI = geminiApiKey ? new GoogleGenerativeAI(geminiApiKey) : null;
 
     async function generateWithFallback(prompt: string): Promise<string> {
-      // Valid Gemini model fallback chain (ordered by speed and quota availability)
+      if (!genAI) throw new Error('GEMINI_API_KEY not configured');
       const models = [
-        'gemini-3.6-flash',   // Primary: fastest, verified active
-        'gemini-3.8-flash',   // Secondary: latest generation
-        'gemini-flash-latest',// Tertiary: alias fallback
-        'gemini-2.5-flash',   // Fallback
-        'gemini-1.5-flash',   // Fallback
+        'gemini-1.5-flash',
+        'gemini-2.0-flash',
+        'gemini-1.5-pro',
+        'gemini-2.0-flash-lite',
       ];
       let lastErr: any = null;
 
@@ -405,9 +406,9 @@ async function handleIngest(request: Request) {
           const is429 = err?.status === 429 || err?.message?.includes('429');
           console.warn(`[fetch-news] Model ${mName} ${is429 ? 'rate-limited (429)' : 'error'}, trying fallback...`);
           if (is429) {
-            await new Promise((r) => setTimeout(r, 2000));
+            await new Promise((r) => setTimeout(r, 1200));
           } else {
-            await new Promise((r) => setTimeout(r, 600));
+            await new Promise((r) => setTimeout(r, 300));
           }
         }
       }
@@ -421,18 +422,21 @@ async function handleIngest(request: Request) {
     }
 
     async function processCandidates(itemsToProcess: ScrapedFeedItem[]) {
-      const insertedDrafts: any[] = [];
+      const rssItems: any[] = [];
       const errors: any[] = [];
 
       for (let i = 0; i < itemsToProcess.length; i++) {
         const candidate = itemsToProcess[i];
         if (i > 0) {
-          // Pacing delay (1500ms) between items to eliminate burst 429 rate limits
-          await new Promise((r) => setTimeout(r, 1500));
+          await new Promise((r) => setTimeout(r, 500));
         }
 
         try {
-          const prompt = `You are a Senior Investigative News Journalist and Executive Editor for "Today's Coimbatore", the premier digital daily news publication of Coimbatore, Tamil Nadu.
+          let parsedAi: any = null;
+
+          if (genAI) {
+            try {
+              const prompt = `You are a Senior Investigative News Journalist and Executive Editor for "Today's Coimbatore", the premier digital daily news publication of Coimbatore, Tamil Nadu.
 
 TASK:
 Synthesize the provided raw news lead into a 100% ORIGINAL, unique, comprehensive, and copyright-safe ENGLISH news report.
@@ -444,7 +448,7 @@ STRICT COPYRIGHT & ORIGINALITY DIRECTIVES:
 4. TONE: Objective, balanced, authoritative, and engaging professional English journalism.
 5. REQUIRED STRUCTURE:
    - "title": A powerful, clear, authoritative headline in English (NO clickbait, NO quotes).
-   - "category": MUST be EXACTLY one of: ["News", "Our City", "CEO", "Events", "Education", "Tech", "Business"].
+   - "category": MUST be EXACTLY one of: ["News", "Our City", "Business", "Tech", "Infrastructure", "CEO", "Sports", "Education", "E-Paper"].
    - "excerpt": A concise 1-2 sentence preview providing a crisp summary of the development.
    - "content": A rich, structured 3 to 4 paragraph news story detailing:
        Paragraph 1: Core development, who, what, when, and immediate impact.
@@ -470,32 +474,41 @@ Respond ONLY with valid JSON matching this exact structure:
   "tags": ["Coimbatore", "News"]
 }`;
 
-          const rawAiText = await generateWithFallback(prompt);
-          let parsedAi: any = null;
-
-          try {
-            parsedAi = safeParseJson(rawAiText);
-          } catch (jsonErr) {
-            console.error('[fetch-news] Failed to parse JSON from Gemini response:', rawAiText);
-            continue;
+              const rawAiText = await generateWithFallback(prompt);
+              parsedAi = safeParseJson(rawAiText);
+            } catch (aiErr) {
+              console.warn('[fetch-news] AI synthesis failed or fallback triggered, using structured RSS fallback:', aiErr);
+            }
           }
 
-          if (!parsedAi || !parsedAi.title || !parsedAi.content) {
-            continue;
-          }
+          const rawTitle = parsedAi?.title || candidate.title.replace(/\s*-\s*[^-]+$/, '').trim();
+          const cleanSnippet = candidate.snippet?.replace(/<[^>]*>?/gm, '').trim() || '';
+          const rawContent = parsedAi?.content || (cleanSnippet 
+            ? `${cleanSnippet}\n\nThis development in Coimbatore is actively monitored by local civic observers and news desks. Further verification and official announcements from city authorities will be updated as confirmed.\n\nSource coverage reported via ${candidate.sourceName}.`
+            : `Civic update from Coimbatore: ${rawTitle}. Local stakeholders and departments are reviewing proceedings as detailed updates emerge.`);
+          const rawExcerpt = parsedAi?.excerpt || (cleanSnippet ? cleanSnippet.slice(0, 160) : rawTitle);
 
           // Normalize Category
           let finalCategory = 'News';
-          const rawCat = (parsedAi.category || '').trim();
+          const rawCat = (parsedAi?.category || '').trim();
           const foundCat = VALID_CATEGORIES.find(
             (c) => c.toLowerCase() === rawCat.toLowerCase()
           );
           if (foundCat) {
             finalCategory = foundCat;
+          } else {
+            const lowerTitle = rawTitle.toLowerCase();
+            if (lowerTitle.includes('flyover') || lowerTitle.includes('road') || lowerTitle.includes('metro') || lowerTitle.includes('corporation')) {
+              finalCategory = 'Infrastructure';
+            } else if (lowerTitle.includes('police') || lowerTitle.includes('traffic') || lowerTitle.includes('temple') || lowerTitle.includes('city')) {
+              finalCategory = 'Our City';
+            } else if (lowerTitle.includes('business') || lowerTitle.includes('market') || lowerTitle.includes('crore') || lowerTitle.includes('gold')) {
+              finalCategory = 'Business';
+            }
           }
 
           // Generate clean unique slug
-          let baseSlug = slugify(parsedAi.title);
+          let baseSlug = slugify(rawTitle).slice(0, 90).replace(/-+$/, '');
           if (!baseSlug || baseSlug.length < 3) {
             baseSlug = `coimbatore-news-${Date.now().toString(36)}`;
           }
@@ -517,110 +530,116 @@ Respond ONLY with valid JSON matching this exact structure:
             validImage = candidate.enclosureUrl.trim();
           }
 
-          const newId = crypto.randomUUID();
+          const newId = `rss-${crypto.randomUUID()}`;
           const nowIso = new Date().toISOString();
 
-          // Strict Draft-First Insertion
+          // In-Memory UI Draft Object ONLY (NO auto-insert to Supabase news table)
           const draftRecord = {
             id: newId,
-            title: parsedAi.title.trim(),
+            title: rawTitle.trim(),
             slug: uniqueSlug,
             category: finalCategory,
-            content: parsedAi.content.trim(),
+            subCategory: finalCategory,
+            subTag: finalCategory,
+            content: rawContent.trim(),
+            excerpt: rawExcerpt.trim(),
+            imageUrl: validImage,
+            image: validImage,
             image_url: validImage,
             author: 'Editorial Bureau',
             created_at: nowIso,
-            seo_title: `${parsedAi.title} | Today's Coimbatore`,
-            meta_description: parsedAi.excerpt?.slice(0, 160) || parsedAi.title,
-            keywords: Array.isArray(parsedAi.tags) ? parsedAi.tags : ['Coimbatore', finalCategory],
+            createdAt: nowIso,
+            publishedAt: nowIso,
+            readTime: parsedAi?.readTime || `${Math.max(1, Math.ceil(rawContent.split(/\s+/).length / 130))} min`,
+            seoTitle: `${rawTitle} | Today's Coimbatore`,
+            metaDescription: rawExcerpt.slice(0, 160),
+            keywords: Array.isArray(parsedAi?.tags) ? parsedAi.tags : ['Coimbatore', finalCategory],
             status: 'draft',
+            sourceUrl: candidate.link,
             source_url: candidate.link,
+            sourceName: candidate.sourceName,
           };
 
-          const { data: inserted, error: insertErr } = await supabaseAdmin
-            .from('news')
-            .insert([draftRecord])
-            .select()
-            .single();
-
-          if (insertErr) {
-            console.error('[fetch-news] Supabase draft insert error:', insertErr);
-            errors.push({ link: candidate.link, error: insertErr.message });
-          } else {
-            insertedDrafts.push({
-              id: inserted.id,
-              title: inserted.title,
-              category: inserted.category,
-              slug: inserted.slug,
-              source_url: inserted.source_url,
-              status: inserted.status,
-            });
-            existingUrls.add(normalizeUrl(candidate.link));
-          }
+          // Collect in memory array (Zero Supabase insert queries!)
+          rssItems.push(draftRecord);
+          existingUrls.add(normalizeUrl(candidate.link));
         } catch (itemErr: any) {
-          console.error('[fetch-news] Error processing candidate RSS item with Gemini:', itemErr);
+          console.error('[fetch-news] Error processing candidate RSS item:', itemErr);
           errors.push({ link: candidate.link, error: itemErr.message || String(itemErr) });
         }
       }
 
-      // Dispatch async summary email notification to editorial bureau
-      if (insertedDrafts.length > 0) {
-        sendDraftIngestionNotification(insertedDrafts).catch((emailErr) => {
-          console.error('[fetch-news] Background email notification failed:', emailErr);
-        });
-      }
-
       return {
-        insertedCount: insertedDrafts.length,
-        insertedDrafts,
+        rssItems,
         errors: errors.length > 0 ? errors : undefined,
       };
     }
 
-    // 8. Requirement 3: Non-Blocking Execution / Quick HTTP Response
-    if (isSync) {
-      // Synchronous execution mode (for manual testing or callers with `?sync=true`)
-      const syncResult = await processCandidates(topCandidates);
-      return NextResponse.json({
-        success: true,
-        mode: 'sync',
-        scannedAcrossFeeds: aggregatedItems.length,
-        skippedUrls: skippedUrlCount,
-        skippedSimilarTopics: skippedSimilarityCount,
-        topCandidatesBatched: topCandidates.length,
-        ...syncResult,
-        elapsedTimeMs: Date.now() - startTime,
-        feedDiagnostics,
-      });
+    // Process top candidates in memory
+    const result = await processCandidates(topCandidates);
+
+    // Option 2: Persist parsed candidates into Supabase `rss_drafts` table
+    // DO NOT insert anything into the main `news` table during this fetch step.
+    let persistedDrafts = result.rssItems;
+    if (result.rssItems.length > 0) {
+      const dbDraftPayload = result.rssItems.map((item) => ({
+        title: item.title,
+        slug: item.slug,
+        category: item.category,
+        content: item.content,
+        image: item.imageUrl || null,
+        source: item.sourceUrl || null,
+        rss_guid: item.sourceUrl || item.slug,
+      }));
+
+      const { data: upsertedData, error: upsertErr } = await supabaseAdmin
+        .from('rss_drafts')
+        .upsert(dbDraftPayload, { onConflict: 'rss_guid' })
+        .select();
+
+      if (upsertErr) {
+        console.error('[fetch-news] Error upserting to rss_drafts:', upsertErr);
+      } else if (upsertedData && upsertedData.length > 0) {
+        // Map back to our Article / Draft interface with the real Supabase generated IDs
+        persistedDrafts = upsertedData.map((d: any) => ({
+          id: d.id,
+          title: d.title,
+          slug: d.slug,
+          category: d.category,
+          subCategory: d.category,
+          subTag: d.category,
+          content: d.content,
+          excerpt: d.content ? d.content.slice(0, 160) : d.title,
+          imageUrl: d.image,
+          image: d.image,
+          image_url: d.image,
+          author: 'Editorial Bureau',
+          created_at: d.created_at,
+          createdAt: d.created_at,
+          publishedAt: d.created_at,
+          readTime: `${Math.max(1, Math.ceil((d.content || '').split(/\s+/).length / 130))} min`,
+          seoTitle: `${d.title} | Today's Coimbatore`,
+          metaDescription: (d.content || '').slice(0, 160),
+          keywords: ['Coimbatore', d.category],
+          status: 'draft',
+          sourceUrl: d.source || d.rss_guid,
+          source_url: d.source || d.rss_guid,
+          rss_guid: d.rss_guid,
+        }));
+      }
     }
 
-    // Non-blocking mode (default): Return instant 200 response while Next.js `after()` completes task
-    if (typeof after === 'function') {
-      after(async () => {
-        try {
-          await processCandidates(topCandidates);
-        } catch (bgErr) {
-          console.error('[fetch-news] Background execution error:', bgErr);
-        }
-      });
-    } else {
-      processCandidates(topCandidates).catch((bgErr) => {
-        console.error('[fetch-news] Background execution error:', bgErr);
-      });
-    }
-
-    // Return immediate HTTP response in under 2 seconds!
     return NextResponse.json({
       success: true,
-      mode: 'async_background',
-      message: `News ingestion initiated for ${topCandidates.length} unique candidates in background.`,
-      processingCandidatesCount: topCandidates.length,
-      candidates: topCandidates.map((c) => ({ title: c.title, source: c.sourceName })),
+      data: persistedDrafts,
+      count: persistedDrafts.length,
       scannedAcrossFeeds: aggregatedItems.length,
       skippedUrls: skippedUrlCount,
       skippedSimilarTopics: skippedSimilarityCount,
-      feedDiagnostics,
+      topCandidatesBatched: topCandidates.length,
+      errors: result.errors,
       elapsedTimeMs: Date.now() - startTime,
+      feedDiagnostics,
     });
   } catch (err: any) {
     console.error('Unhandled error in /api/cron/fetch-news:', err);

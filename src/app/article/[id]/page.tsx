@@ -52,8 +52,10 @@ export async function generateMetadata({ params }: ArticlePageProps): Promise<Me
     article?.image_url?.trim() ||
     'https://todayscoimbatore.com/images/logo.png';
 
-  const keywordsArray = article?.keywords
-    ? (typeof article.keywords === 'string' ? article.keywords.split(',').map((k: string) => k.trim()).filter(Boolean) : article.keywords)
+  const keywordsArray = Array.isArray(article?.keywords)
+    ? article.keywords.map((k: any) => String(k).trim()).filter(Boolean)
+    : typeof article?.keywords === 'string'
+    ? article.keywords.split(',').map((k: string) => k.trim()).filter(Boolean)
     : ['Coimbatore News', 'Kovai Updates', article?.category || 'News', "Today's Coimbatore"];
 
   return {

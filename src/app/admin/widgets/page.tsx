@@ -197,10 +197,41 @@ export default function AdminWidgetsPage() {
       if (res.ok) {
         const json = await res.json();
         setPoll(json.data);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('covai-poll-update', {
+              detail: { counts: { yes: 0, no: 0 }, reset: true },
+            })
+          );
+        }
         triggerSuccess('✓ New Daily Poll published with fresh vote counters!');
       }
     } catch {
       triggerSuccess('Failed to update poll question');
+    }
+  };
+
+  const handleResetPoll = async () => {
+    try {
+      const res = await fetch('/api/widgets/poll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reset: true }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setPoll(json.data);
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(
+            new CustomEvent('covai-poll-update', {
+              detail: { counts: { yes: 0, no: 0 }, reset: true },
+            })
+          );
+        }
+        triggerSuccess('✓ Poll votes reset to 0!');
+      }
+    } catch {
+      triggerSuccess('Failed to reset poll votes');
     }
   };
 
@@ -598,7 +629,16 @@ export default function AdminWidgetsPage() {
 
             {poll && (
               <div className="bg-stone-50 p-3 rounded-xl border border-stone-200 space-y-2">
-                <p className="text-xs font-bold text-stone-900">{poll.question}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <p className="text-xs font-bold text-stone-900">{poll.question}</p>
+                  <button
+                    type="button"
+                    onClick={handleResetPoll}
+                    className="shrink-0 text-[10px] font-bold text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 border border-red-200 px-2 py-1 rounded-md transition-colors cursor-pointer"
+                  >
+                    Reset Votes
+                  </button>
+                </div>
                 <div className="flex items-center justify-between text-xs font-extrabold text-stone-700">
                   <span className="text-emerald-700">YES: {poll.yesPercent}% ({poll.yesVotes} votes)</span>
                   <span className="text-red-700">NO: {poll.noPercent}% ({poll.noVotes} votes)</span>

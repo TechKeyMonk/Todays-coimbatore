@@ -27,6 +27,7 @@ export interface DirectoryListing {
   verified?: boolean;
   tags?: string[];
   imageUrl?: string;
+  images?: string[];
   createdAt?: string;
 }
 
@@ -42,7 +43,21 @@ function toUuid(idStr?: any): string {
   return [hash.slice(0, 8), hash.slice(8, 12), '4' + hash.slice(13, 16), '8' + hash.slice(17, 20), hash.slice(20, 32)].join('-');
 }
 
+function sanitizeUrl(url?: string): string | null {
+  if (!url || typeof url !== 'string') return null;
+  const trimmed = url.trim();
+  if (/^https?:\/\/[^\s$.?#].[^\s]*$/i.test(trimmed)) {
+    return trimmed;
+  }
+  return null;
+}
+
 function mapRowToListing(l: any): DirectoryListing {
+  const images = Array.isArray(l.images) && l.images.length > 0
+    ? l.images.filter(Boolean)
+    : (l.image_url ? [l.image_url] : (l.photo_url ? [l.photo_url] : (l.photo ? [l.photo] : [])));
+  const coverImage = images[0] || l.image_url || l.imageUrl || undefined;
+
   return {
     id: l.id,
     name: l.title || l.name || 'Business Listing',
@@ -63,7 +78,8 @@ function mapRowToListing(l: any): DirectoryListing {
     timing: l.timing || undefined,
     description: l.description || ((l.title || l.name || 'This business') + ' in ' + (l.area || 'Coimbatore') + '.'),
     tags: Array.isArray(l.tags) ? l.tags : [],
-    imageUrl: l.image_url || l.imageUrl || undefined,
+    imageUrl: coverImage,
+    images: images,
     createdAt: l.created_at || new Date().toISOString(),
   };
 }
@@ -115,36 +131,67 @@ export async function POST(request: Request) {
 
     if (action === 'save' || action === 'create') {
       const item = body.listing || body;
-      if (!item || !item.name) {
+      if (!item || (!item.name && !item.title)) {
         return NextResponse.json({ success: false, error: 'Business name is required' }, { status: 400 });
       }
+
+      // Auto-insert custom category if not already in categories table
+      if (item.category && item.category.trim()) {
+        const catName = item.category.trim();
+        const catSlug = slugify(item.categorySlug || catName);
+        try {
+          const { data: existingCat } = await supabaseAdmin
+            .from('categories')
+            .select('id, name, slug')
+            .or(`slug.ilike.${catSlug},name.ilike.${catName}`)
+            .limit(1);
+
+          if (!existingCat || existingCat.length === 0) {
+            await supabaseAdmin.from('categories').insert([{
+              id: toUuid(catSlug),
+              name: catName,
+              slug: catSlug,
+              icon: item.icon || '🏢',
+            }]);
+          }
+        } catch (catErr) {
+          console.warn('[directory POST] Category auto-insert warning:', catErr);
+        }
+      }
+
+      let imagesList: string[] = [];
+      if (Array.isArray(item.images)) {
+        imagesList = (item.images as any[])
+          .map((u: any) => sanitizeUrl(u))
+          .filter((u: string | null): u is string => u !== null)
+          .slice(0, 5);
+      } else if (item.imageUrl) {
+        const s = sanitizeUrl(item.imageUrl);
+        if (s) imagesList = [s];
+      }
+
+      const listingPayload: any = {
+        id: toUuid(item.id || item.name || item.title),
+        title: (item.name || item.title || '').trim(),
+        category: (item.category || 'General').trim(),
+        phone: item.phone || null,
+        address: item.address || null,
+        area: item.area || 'Coimbatore',
+        pincode: item.pincode || null,
+        rating: typeof item.rating === 'number' ? item.rating : 4.5,
+        images: imagesList,
+      };
+
       const { data: upserted, error } = await supabaseAdmin
         .from('listings')
-        .upsert([{
-          id: toUuid(item.id || item.name),
-          title: item.name || item.title,
-          category: item.category || 'General',
-          phone: item.phone || null,
-          address: item.address || null,
-          area: item.area || 'Coimbatore',
-          rating: typeof item.rating === 'number' ? item.rating : 4.5,
-          featured: !!item.featured,
-          popular: !!item.popular,
-          verified: item.verified !== false,
-          website: item.website || null,
-          email: item.email || null,
-          owner_name: item.ownerName || null,
-          timing: item.timing || null,
-          description: item.description || null,
-          image_url: item.imageUrl || null,
-          tags: Array.isArray(item.tags) ? item.tags : [],
-          created_at: item.createdAt || new Date().toISOString(),
-        }], { onConflict: 'id' })
-        .select().single();
+        .upsert([listingPayload], { onConflict: 'id' })
+        .select()
+        .single();
+
       if (error) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
       }
-      try { revalidatePath('/', 'layout'); revalidatePath('/admin', 'layout'); } catch {}
+      try { revalidatePath('/', 'layout'); revalidatePath('/admin', 'layout'); revalidatePath('/directory', 'layout'); } catch {}
       return NextResponse.json({ success: true, listing: mapRowToListing(upserted) }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
     }
 
@@ -159,10 +206,17 @@ export async function POST(request: Request) {
       if (updates.address !== undefined) p.address = updates.address;
       if (updates.area !== undefined) p.area = updates.area;
       if (updates.rating !== undefined) p.rating = updates.rating;
-      if (updates.featured !== undefined) p.featured = updates.featured;
-      if (updates.popular !== undefined) p.popular = updates.popular;
-      if (updates.imageUrl !== undefined) p.image_url = updates.imageUrl;
-      if (updates.description !== undefined) p.description = updates.description;
+      if (updates.images !== undefined) {
+        p.images = Array.isArray(updates.images)
+          ? (updates.images as any[])
+              .map((u: any) => sanitizeUrl(u))
+              .filter((u: string | null): u is string => u !== null)
+              .slice(0, 5)
+          : [];
+      } else if (updates.imageUrl !== undefined) {
+        const s = sanitizeUrl(updates.imageUrl);
+        if (s) p.images = [s];
+      }
       const { data: updated, error } = await supabaseAdmin.from('listings').update(p).eq('id', toUuid(id)).select().single();
       if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
       try { revalidatePath('/admin', 'layout'); } catch {}
@@ -208,14 +262,17 @@ export async function PUT(request: Request) {
     if (item.address !== undefined) p.address = item.address;
     if (item.area !== undefined) p.area = item.area;
     if (item.rating !== undefined) p.rating = item.rating;
-    if (item.featured !== undefined) p.featured = item.featured;
-    if (item.popular !== undefined) p.popular = item.popular;
-    if (item.imageUrl !== undefined) p.image_url = item.imageUrl;
-    if (item.description !== undefined) p.description = item.description;
-    if (item.ownerName !== undefined) p.owner_name = item.ownerName;
-    if (item.website !== undefined) p.website = item.website;
-    if (item.email !== undefined) p.email = item.email;
-    if (item.timing !== undefined) p.timing = item.timing;
+    if (item.images !== undefined) {
+      p.images = Array.isArray(item.images)
+        ? (item.images as any[])
+            .map((u: any) => sanitizeUrl(u))
+            .filter((u: string | null): u is string => u !== null)
+            .slice(0, 5)
+        : [];
+    } else if (item.imageUrl !== undefined) {
+      const s = sanitizeUrl(item.imageUrl);
+      if (s) p.images = [s];
+    }
     const { data: updated, error } = await supabaseAdmin.from('listings').update(p).eq('id', toUuid(id)).select().single();
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     try { revalidatePath('/admin', 'layout'); } catch {}

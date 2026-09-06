@@ -24,13 +24,13 @@ import dbService, { Article, formatRelativeTime } from '../../../services/db';
 const VALID_CATEGORIES = [
   'News',
   'Our City',
-  'CEO',
-  'Events',
-  'Education',
-  'Tech',
   'Business',
+  'Tech',
   'Infrastructure',
-  'TNEB',
+  'CEO',
+  'Sports',
+  'Education',
+  'E-Paper',
 ] as const;
 
 interface ToastMessage {
@@ -38,6 +38,8 @@ interface ToastMessage {
   type: 'success' | 'error' | 'info';
   text: string;
 }
+
+const RSS_PREVIEW_STORAGE_KEY = 'tc_rss_preview_drafts';
 
 export default function AdminReviewPage() {
   const [drafts, setDrafts] = useState<Article[]>([]);
@@ -62,15 +64,59 @@ export default function AdminReviewPage() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // 1. Fetch Drafts from DB / API
+  // Helper to persist in-memory preview queue in localStorage across browser refreshes
+  const updateLocalPreviewStorage = (items: Article[]) => {
+    try {
+      const previewOnly = items.filter((d) => d.id.startsWith('rss-preview-'));
+      localStorage.setItem(RSS_PREVIEW_STORAGE_KEY, JSON.stringify(previewOnly));
+    } catch (e) {
+      console.warn('Failed to save RSS preview queue to localStorage:', e);
+    }
+  };
+
+  // 1. Fetch Drafts on Component Mount from Supabase `rss_drafts` table
   const loadDrafts = async () => {
     setIsLoading(true);
     try {
-      const items = await dbService.getDraftArticles();
-      setDrafts(items || []);
+      // Primary: Load pending drafts from Supabase `rss_drafts` table
+      let rssTableDrafts: Article[] = [];
+      try {
+        const res = await fetch('/api/admin/rss');
+        if (res.ok) {
+          const json = await res.json();
+          if (Array.isArray(json.data)) {
+            rssTableDrafts = json.data;
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load rss_drafts from API:', e);
+      }
+
+      // Secondary: Any manual drafts in news table
+      let dbDrafts: Article[] = [];
+      try {
+        dbDrafts = (await dbService.getDraftArticles()) || [];
+      } catch (e) {
+        console.warn('Failed to load DB news drafts:', e);
+      }
+
+      // Merge avoiding duplicates
+      const combined = [...rssTableDrafts];
+      const seenTitles = new Set(combined.map((d) => d.title.toLowerCase().trim()));
+      const seenIds = new Set(combined.map((d) => d.id));
+
+      for (const d of dbDrafts) {
+        if (!seenIds.has(d.id) && !seenTitles.has(d.title.toLowerCase().trim())) {
+          combined.push(d);
+          seenIds.add(d.id);
+          seenTitles.add(d.title.toLowerCase().trim());
+        }
+      }
+
+      setDrafts(combined);
     } catch (err) {
       console.error('Failed to load drafts:', err);
-      addToast('Failed to fetch pending drafts from database.', 'error');
+      addToast('Failed to load pending drafts.', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -80,11 +126,11 @@ export default function AdminReviewPage() {
     loadDrafts();
   }, []);
 
-  // 2. Trigger RSS Ingestion via /api/cron/fetch-news
+  // 2. Trigger RSS Ingestion: Upserts to `rss_drafts` with ZERO inserts into `news`
   const handleTriggerRss = async () => {
     setIsFetchingRss(true);
     try {
-      const res = await fetch('/api/cron/fetch-news?secret=Todayscoimbatore@2026&sync=true', {
+      const res = await fetch('/api/admin/rss', {
         method: 'POST',
       });
       const json = await res.json();
@@ -93,25 +139,14 @@ export default function AdminReviewPage() {
         throw new Error(json.error || 'RSS ingestion failed');
       }
 
-      const count = json.insertedCount ?? json.insertedDraftsCount ?? 0;
-      if (count > 0) {
-        addToast(
-          `✓ Success: Ingested ${count} new AI English draft(s)!`,
-          'success'
-        );
-      } else if (json.processingCandidatesCount > 0) {
-        addToast(
-          `✓ Ingestion started for ${json.processingCandidatesCount} candidates in background!`,
-          'success'
-        );
-      } else {
-        addToast(
-          json.message || 'RSS scanned: All articles are already up-to-date.',
-          'info'
-        );
-      }
-
+      // Reload drafts directly from Supabase rss_drafts table
       await loadDrafts();
+
+      const count = json.count ?? (Array.isArray(json.data) ? json.data.length : 0);
+      addToast(
+        `✓ Scanned RSS! Persisted ${count} draft(s) into rss_drafts table. Zero news table inserts.`,
+        'success'
+      );
     } catch (err: any) {
       console.error('RSS Fetch error:', err);
       addToast(`Error: ${err.message || 'Failed to trigger RSS ingestion.'}`, 'error');
@@ -120,29 +155,109 @@ export default function AdminReviewPage() {
     }
   };
 
-  // 3. Reject / Dismiss and Delete Draft
+  // 3. Explicit Publish Action: Moves draft from `rss_drafts` to main `news` table on Publish
+  const handlePublishDraft = async (draft: Article) => {
+    setIsProcessingId(draft.id);
+    try {
+      const res = await fetch('/api/admin/rss', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'publish', id: draft.id }),
+      });
+
+      if (!res.ok) {
+        // Fallback: If not found in rss_drafts (e.g. manual news draft), publish via /api/content
+        const fallbackRes = await fetch('/api/content', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'create_article',
+            data: {
+              title: draft.title,
+              content: draft.content,
+              category: draft.category || 'News',
+              excerpt: draft.excerpt || draft.content?.slice(0, 160),
+              imageUrl: draft.imageUrl || (draft as any).image || 'https://images.unsplash.com/photo-1588681664899-f142ff2dc9b1?auto=format&fit=crop&q=80&w=800',
+              sourceUrl: draft.sourceUrl,
+              author: draft.author || 'Editorial Bureau',
+              status: 'published',
+              tags: draft.tags || ['Coimbatore', draft.category || 'News'],
+            },
+          }),
+        });
+
+        if (!fallbackRes.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Failed to publish draft to news table');
+        }
+      }
+
+      // Remove published article from local UI state list
+      setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
+
+      if (viewingDraft?.id === draft.id) {
+        setViewingDraft(null);
+      }
+
+      addToast(
+        `✓ Published: "${draft.title.slice(0, 40)}..." is now LIVE on Today's Coimbatore!`,
+        'success'
+      );
+    } catch (err: any) {
+      console.error('Publish error:', err);
+      addToast(`Failed to publish article: ${err.message}`, 'error');
+    } finally {
+      setIsProcessingId(null);
+    }
+  };
+
+  // 4. Reject / Discard Draft: Removes directly from `rss_drafts` without publishing to `news`
   const handleDismissDraft = async (draft: Article) => {
-    if (!window.confirm(`Are you sure you want to dismiss and delete this draft:\n"${draft.title}"?`)) {
+    if (!window.confirm(`Are you sure you want to discard this draft:\n"${draft.title}"?`)) {
       return;
     }
 
     setIsProcessingId(draft.id);
     try {
-      const ok = await dbService.deleteArticle(draft.id);
-      if (ok) {
-        setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
-        addToast(`Draft dismissed successfully.`, 'info');
-        if (viewingDraft?.id === draft.id) {
-          setViewingDraft(null);
-        }
-      } else {
-        throw new Error('Deletion failed');
+      const res = await fetch(`/api/admin/rss?id=${encodeURIComponent(draft.id)}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        // Also attempt cleanup via dbService if it was a legacy draft
+        await dbService.deleteArticle(draft.id).catch(() => {});
       }
+
+      // Remove from local UI state list
+      setDrafts((prev) => prev.filter((d) => d.id !== draft.id));
+
+      if (viewingDraft?.id === draft.id) {
+        setViewingDraft(null);
+      }
+      addToast('Draft discarded and deleted from database.', 'info');
     } catch (err: any) {
       console.error('Delete error:', err);
       addToast(`Failed to dismiss draft: ${err.message}`, 'error');
     } finally {
       setIsProcessingId(null);
+    }
+  };
+
+  // 5. Clear All Pending Drafts
+  const handleClearPreviewQueue = async () => {
+    if (drafts.length === 0) return;
+    if (!window.confirm('Are you sure you want to clear all un-published drafts from rss_drafts table?')) {
+      return;
+    }
+    try {
+      for (const d of drafts) {
+        await fetch(`/api/admin/rss?id=${encodeURIComponent(d.id)}`, { method: 'DELETE' }).catch(() => {});
+      }
+      setDrafts([]);
+      localStorage.removeItem(RSS_PREVIEW_STORAGE_KEY);
+      addToast('All drafts cleared from rss_drafts table.', 'info');
+    } catch (e) {
+      console.warn('Clear error:', e);
     }
   };
 
@@ -268,7 +383,7 @@ ${draft.sourceUrl || 'External RSS'}`;
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3 min-w-0">
             <Link
-              href="/admin"
+              href="/admin?tab=articles"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-stone-600 dark:text-gray-300 hover:text-red-600 hover:bg-stone-100 dark:hover:bg-slate-800 transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -278,10 +393,10 @@ ${draft.sourceUrl || 'External RSS'}`;
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
               <h1 className="text-sm sm:text-base font-black text-stone-900 dark:text-white truncate">
-                AI Draft Review &amp; Copy Assistant
+                AI Draft Review &amp; Publishing Queue
               </h1>
               <span className="bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-amber-300 dark:border-amber-800">
-                {drafts.length} DRAFTS READY
+                {drafts.length} PREVIEW DRAFTS
               </span>
             </div>
           </div>
@@ -295,7 +410,7 @@ ${draft.sourceUrl || 'External RSS'}`;
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isFetchingRss ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">
-                {isFetchingRss ? 'Ingesting RSS...' : 'Fetch Latest RSS'}
+                {isFetchingRss ? 'Ingesting RSS (In-Memory)...' : 'Fetch Latest RSS'}
               </span>
               <span className="sm:hidden">{isFetchingRss ? 'Ingesting...' : 'Fetch RSS'}</span>
             </button>
@@ -305,26 +420,37 @@ ${draft.sourceUrl || 'External RSS'}`;
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-        {/* Banner Explaining Copy-to-Publish Workflow */}
+        {/* Banner Explaining Database-Backed rss_drafts & Publishing Workflow */}
         <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2.5">
             <Sparkles className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
             <div>
               <span className="font-black uppercase tracking-wider block sm:inline mr-2">
-                Copy &amp; Manual Verification Workflow:
+                Supabase RSS Drafts Queue (rss_drafts):
               </span>
               <span className="text-stone-700 dark:text-stone-300">
-                AI extracts and translates Coimbatore reports into structured English text. Review drafts below, click <strong>&quot;Copy Draft&quot;</strong>, and paste into the respective manual creation forms in <Link href="/admin" className="underline font-bold text-red-600">Admin CMS</Link> with your custom image attachments.
+                Fetched RSS stories are persisted in the <strong>rss_drafts</strong> Supabase table and remain <strong>hidden from the public website</strong>. They persist across page refreshes and move to the live <strong>news</strong> table ONLY when you click <strong>&quot;Publish&quot;</strong>.
               </span>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={loadDrafts}
-            className="text-[11px] font-black uppercase text-amber-700 dark:text-amber-300 hover:underline shrink-0 cursor-pointer"
-          >
-            ↻ Refresh Queue
-          </button>
+          <div className="flex items-center gap-3 shrink-0">
+            {drafts.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearPreviewQueue}
+                className="text-[11px] font-bold text-stone-500 dark:text-stone-400 hover:text-red-600 hover:underline cursor-pointer"
+              >
+                Clear Queue
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={loadDrafts}
+              className="text-[11px] font-black uppercase text-amber-700 dark:text-amber-300 hover:underline cursor-pointer"
+            >
+              ↻ Refresh
+            </button>
+          </div>
         </div>
 
         {/* Filter and Search Toolbar */}
@@ -415,9 +541,14 @@ ${draft.sourceUrl || 'External RSS'}`;
                   <div className="p-5 space-y-3 flex-1 flex flex-col min-w-0">
                     {/* Meta Header */}
                     <div className="flex items-center justify-between gap-2 text-[10px] font-bold uppercase tracking-wider flex-wrap">
-                      <span className="bg-red-100 dark:bg-red-950/80 text-red-700 dark:text-red-400 px-2 py-0.5 rounded-md">
-                        {draft.category || 'News'}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="bg-red-100 dark:bg-red-950/80 text-red-700 dark:text-red-400 px-2 py-0.5 rounded-md">
+                          {draft.category || 'News'}
+                        </span>
+                        <span className="bg-amber-100 dark:bg-amber-950/80 text-amber-800 dark:text-amber-300 px-2 py-0.5 rounded-md border border-amber-300 dark:border-amber-800 font-mono text-[9px]">
+                          rss_drafts (DB)
+                        </span>
+                      </div>
                       <div className="flex items-center gap-1 text-stone-400 font-mono text-[9px]">
                         <Clock className="w-3 h-3" />
                         <span>{formatRelativeTime(draft.createdAt)}</span>
@@ -453,23 +584,23 @@ ${draft.sourceUrl || 'External RSS'}`;
                     )}
                   </div>
 
-                  {/* Actions Bar: View Content, Copy Draft, Dismiss */}
-                  <div className="p-3 bg-stone-50 dark:bg-slate-800/50 border-t border-stone-100 dark:border-slate-800 flex items-center justify-between gap-2">
+                  {/* Actions Bar: View Content, Dismiss, Copy Draft, Publish */}
+                  <div className="p-3 bg-stone-50 dark:bg-slate-800/50 border-t border-stone-100 dark:border-slate-800 flex items-center justify-between gap-2 flex-wrap">
                     <button
                       type="button"
                       onClick={() => setViewingDraft(draft)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-stone-700 dark:text-gray-300 hover:bg-stone-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold text-stone-700 dark:text-gray-300 hover:bg-stone-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
                     >
                       <Eye className="w-3.5 h-3.5" />
-                      <span>View Content</span>
+                      <span>View</span>
                     </button>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <button
                         type="button"
                         onClick={() => handleDismissDraft(draft)}
                         disabled={isProcessing}
-                        title="Dismiss & Delete draft"
+                        title="Dismiss & Remove draft"
                         className="p-1.5 rounded-lg text-stone-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -478,14 +609,30 @@ ${draft.sourceUrl || 'External RSS'}`;
                       <button
                         type="button"
                         onClick={(e) => handleCopyDraft(draft, e)}
-                        className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs ${
+                        title="Copy draft to clipboard"
+                        className={`inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                           isCopied
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-stone-900 hover:bg-black dark:bg-red-600 dark:hover:bg-red-700 text-white'
+                            ? 'bg-stone-800 text-white'
+                            : 'border border-stone-300 dark:border-slate-700 hover:bg-stone-200 dark:hover:bg-slate-700 text-stone-700 dark:text-gray-200'
                         }`}
                       >
                         {isCopied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{isCopied ? 'Copied!' : 'Copy Draft'}</span>
+                        <span>{isCopied ? 'Copied' : 'Copy'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handlePublishDraft(draft)}
+                        disabled={isProcessing}
+                        title="Insert and publish directly to live news feed"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black uppercase tracking-wider shadow-xs hover:shadow-md transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {isProcessing ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                        )}
+                        <span>{isProcessing ? 'Publishing...' : 'Publish'}</span>
                       </button>
                     </div>
                   </div>
@@ -630,10 +777,25 @@ ${draft.sourceUrl || 'External RSS'}`;
                 <span>Dismiss Draft</span>
               </button>
 
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2.5 flex-wrap">
                 <Link
-                  href="/admin"
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl border border-stone-300 dark:border-slate-700 hover:bg-stone-100 dark:hover:bg-slate-800 text-xs font-bold text-stone-700 dark:text-gray-200 transition-colors"
+                  href="/admin?tab=articles#publish-article-form"
+                  onClick={() => {
+                    if (viewingDraft) {
+                      try {
+                        localStorage.setItem(
+                          'tc_prefill_draft',
+                          JSON.stringify({
+                            title: viewingDraft.title || '',
+                            content: viewingDraft.content || '',
+                            category: viewingDraft.category || 'NEWS',
+                            author: viewingDraft.author || 'Editorial Bureau',
+                          })
+                        );
+                      } catch (e) {}
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-stone-300 dark:border-slate-700 hover:bg-stone-100 dark:hover:bg-slate-800 text-xs font-bold text-stone-700 dark:text-gray-200 transition-colors"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>Go to Admin Publishing</span>
@@ -642,10 +804,24 @@ ${draft.sourceUrl || 'External RSS'}`;
                 <button
                   type="button"
                   onClick={() => handleCopyDraft(viewingDraft)}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider shadow-md transition-all cursor-pointer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-stone-300 dark:border-slate-700 hover:bg-stone-100 dark:hover:bg-slate-800 text-stone-700 dark:text-gray-200 text-xs font-bold transition-all cursor-pointer"
                 >
                   <Copy className="w-4 h-4" />
-                  <span>Copy Full Structured Draft</span>
+                  <span>Copy Draft</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handlePublishDraft(viewingDraft)}
+                  disabled={isProcessingId === viewingDraft.id}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-black uppercase tracking-wider shadow-md transition-all cursor-pointer disabled:opacity-50"
+                >
+                  {isProcessingId === viewingDraft.id ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4" />
+                  )}
+                  <span>{isProcessingId === viewingDraft.id ? 'Publishing...' : 'Publish to Live News'}</span>
                 </button>
               </div>
             </div>

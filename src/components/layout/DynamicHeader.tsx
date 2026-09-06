@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '../../context/ThemeContext';
-import dbService, { Article, OutageRecord, AdSlotRecord, INITIAL_ADS_DB } from '../../services/db';
+import dbService, { Article, OutageRecord, AdSlotRecord, EventRecord, mapDedicatedEventToEvent, INITIAL_ADS_DB } from '../../services/db';
+import { supabase } from '@/lib/supabaseClient';
 import {
   MapPin,
   Sun,
@@ -20,6 +21,7 @@ import {
   Building2,
 } from 'lucide-react';
 import AdSlider from '../AdSlider';
+import { isArticleInCategory } from '@/lib/categories';
 
 declare global {
   interface Window {
@@ -116,6 +118,7 @@ function SubMenuDropdown({
 
   const activeStory = stories[currentIndex] || stories[0];
   const hasMultiple = stories.length > 1;
+  const isEventCat = categoryName.toLowerCase().includes('event');
 
   return (
     <div className="space-y-3 w-full" onClick={(e) => e.stopPropagation()}>
@@ -124,7 +127,7 @@ function SubMenuDropdown({
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
           <span className="text-[11px] font-black uppercase tracking-wider text-gray-900 dark:text-gray-100">
-            {categoryName} • {stories.length === 0 ? 'Live Updates' : stories.length === 1 ? 'Featured Story' : 'Featured Stories'}
+            {categoryName} • {stories.length === 0 ? 'Live Updates' : isEventCat ? `${stories.length} Live Event${stories.length > 1 ? 's' : ''}` : stories.length === 1 ? 'Featured Story' : 'Featured Stories'}
           </span>
         </div>
         <Link
@@ -187,13 +190,54 @@ function SubMenuDropdown({
                 </p>
               )}
               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-gray-500 dark:text-gray-400 group-hover:text-red-600 transition-colors pt-0.5">
-                <span>Read full story</span>
+                <span>{isEventCat ? 'Explore Event Details' : 'Read full story'}</span>
                 <ArrowRight className="w-3 h-3" />
               </span>
             </div>
           </div>
         </Link>
       ) : null}
+
+      {/* Secondary Story Cards Preview (if multiple stories exist, preview other items) */}
+      {hasMultiple && (
+        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-gray-100 dark:border-slate-800">
+          {stories.map((story, idx) => {
+            if (idx === currentIndex) return null;
+            return (
+              <button
+                key={story.id || idx}
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setCurrentIndex(idx);
+                }}
+                className="flex items-center gap-2 p-1.5 rounded-lg bg-gray-50 dark:bg-slate-800/50 hover:bg-red-50/40 dark:hover:bg-slate-800 text-left transition-colors border border-gray-100 dark:border-slate-800/80 cursor-pointer group/item"
+              >
+                {story.imageUrl ? (
+                  <img
+                    src={story.imageUrl}
+                    alt={story.title}
+                    className="w-10 h-10 rounded-md object-cover shrink-0"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-md bg-stone-200 dark:bg-slate-700 flex items-center justify-center text-xs shrink-0">
+                    🎟️
+                  </div>
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] font-bold text-gray-800 dark:text-gray-200 truncate group-hover/item:text-red-600 transition-colors">
+                    {story.title}
+                  </p>
+                  <p className="text-[9px] text-gray-500 dark:text-gray-400 truncate">
+                    {story.tag} • {story.timeAgo}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       {/* Carousel Controls only if multiple stories exist */}
       {hasMultiple && (
@@ -254,6 +298,7 @@ export default function DynamicHeader() {
   const [currentDateString, setCurrentDateString] = useState('Saturday, 29 Aug 2026');
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [dbArticles, setDbArticles] = useState<Article[]>([]);
+  const [liveEvents, setLiveEvents] = useState<EventRecord[]>([]);
   const [dbOutages, setDbOutages] = useState<OutageRecord[]>([]);
   const [topLeaderboardAd, setTopLeaderboardAd] = useState<AdSlotRecord | null>(INITIAL_ADS_DB[0] || null);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
@@ -366,6 +411,40 @@ export default function DynamicHeader() {
             if (topAd) setTopLeaderboardAd(topAd);
           }
         }
+
+        // Live Events fetch from Supabase `events` table (matching Part 1 requirements)
+        try {
+          const { data: supaEvents, error: supaEventsErr } = await supabase
+            .from('events')
+            .select('*')
+            .order('created_at', { ascending: false })
+            .limit(3);
+
+          let combinedEvents: EventRecord[] = [];
+          if (!supaEventsErr && supaEvents && supaEvents.length > 0) {
+            combinedEvents = supaEvents.map(mapDedicatedEventToEvent);
+          }
+
+          if (combinedEvents.length < 3) {
+            const fallbackEvts = await dbService.getEvents();
+            for (const fb of (fallbackEvts || [])) {
+              if (combinedEvents.length >= 3) break;
+              if (!combinedEvents.some((ce) => ce.id === fb.id || ce.title.toLowerCase() === fb.title.toLowerCase())) {
+                combinedEvents.push(fb);
+              }
+            }
+          }
+
+          if (combinedEvents.length > 0 && isMounted) {
+            setLiveEvents(combinedEvents.slice(0, 3));
+          }
+        } catch (evErr) {
+          console.warn('Events fetch in header fallback:', evErr);
+          const fallbackEvts = await dbService.getEvents();
+          if (fallbackEvts && fallbackEvts.length > 0 && isMounted) {
+            setLiveEvents(fallbackEvts.slice(0, 3));
+          }
+        }
       } catch (e) {
         console.warn('Header data load warning:', e);
       }
@@ -403,10 +482,23 @@ export default function DynamicHeader() {
       fetchHeaderData();
     });
 
+    const handleEventUpdate = () => {
+      fetchHeaderData();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('eventsStorageUpdate', handleEventUpdate);
+      window.addEventListener('todayscoimbatore:db-updated', handleEventUpdate);
+    }
+
     return () => {
       isMounted = false;
       clearInterval(weatherInterval);
       unsubscribeArticles();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('eventsStorageUpdate', handleEventUpdate);
+        window.removeEventListener('todayscoimbatore:db-updated', handleEventUpdate);
+      }
     };
   }, []);
 
@@ -449,33 +541,29 @@ export default function DynamicHeader() {
 
   // Extract strictly live DB stories for a category (NO dummy mock data)
   const getCategoryStories = (catId: string): PopupStory[] => {
-    const normId = catId.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const matchedDb = dbArticles.filter((art) => {
-      const artCat = (art.category || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const artSub = (art.subCategory || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (catId === 'events') {
+      return liveEvents.slice(0, 3).map((e) => {
+        const rawImg = e.posterUrl || (e as any).image_url;
+        const cleanImg =
+          rawImg && typeof rawImg === 'string' && rawImg.trim() !== '' && rawImg.trim() !== 'null' && rawImg.trim() !== 'undefined'
+            ? rawImg.trim()
+            : undefined;
 
-      if (normId === 'events' || normId === 'event') {
-        return (
-          artCat.includes('event') ||
-          artSub.includes('event') ||
-          artCat === 'events' ||
-          artSub === 'events'
-        );
-      }
+        return {
+          id: e.id,
+          title: e.title,
+          category: 'EVENTS',
+          tag: e.date || 'UPCOMING',
+          timeAgo: e.venue || 'Coimbatore',
+          imageUrl: cleanImg,
+          videoUrl: e.videoUrl,
+          excerpt: e.description || `${e.title} in ${e.venue || 'Coimbatore'}.`,
+          href: '/events',
+        };
+      });
+    }
 
-      return (
-        artCat === normId ||
-        artSub === normId ||
-        (normId === 'ourcity' && (artCat.includes('city') || artCat.includes('civic'))) ||
-        (normId === 'ceosofcoimbatore' && (artCat.includes('ceo') || artSub.includes('ceo'))) ||
-        (normId === 'infrastructure' && (artCat.includes('infra') || artSub.includes('infra'))) ||
-        (normId === 'tech' && (artCat.includes('tech') || artSub.includes('tech') || artSub.includes('ev'))) ||
-        (normId === 'business' && (artCat.includes('business') || artCat.includes('industry') || artSub.includes('business'))) ||
-        (normId === 'sports' && (artCat.includes('sport') || artSub.includes('sport'))) ||
-        (normId === 'education' && (artCat.includes('edu') || artSub.includes('edu'))) ||
-        (normId === 'news' && (artCat.includes('news') || artCat.includes('trending') || artCat.includes('topstories')))
-      );
-    });
+    const matchedDb = dbArticles.filter((art) => isArticleInCategory(art, catId));
 
     return matchedDb.map((a) => {
       const rawImg = a.imageUrl || (a as any).image || (a.mediaType === 'image' ? (a as any).mediaUrl : undefined);
@@ -554,245 +642,190 @@ export default function DynamicHeader() {
       <AdSlider ad={topLeaderboardAd} variant="header" />
 
       {/* 2. RED LIVE ALERT BANNER WITH DYNAMIC SHUTDOWN TICKER & HOVER-PAUSE */}
-      <div className="w-full max-w-[100vw] overflow-x-hidden bg-red-600 text-white text-xs font-bold py-1.5 px-2 md:px-4 lg:px-6 flex items-center justify-between gap-3 select-none relative">
-        <div className="flex items-center gap-2 shrink-0 z-10 bg-red-600 pr-2">
-          <span className="bg-white text-red-600 text-[10px] font-black px-2 py-0.5 rounded uppercase shrink-0 shadow-xs flex items-center gap-1">
-            <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping" />
-            <span>LIVE ALERT</span>
-          </span>
-        </div>
+      <div className="w-full max-w-[100vw] overflow-x-hidden bg-red-600 text-white text-xs font-bold py-1.5 px-4 sm:px-6 lg:px-8 select-none relative">
+        <div className="w-full max-w-[1720px] mx-auto flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 shrink-0 z-10 bg-red-600 pr-2">
+            <span className="bg-white text-red-600 text-[10px] font-black px-2 py-0.5 rounded uppercase shrink-0 shadow-xs flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-ping" />
+              <span>LIVE ALERT</span>
+            </span>
+          </div>
 
-        {/* Scrolling Ticker Track */}
-        <div className="flex-1 min-w-0 max-w-full overflow-hidden overflow-x-hidden relative group">
-          {tickerAlerts.length === 0 ? (
-            <div className="text-white text-xs font-bold py-0.5 truncate">
-              LIVE ALERT: No major TNEB power outages scheduled in Coimbatore today.
-            </div>
-          ) : (
-            <div className="flex items-center whitespace-nowrap animate-ticker group-hover:[animation-play-state:paused] cursor-default text-xs">
-              {tickerAlerts.concat(tickerAlerts).map((item, idx) => (
-                <span key={`${item.id}-${idx}`} className="inline-flex items-center mx-4 gap-2 font-medium">
-                  <span className="bg-red-800 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider border border-red-400/40">
-                    [{item.tag}]
+          {/* Scrolling Ticker Track */}
+          <div className="flex-1 min-w-0 max-w-full overflow-hidden overflow-x-hidden relative group">
+            {tickerAlerts.length === 0 ? (
+              <div className="text-white text-xs font-bold py-0.5 truncate">
+                LIVE ALERT: No major TNEB power outages scheduled in Coimbatore today.
+              </div>
+            ) : (
+              <div className="flex items-center whitespace-nowrap animate-ticker group-hover:[animation-play-state:paused] cursor-default text-xs">
+                {tickerAlerts.concat(tickerAlerts).map((item, idx) => (
+                  <span key={`${item.id}-${idx}`} className="inline-flex items-center mx-4 gap-2 font-medium">
+                    <span className="bg-red-800 text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider border border-red-400/40">
+                      [{item.tag}]
+                    </span>
+                    <span className="font-black text-white uppercase tracking-wide underline decoration-amber-300 decoration-2 underline-offset-2">
+                      {item.areas}
+                    </span>
+                    <span className="text-white/95 font-bold">
+                      ({item.time})
+                    </span>
+                    <span className="text-white/80 text-[11px]">
+                      • {item.reason}
+                    </span>
+                    <span className="text-red-300 ml-2">✦</span>
                   </span>
-                  <span className="font-black text-white uppercase tracking-wide underline decoration-amber-300 decoration-2 underline-offset-2">
-                    {item.areas}
-                  </span>
-                  <span className="text-white/95 font-bold">
-                    ({item.time})
-                  </span>
-                  <span className="text-white/80 text-[11px]">
-                    • {item.reason}
-                  </span>
-                  <span className="text-red-300 ml-2">✦</span>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-        <div className="hidden lg:flex items-center gap-3 text-xs font-bold shrink-0 z-10 bg-red-600 pl-2">
-          <span className="bg-white/20 px-2 py-0.5 rounded text-[11px]">HOVER TO PAUSE</span>
-          <a
-            href="tel:1912"
-            className="inline-flex items-center gap-1 hover:text-red-100 transition-colors"
-          >
-            <Phone className="w-3 h-3" />
-            <span>1912 Helpline</span>
-          </a>
+          <div className="hidden lg:flex items-center gap-3 text-xs font-bold shrink-0 z-10 bg-red-600 pl-2">
+            <span className="bg-white/20 px-2 py-0.5 rounded text-[11px]">HOVER TO PAUSE</span>
+            <a
+              href="tel:1912"
+              className="inline-flex items-center gap-1 hover:text-red-100 transition-colors"
+            >
+              <Phone className="w-3 h-3" />
+              <span>1912 Helpline</span>
+            </a>
+          </div>
         </div>
       </div>
 
       {/* 3. BRANDING & CONTROLS ROW */}
-      <div className="w-full min-h-[64px] h-[72px] sm:h-[80px] md:h-[96px] lg:h-[104px] px-3 sm:px-4 md:px-6 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800 flex items-center justify-between gap-2">
-        <Link href="/" aria-label="Today's Coimbatore Home" className="flex items-center shrink-0">
-          <img 
-            src="/logo.png" 
-            alt="TODAY'S COIMBATORE" 
-            className="h-10 sm:h-12 md:h-14 lg:h-16 xl:h-[68px] w-auto max-w-[190px] sm:max-w-[240px] md:max-w-[320px] lg:max-w-[360px] object-contain block dark:hidden" 
-          />
-          <img 
-            src="/logo-dark.png" 
-            alt="TODAY'S COIMBATORE" 
-            className="h-10 sm:h-12 md:h-14 lg:h-16 xl:h-[68px] w-auto max-w-[190px] sm:max-w-[240px] md:max-w-[320px] lg:max-w-[360px] object-contain hidden dark:block" 
-          />
-        </Link>
-
-        {/* RIGHT SLOT: CONTROLS (Desktop Full / Mobile Hamburger Only) */}
-        <div className="flex items-center gap-1.5 md:gap-3.5 shrink-0 justify-end">
-          {/* Location & Date (Desktop Only) */}
-          <div className="text-xs text-gray-500 border-r border-gray-200 dark:border-slate-700 pr-3.5 hidden lg:block text-right shrink-0">
-            <div className="flex items-center justify-end gap-1.5 font-bold text-gray-800 dark:text-gray-200 text-xs">
-              <MapPin className="w-3.5 h-3.5 text-red-600 shrink-0" />
-              <span>Coimbatore, Tamil Nadu</span>
-            </div>
-            <div className="text-[11px] font-medium text-gray-400 mt-0.5">{currentDateString}</div>
-          </div>
-
-          {/* Weather & AQI (Desktop Only) */}
-          <div className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-bold text-gray-700 dark:text-gray-200 hidden md:flex items-center gap-2 shrink-0">
-            <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
-              <Sun className="w-3.5 h-3.5" />
-              <span>{headerWeather.temp}°C</span>
-            </span>
-            <span className="text-gray-300 dark:text-slate-600">|</span>
-            <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">AQI {headerWeather.aqi} ({headerWeather.aqiStatus})</span>
-          </div>
-
-          {/* Functional Search Input (Desktop Only) */}
-          <form onSubmit={handleSearchSubmit} className="relative hidden md:block shrink-0">
-            <input
-              type="text"
-              placeholder="Search news, topics, areas..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-xs font-medium rounded-lg px-3 py-1.5 pl-8 w-44 lg:w-56 focus:outline-none focus:ring-1 focus:ring-red-500 text-gray-800 dark:text-gray-200"
+      <div className="w-full min-h-[64px] h-[72px] sm:h-[80px] md:h-[96px] lg:h-[104px] bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800">
+        <div className="w-full max-w-[1720px] mx-auto h-full px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-2">
+          <Link href="/" aria-label="Today's Coimbatore Home" className="flex items-center shrink-0">
+            <img 
+              src="/logo.png" 
+              alt="TODAY'S COIMBATORE" 
+              className="h-10 sm:h-12 md:h-14 lg:h-16 xl:h-[68px] w-auto max-w-[190px] sm:max-w-[240px] md:max-w-[320px] lg:max-w-[360px] object-contain block dark:hidden" 
             />
-            <button type="submit" className="absolute left-2.5 top-2 text-gray-400 hover:text-gray-600 cursor-pointer" aria-label="Submit Search">
-              <Search className="w-3.5 h-3.5" />
-            </button>
-          </form>
+            <img 
+              src="/logo-dark.png" 
+              alt="TODAY'S COIMBATORE" 
+              className="h-10 sm:h-12 md:h-14 lg:h-16 xl:h-[68px] w-auto max-w-[190px] sm:max-w-[240px] md:max-w-[320px] lg:max-w-[360px] object-contain hidden dark:block" 
+            />
+          </Link>
 
-          {/* Language Selection Dropdown (Desktop Only) */}
-          <div className="notranslate shrink-0 hidden md:block" translate="no">
-            <select
-              value={selectedLang}
-              onChange={(e) => handleLanguageChange(e.target.value)}
-              className="notranslate bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-xs font-black rounded-lg h-9 px-2 text-gray-800 dark:text-gray-200 cursor-pointer focus:outline-none focus:ring-1 focus:ring-red-500 shrink-0"
-              translate="no"
-              aria-label="Select Site Language"
+          {/* RIGHT SLOT: CONTROLS (Desktop Full / Mobile Hamburger Only) */}
+          <div className="flex items-center gap-1.5 md:gap-3.5 shrink-0 justify-end">
+            {/* Location & Date (Desktop Only) */}
+            <div className="text-xs text-gray-500 border-r border-gray-200 dark:border-slate-700 pr-3.5 hidden lg:block text-right shrink-0">
+              <div className="flex items-center justify-end gap-1.5 font-bold text-gray-800 dark:text-gray-200 text-xs">
+                <MapPin className="w-3.5 h-3.5 text-red-600 shrink-0" />
+                <span>Coimbatore, Tamil Nadu</span>
+              </div>
+              <div className="text-[11px] font-medium text-gray-400 mt-0.5">{currentDateString}</div>
+            </div>
+
+            {/* Weather & AQI (Desktop Only) */}
+            <div className="bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-full px-3.5 py-1.5 text-xs font-bold text-gray-700 dark:text-gray-200 hidden md:flex items-center gap-2 shrink-0 shadow-2xs">
+              <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                <Sun className="w-3.5 h-3.5" />
+                <span>{headerWeather.temp}°C</span>
+              </span>
+              <span className="text-gray-300 dark:text-slate-600">|</span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">AQI {headerWeather.aqi} ({headerWeather.aqiStatus})</span>
+            </div>
+
+            {/* Functional Search Input (Desktop Only) */}
+            <form onSubmit={handleSearchSubmit} className="relative hidden md:block shrink-0">
+              <input
+                type="text"
+                placeholder="Search news, topics, areas..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-xs font-medium rounded-full px-3 py-1.5 pl-8 w-44 lg:w-56 focus:outline-none focus:ring-1 focus:ring-red-500 text-gray-800 dark:text-gray-200"
+              />
+              <button type="submit" className="absolute left-2.5 top-2 text-gray-400 hover:text-gray-600 cursor-pointer" aria-label="Submit Search">
+                <Search className="w-3.5 h-3.5" />
+              </button>
+            </form>
+
+            {/* Language Selection Dropdown (Desktop Only) */}
+            <div className="notranslate shrink-0 hidden md:block" translate="no">
+              <select
+                value={selectedLang}
+                onChange={(e) => handleLanguageChange(e.target.value)}
+                className="notranslate bg-gray-50 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 text-xs font-black rounded-lg h-9 px-2 text-gray-800 dark:text-gray-200 cursor-pointer focus:outline-none focus:ring-1 focus:ring-red-500 shrink-0"
+                translate="no"
+                aria-label="Select Site Language"
+              >
+                <option value="en" className="notranslate font-bold" translate="no">EN (English)</option>
+                <option value="ta" className="notranslate font-bold" translate="no">TA (தமிழ்)</option>
+                <option value="ml" className="notranslate font-bold" translate="no">ML (മലയാളം)</option>
+                <option value="te" className="notranslate font-bold" translate="no">TE (తెలుగు)</option>
+                <option value="hi" className="notranslate font-bold" translate="no">HI (हिन्दी)</option>
+                <option value="kn" className="notranslate font-bold" translate="no">KN (ಕನ್ನಡ)</option>
+              </select>
+            </div>
+
+            {/* Dark Mode Toggle (Desktop Only) */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="h-9 w-9 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs hover:bg-gray-200 dark:hover:bg-slate-700 cursor-pointer transition-colors shrink-0 hidden md:flex items-center justify-center"
+              aria-label="Toggle Dark Mode"
             >
-              <option value="en" className="notranslate font-bold" translate="no">EN (English)</option>
-              <option value="ta" className="notranslate font-bold" translate="no">TA (தமிழ்)</option>
-              <option value="ml" className="notranslate font-bold" translate="no">ML (മലയാളം)</option>
-              <option value="te" className="notranslate font-bold" translate="no">TE (తెలుగు)</option>
-              <option value="hi" className="notranslate font-bold" translate="no">HI (हिन्दी)</option>
-              <option value="kn" className="notranslate font-bold" translate="no">KN (ಕನ್ನಡ)</option>
-            </select>
+              {theme === 'dark' ? (
+                <Sun className="w-3.5 h-3.5 text-amber-400" />
+              ) : (
+                <Moon className="w-3.5 h-3.5 text-slate-700" />
+              )}
+            </button>
+
+            {/* Mobile Hamburger Toggle Button (< md: only) */}
+            <button
+              type="button"
+              onClick={() => setIsMobileDrawerOpen(!isMobileDrawerOpen)}
+              className="h-10 w-10 md:hidden rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/60 hover:bg-red-600 hover:text-white transition-all cursor-pointer flex items-center justify-center shrink-0"
+              aria-label="Toggle Mobile Navigation Drawer"
+              aria-expanded={isMobileDrawerOpen}
+            >
+              {isMobileDrawerOpen ? (
+                <X className="w-5 h-5" />
+              ) : (
+                <Menu className="w-5 h-5" />
+              )}
+            </button>
           </div>
-
-          {/* Dark Mode Toggle (Desktop Only) */}
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="h-9 w-9 bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-lg text-xs hover:bg-gray-200 dark:hover:bg-slate-700 cursor-pointer transition-colors shrink-0 hidden md:flex items-center justify-center"
-            aria-label="Toggle Dark Mode"
-          >
-            {theme === 'dark' ? (
-              <Sun className="w-3.5 h-3.5 text-amber-400" />
-            ) : (
-              <Moon className="w-3.5 h-3.5 text-slate-700" />
-            )}
-          </button>
-
-          {/* Mobile Hamburger Toggle Button (< md: only) */}
-          <button
-            type="button"
-            onClick={() => setIsMobileDrawerOpen(!isMobileDrawerOpen)}
-            className="h-10 w-10 md:hidden rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/60 hover:bg-red-600 hover:text-white transition-all cursor-pointer flex items-center justify-center shrink-0"
-            aria-label="Toggle Mobile Navigation Drawer"
-            aria-expanded={isMobileDrawerOpen}
-          >
-            {isMobileDrawerOpen ? (
-              <X className="w-5 h-5" />
-            ) : (
-              <Menu className="w-5 h-5" />
-            )}
-          </button>
         </div>
       </div>
 
-      {/* 4. PRIMARY NAVIGATION ROW - FULL WIDTH FLUSH (Desktop Only) */}
-      <div className="hidden md:flex w-full px-2 md:px-4 lg:px-6 mx-auto py-2 items-center justify-between border-b border-gray-100 dark:border-slate-800 text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wide relative z-50 pointer-events-auto">
-        <div className="flex items-center gap-6 sm:gap-7 overflow-x-auto no-scrollbar whitespace-nowrap">
-          <Link href="/" prefetch={true} className="text-red-600 hover:text-red-700 font-black shrink-0 cursor-pointer">
-            HOME
-          </Link>
-          <a
-            href="/directory"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-red-600 transition-colors shrink-0 cursor-pointer"
-          >
-            DIRECTORY
-          </a>
-          <Link
-            href="/blood-donors"
-            prefetch={true}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1.5 rounded-full transition flex items-center gap-1.5 shrink-0 shadow-xs uppercase text-xs sm:text-sm tracking-wide cursor-pointer"
-          >
-            <span>BLOOD DONORS</span>
-            <span className="bg-white text-red-600 text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">24/7</span>
-          </Link>
-          <Link href="/about" prefetch={true} className="hover:text-red-600 transition-colors shrink-0 cursor-pointer">
-            ABOUT US
-          </Link>
-        </div>
-
-        <div className="flex items-center gap-3.5 shrink-0">
-          {/* Social Media Links (Desktop Navbar) */}
-          <div className="hidden lg:flex items-center gap-1 text-stone-600 dark:text-gray-300">
-            {/* Instagram */}
+      {/* 4. PRIMARY NAVIGATION ROW (Desktop Only) */}
+      <div className="hidden md:flex w-full bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800">
+        <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wide">
+          <div className="flex items-center gap-6 sm:gap-7 overflow-x-auto no-scrollbar whitespace-nowrap">
+            <Link href="/" prefetch={true} className="text-red-600 hover:text-red-700 font-black shrink-0 cursor-pointer">
+              HOME
+            </Link>
             <a
-              href="https://www.instagram.com/tech_key_monk/"
+              href="/directory"
               target="_blank"
               rel="noopener noreferrer"
-              aria-label="Instagram"
-              title="Follow us on Instagram"
-              className="p-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-slate-800 text-stone-600 dark:text-gray-300 hover:text-[#E4405F] dark:hover:text-[#E4405F] transition-all cursor-pointer inline-flex items-center justify-center"
+              className="hover:text-red-600 transition-colors shrink-0 cursor-pointer font-bold"
             >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
-              </svg>
+              DIRECTORY
             </a>
-
-            {/* YouTube */}
-            <a
-              href="https://www.youtube.com/@TechKeyMonk-CBE"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="YouTube"
-              title="Subscribe on YouTube"
-              className="p-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-slate-800 text-stone-600 dark:text-gray-300 hover:text-[#FF0000] dark:hover:text-[#FF0000] transition-all cursor-pointer inline-flex items-center justify-center"
+            <Link
+              href="/blood-donors"
+              prefetch={true}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1 rounded-full transition flex items-center gap-1.5 shrink-0 shadow-xs uppercase text-xs tracking-wide cursor-pointer"
             >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
-              </svg>
-            </a>
-
-            {/* Facebook */}
-            <a
-              href="https://www.facebook.com/p/TechKey-Monk-61554380970425/"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Facebook"
-              title="Follow us on Facebook"
-              className="p-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-slate-800 text-stone-600 dark:text-gray-300 hover:text-[#1877F2] dark:hover:text-[#1877F2] transition-all cursor-pointer inline-flex items-center justify-center"
-            >
-              <svg className="w-4 h-4 fill-current" viewBox="0 0 24 24">
-                <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z" />
-              </svg>
-            </a>
-
-            {/* X / Twitter */}
-            <a
-              href="https://x.com/TechKeyMonk"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="X (formerly Twitter)"
-              title="Follow us on X"
-              className="p-1.5 rounded-lg hover:bg-stone-100 dark:hover:bg-slate-800 text-stone-600 dark:text-gray-300 hover:text-[#1DA1F2] dark:hover:text-[#1DA1F2] transition-all cursor-pointer inline-flex items-center justify-center"
-            >
-              <svg className="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24">
-                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-              </svg>
-            </a>
+              <span>BLOOD DONORS</span>
+              <span className="bg-white text-red-600 text-[9px] font-black px-1.5 py-0.5 rounded-full leading-none">24/7</span>
+            </Link>
+            <Link href="/about" prefetch={true} className="hover:text-red-600 transition-colors shrink-0 cursor-pointer font-bold">
+              ABOUT US
+            </Link>
           </div>
 
           <Link
             href="/epaper"
             prefetch={true}
-            className="bg-red-600 hover:bg-red-700 text-white text-xs font-black px-3.5 py-1 rounded flex items-center gap-1.5 shadow-xs uppercase tracking-wider shrink-0 transition-colors cursor-pointer"
+            className="bg-red-600 hover:bg-red-700 text-white text-xs font-black px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xs uppercase tracking-wider shrink-0 transition-colors cursor-pointer"
           >
             <Smartphone className="w-3.5 h-3.5" />
             <span>E-PAPER</span>
@@ -803,8 +836,9 @@ export default function DynamicHeader() {
       {/* 5. SECONDARY CATEGORY NAVIGATION ROW (Desktop Only) */}
       <nav
         ref={navRef}
-        className="hidden md:flex w-full px-2 md:px-4 lg:px-6 mx-auto py-2 flex-wrap lg:flex-nowrap items-center gap-3 sm:gap-5 md:gap-6 overflow-visible text-[12px] sm:text-[13px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide relative z-50 pointer-events-auto"
+        className="hidden md:flex w-full bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-slate-800"
       >
+        <div className="w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-2 flex flex-wrap lg:flex-nowrap items-center gap-3 sm:gap-5 md:gap-6 overflow-visible text-[12px] sm:text-[13px] font-bold text-gray-700 dark:text-gray-300 uppercase tracking-wide relative z-50 pointer-events-auto">
         {EDITORIAL_CATEGORIES.map((cat, index) => {
           const isDropdownOpen = activeCategory === cat.id;
           const isLastItems = index >= EDITORIAL_CATEGORIES.length - 3;
@@ -882,6 +916,7 @@ export default function DynamicHeader() {
             </div>
           );
         })}
+        </div>
       </nav>
 
       {/* 6. SLIDE-OUT MOBILE NAVIGATION DRAWER */}

@@ -157,6 +157,11 @@ export default function DirectoryPage() {
             const mapped: DirectoryListing[] = supaListings.map((sl) => {
               const exactCategoryName = sl.category?.trim() || 'General Services';
               const theme = getCategoryIcon(exactCategoryName);
+              const itemImages = Array.isArray(sl.images) && sl.images.length > 0
+                ? sl.images.filter(Boolean)
+                : ((sl as any).imageUrl || (sl as any).image_url ? [((sl as any).imageUrl || (sl as any).image_url)] : []);
+              const coverImage = itemImages[0] || (sl as any).imageUrl || (sl as any).image_url || getCategoryFallbackImage(exactCategoryName);
+
               return {
                 id: sl.id,
                 name: toTitleCase(sl.title),
@@ -189,7 +194,8 @@ export default function DirectoryPage() {
                     ? 'Brookefields Management'
                     : `${sl.title.split(' ')[0]} Management`),
                 description: `${toTitleCase(sl.title)} — Verified business & commercial service provider in ${sl.area || 'Coimbatore'}.`,
-                imageUrl: (sl as any).imageUrl || (sl as any).image_url || getCategoryFallbackImage(exactCategoryName),
+                imageUrl: coverImage,
+                images: itemImages,
                 verified: true,
                 popular: true,
               };
@@ -676,13 +682,28 @@ export default function DirectoryPage() {
                   >
                     <div className="space-y-3">
                       {/* Image Preview Box & Gallery Trigger */}
-                      <div className="relative h-40 w-full rounded-xl overflow-hidden bg-slate-900 border border-stone-100 dark:border-slate-800 group/img">
+                      <div
+                        onClick={() => handleOpenGalleryModal(item)}
+                        className="relative h-40 w-full rounded-xl overflow-hidden bg-slate-900 border border-stone-100 dark:border-slate-800 group/img cursor-pointer"
+                      >
                         <img
-                          src={optimizeUnsplashUrl(item.imageUrl || getCategoryFallbackImage(item.category, item.categorySlug), 500, 80)}
+                          src={optimizeUnsplashUrl(
+                            (item.images && item.images.length > 0 ? item.images[0] : item.imageUrl) ||
+                              getCategoryFallbackImage(item.category, item.categorySlug),
+                            500,
+                            80
+                          )}
                           alt={item.name}
                           loading="lazy"
                           decoding="async"
                           className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (!target.dataset.fallbackApplied) {
+                              target.dataset.fallbackApplied = 'true';
+                              target.src = getCategoryFallbackImage(item.category, item.categorySlug);
+                            }
+                          }}
                         />
                         <div className="absolute top-2 left-2 flex items-center gap-1">
                           <span className="bg-red-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-md shadow-xs">
@@ -706,11 +727,18 @@ export default function DirectoryPage() {
                         {/* Photo Gallery Button Overlay */}
                         <button
                           type="button"
-                          onClick={() => handleOpenGalleryModal(item)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenGalleryModal(item);
+                          }}
                           className="absolute bottom-2 left-2 px-2.5 py-1 rounded-md bg-black/75 hover:bg-black text-white text-[9px] font-black uppercase tracking-wider backdrop-blur-xs flex items-center gap-1 transition-all cursor-pointer"
                         >
                           <Camera className="w-3 h-3 text-amber-400" />
-                          <span>View Photos</span>
+                          <span>
+                            {item.images && item.images.length > 1
+                              ? `${item.images.length} Photos`
+                              : 'View Photos'}
+                          </span>
                         </button>
 
                         <span className="absolute bottom-2 right-2 bg-black/80 text-white text-[9px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
@@ -897,13 +925,28 @@ export default function DirectoryPage() {
                   >
                     <div className="space-y-3">
                       {/* Image Preview Box & Gallery Trigger */}
-                      <div className="relative h-40 w-full rounded-xl overflow-hidden bg-slate-900 border border-stone-100 dark:border-slate-800 group/img">
+                      <div
+                        onClick={() => handleOpenGalleryModal(item)}
+                        className="relative h-40 w-full rounded-xl overflow-hidden bg-slate-900 border border-stone-100 dark:border-slate-800 group/img cursor-pointer"
+                      >
                         <img
-                          src={optimizeUnsplashUrl(item.imageUrl || getCategoryFallbackImage(item.category, item.categorySlug), 500, 80)}
+                          src={optimizeUnsplashUrl(
+                            (item.images && item.images.length > 0 ? item.images[0] : item.imageUrl) ||
+                              getCategoryFallbackImage(item.category, item.categorySlug),
+                            500,
+                            80
+                          )}
                           alt={item.name}
                           loading="lazy"
                           decoding="async"
                           className="w-full h-full object-cover group-hover/img:scale-105 transition-transform duration-500"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (!target.dataset.fallbackApplied) {
+                              target.dataset.fallbackApplied = 'true';
+                              target.src = getCategoryFallbackImage(item.category, item.categorySlug);
+                            }
+                          }}
                         />
                         <div className="absolute top-2 left-2 flex items-center gap-1">
                           <span className="bg-red-600 text-white text-[9px] font-black uppercase px-2 py-0.5 rounded-md shadow-xs">
@@ -927,11 +970,18 @@ export default function DirectoryPage() {
                         {/* Photo Gallery Button Overlay */}
                         <button
                           type="button"
-                          onClick={() => handleOpenGalleryModal(item)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenGalleryModal(item);
+                          }}
                           className="absolute bottom-2 left-2 px-2.5 py-1 rounded-md bg-black/75 hover:bg-black text-white text-[9px] font-black uppercase tracking-wider backdrop-blur-xs flex items-center gap-1 transition-all cursor-pointer"
                         >
                           <Camera className="w-3 h-3 text-amber-400" />
-                          <span>View Photos</span>
+                          <span>
+                            {item.images && item.images.length > 1
+                              ? `${item.images.length} Photos`
+                              : 'View Photos'}
+                          </span>
                         </button>
 
                         <span className="absolute bottom-2 right-2 bg-black/80 text-white text-[9px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">

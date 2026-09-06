@@ -55,6 +55,7 @@ export default function ContactUsClient() {
         name: name.trim(),
         email: email.trim(),
         phone: phone.trim() || 'N/A',
+        category: subject.trim(),
         subject: subject.trim(),
         message: message.trim(),
       });

@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, phone, subject, message } = body;
+    const { name, email, phone, subject, category, message } = body;
 
     if (!name || !email || !message) {
       return NextResponse.json(
@@ -20,13 +20,15 @@ export async function POST(request: Request) {
       );
     }
 
+    const resolvedCategory = (category || subject || 'General Query').trim();
+
     // 1. Insert into Supabase enquiries table
     try {
       await supabaseAdmin.from('enquiries').insert([
         {
           user_name: name.trim(),
           user_phone: phone?.trim() || email.trim(),
-          service_requested: subject?.trim() || 'Contact Form',
+          service_requested: resolvedCategory,
           message: message.trim(),
           status: 'unread',
           created_at: new Date().toISOString(),

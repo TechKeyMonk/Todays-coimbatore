@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
 import { supabaseAdmin } from '@/lib/supabaseServer';
 import { Article } from '@/services/db';
+import { getCategoryConfig, isArticleInCategory, sanitizeCategorySlug } from '@/lib/categories';
 import crypto from 'crypto';
 
 export const dynamic = 'force-dynamic';
@@ -17,16 +18,42 @@ function slugify(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+async function cleanupOldStorageImage(oldUrl?: string | null) {
+  if (!oldUrl || typeof oldUrl !== 'string') return;
+  try {
+    if (oldUrl.includes('articles-bucket')) {
+      const parts = oldUrl.split('articles-bucket/');
+      if (parts.length > 1) {
+        const filePath = decodeURIComponent(parts[1].split('?')[0]);
+        if (filePath) {
+          await supabaseAdmin.storage.from('articles-bucket').remove([filePath]);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Storage Cleanup] Non-critical error removing old article asset:', err);
+  }
+}
+
 function mapNewsRowToArticle(row: any): Article {
   const wordCount = ((row.content || '') + ' ' + (row.title || '')).trim().split(/\s+/).filter(Boolean).length;
   const readTime = row.read_time || `${Math.max(1, Math.ceil(wordCount / 130))} min`;
   const slug = row.slug || slugify(row.title) || row.id;
   const isExclusive = !!(
     row.is_exclusive === true ||
-    (Array.isArray(row.keywords) && row.keywords.includes('__EXCLUSIVE__'))
+    row.is_spotlight === true ||
+    row.isSpotlight === true ||
+    row.spotlight === 1 ||
+    row.spotlight === true ||
+    (Array.isArray(row.keywords) && (row.keywords.includes('__EXCLUSIVE__') || row.keywords.includes('__SPOTLIGHT__'))) ||
+    (typeof row.keywords === 'string' && (row.keywords.includes('__EXCLUSIVE__') || row.keywords.includes('__SPOTLIGHT__'))) ||
+    row.category?.toUpperCase() === 'BREAKING SPOTLIGHT'
   );
   const videoUrl = row.video_url || undefined;
   const mediaType = (row.media_type || (videoUrl ? 'video' : 'image')) as 'image' | 'video';
+
+  const rawImageUrl = (row.image_url || '').toString().trim();
+  const validImageUrl = rawImageUrl && rawImageUrl !== 'null' && rawImageUrl !== 'undefined' ? rawImageUrl : null;
 
   return {
     id: row.id,
@@ -40,12 +67,15 @@ function mapNewsRowToArticle(row: any): Article {
     createdAt: row.created_at || new Date().toISOString(),
     updatedAt: row.updated_at || row.created_at || new Date().toISOString(),
     isExclusive,
+    isSpotlight: isExclusive,
+    is_spotlight: isExclusive,
     status: (row.status || 'published') as 'published' | 'draft' | 'archived',
     sourceUrl: row.source_url || undefined,
     source_url: row.source_url || undefined,
     mediaType,
-    imageUrl: row.image_url || undefined,
-    image: row.image_url || undefined,
+    imageUrl: validImageUrl || undefined,
+    image: validImageUrl || undefined,
+    image_url: validImageUrl,
     videoUrl,
     excerpt: row.content ? row.content.slice(0, 180).trim() + '...' : 'Coimbatore hyper-local reporting.',
     content: row.content || '',
@@ -62,6 +92,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category') || undefined;
+    const search = searchParams.get('search') || searchParams.get('q') || undefined;
     const status = searchParams.get('status') || undefined;
 
     let query = supabaseAdmin.from('news').select('*').order('created_at', { ascending: false });
@@ -75,8 +106,27 @@ export async function GET(request: Request) {
       query = query.or('status.eq.published,status.is.null');
     }
 
-    if (category && category !== 'ALL') {
-      query = query.ilike('category', category);
+    if (category && category.trim() !== '' && category.toUpperCase() !== 'ALL') {
+      const sanitized = sanitizeCategorySlug(category);
+      const categoryConfig = getCategoryConfig(sanitized);
+      if (categoryConfig && categoryConfig.allowedDbCategories.length > 0) {
+        query = query.in('category', categoryConfig.allowedDbCategories);
+      } else {
+        const escaped = category.trim().replace(/[%_]/g, '');
+        if (escaped.length > 0) {
+          query = query.ilike('category', `%${escaped}%`);
+        }
+      }
+    } else {
+      // Standard news query strictly ignores EVENTS
+      query = query.not('category', 'ilike', '%event%');
+    }
+
+    if (search && search.trim().length > 0) {
+      const sanitizedSearch = search.trim().replace(/[%_]/g, '');
+      if (sanitizedSearch.length > 0) {
+        query = query.or(`title.ilike.%${sanitizedSearch}%,content.ilike.%${sanitizedSearch}%`);
+      }
     }
 
     const { data, error } = await query;
@@ -86,7 +136,24 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: 'Failed to fetch articles' }, { status: 500 });
     }
 
-    const articles = (data || []).map(mapNewsRowToArticle);
+    let articles = (data || []).map(mapNewsRowToArticle);
+
+    if (category && category.trim() !== '' && category.toUpperCase() !== 'ALL') {
+      articles = articles.filter((art) => isArticleInCategory(art, category));
+    } else {
+      articles = articles.filter((art) => (art.category || '').toUpperCase().trim() !== 'EVENTS');
+    }
+
+    if (search && search.trim().length > 0) {
+      const q = search.trim().toLowerCase();
+      articles = articles.filter((art) =>
+        art.title?.toLowerCase().includes(q) ||
+        art.excerpt?.toLowerCase().includes(q) ||
+        art.content?.toLowerCase().includes(q) ||
+        art.category?.toLowerCase().includes(q) ||
+        art.author?.toLowerCase().includes(q)
+      );
+    }
 
     return NextResponse.json(articles, {
       headers: { 'Cache-Control': 'no-store, max-age=0' },
@@ -109,12 +176,20 @@ export async function POST(request: Request) {
     const rawSlug = body.slug || slugify(title) || `story-${Date.now()}`;
     const slug = rawSlug.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
     const content = body.content || body.excerpt || '';
-    const category = body.category || 'NEWS';
+    const rawCategory = (body.category || 'NEWS').trim();
+    if (rawCategory.toUpperCase() === 'EVENTS') {
+      return NextResponse.json(
+        { success: false, error: 'Category "EVENTS" cannot be assigned to general news stories. Please use the Events CMS.' },
+        { status: 400 }
+      );
+    }
+    const category = rawCategory;
     const author = body.author || 'Editorial Bureau';
-    const imageUrl = body.imageUrl || body.image || body.mediaUrl || null;
+    const rawImage = (body.imageUrl || body.image || body.mediaUrl || '').toString().trim();
+    const imageUrl = rawImage && rawImage !== 'null' && rawImage !== 'undefined' ? rawImage : null;
     const videoUrl = body.videoUrl || null;
     const status = body.status || 'published';
-    const isExclusive = !!body.isExclusive;
+    const isExclusive = !!(body.isExclusive || body.isSpotlight || body.is_spotlight || body.spotlight);
 
     // Build keywords array
     let keywords: string[] | null = null;
@@ -126,6 +201,7 @@ export async function POST(request: Request) {
     if (isExclusive) {
       keywords = keywords || [];
       if (!keywords.includes('__EXCLUSIVE__')) keywords.push('__EXCLUSIVE__');
+      if (!keywords.includes('__SPOTLIGHT__')) keywords.push('__SPOTLIGHT__');
     }
 
     const newId =
@@ -194,26 +270,59 @@ export async function PUT(request: Request) {
 
     if (body.title !== undefined) updatePayload.title = body.title;
     if (body.slug !== undefined) updatePayload.slug = slugify(body.slug);
-    if (body.category !== undefined) updatePayload.category = body.category;
+    if (body.category !== undefined) {
+      const catUpper = String(body.category).trim().toUpperCase();
+      if (catUpper === 'EVENTS') {
+        return NextResponse.json(
+          { success: false, error: 'Category "EVENTS" cannot be assigned to general news stories.' },
+          { status: 400 }
+        );
+      }
+      updatePayload.category = body.category;
+    }
     if (body.content !== undefined) updatePayload.content = body.content;
     if (body.author !== undefined) updatePayload.author = body.author;
     if (body.status !== undefined) updatePayload.status = body.status;
-    if (body.imageUrl !== undefined || body.image !== undefined) {
-      updatePayload.image_url = body.imageUrl || body.image || null;
+    if (body.imageUrl !== undefined || body.image !== undefined || body.image_url !== undefined || body.mediaUrl !== undefined) {
+      const raw = (body.imageUrl ?? body.image ?? body.image_url ?? body.mediaUrl ?? '').toString().trim();
+      updatePayload.image_url = raw && raw !== 'null' && raw !== 'undefined' ? raw : null;
     }
     if (body.videoUrl !== undefined) updatePayload.video_url = body.videoUrl;
     if (body.seoTitle !== undefined) updatePayload.seo_title = body.seoTitle;
     if (body.metaDescription !== undefined) updatePayload.meta_description = body.metaDescription;
-    if (body.keywords !== undefined || body.isExclusive !== undefined) {
+    if (body.keywords !== undefined || body.isExclusive !== undefined || body.isSpotlight !== undefined || body.is_spotlight !== undefined || body.spotlight !== undefined) {
+      const isSpotlight = !!(body.isExclusive || body.isSpotlight || body.is_spotlight || body.spotlight);
       const kw: string[] = Array.isArray(body.keywords)
         ? body.keywords
         : typeof body.keywords === 'string'
         ? body.keywords.split(',').map((k: string) => k.trim()).filter(Boolean)
         : [];
-      if (body.isExclusive && !kw.includes('__EXCLUSIVE__')) kw.push('__EXCLUSIVE__');
+      if (isSpotlight) {
+        if (!kw.includes('__EXCLUSIVE__')) kw.push('__EXCLUSIVE__');
+        if (!kw.includes('__SPOTLIGHT__')) kw.push('__SPOTLIGHT__');
+      } else if (body.isExclusive === false || body.isSpotlight === false || body.is_spotlight === false || body.spotlight === 0) {
+        const filteredKw = kw.filter((k: string) => k !== '__EXCLUSIVE__' && k !== '__SPOTLIGHT__');
+        kw.length = 0;
+        kw.push(...filteredKw);
+      }
       updatePayload.keywords = kw.length > 0 ? kw : null;
     }
     updatePayload.updated_at = new Date().toISOString();
+
+    // Check old image for storage cleanup
+    let oldImageUrl: string | null = null;
+    try {
+      const { data: existingRow } = await supabaseAdmin
+        .from('news')
+        .select('image_url')
+        .or(isUuid ? `id.eq.${articleId}` : `slug.eq.${articleId}`)
+        .maybeSingle();
+      if (existingRow?.image_url) {
+        oldImageUrl = existingRow.image_url;
+      }
+    } catch (e) {
+      console.warn('Could not fetch existing article image_url:', e);
+    }
 
     let query = supabaseAdmin.from('news').update(updatePayload);
     if (isUuid) {
@@ -226,6 +335,10 @@ export async function PUT(request: Request) {
     if (error) {
       console.error('[articles PUT] Supabase update error:', error);
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    if (oldImageUrl && updatePayload.image_url === null && oldImageUrl !== updatePayload.image_url) {
+      await cleanupOldStorageImage(oldImageUrl);
     }
 
     try {
