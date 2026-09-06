@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, CheckCircle2, Trash2, ExternalLink, Clock, Sparkles, FileText, Check } from 'lucide-react';
 import { clientNewsService, RssDraft } from '@/lib/supabase/news';
 
@@ -11,13 +11,13 @@ export default function RssFetcher() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  const showMessage = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const showMessage = useCallback((text: string, type: 'success' | 'error' | 'info' = 'success') => {
     setMessage({ text, type });
     setTimeout(() => setMessage(null), 5000);
-  };
+  }, []);
 
   // 1. Fetch Drafts on Component Mount directly from Supabase `rss_drafts`
-  const loadDrafts = async () => {
+  const loadDrafts = useCallback(async () => {
     setIsLoading(true);
     try {
       const items = await clientNewsService.getRssDrafts();
@@ -28,11 +28,11 @@ export default function RssFetcher() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [showMessage]);
 
   useEffect(() => {
     loadDrafts();
-  }, []);
+  }, [loadDrafts]);
 
   // 2. Scan & Fetch RSS: Upserts into `rss_drafts` without inserting to `news`
   const handleFetchRss = async () => {

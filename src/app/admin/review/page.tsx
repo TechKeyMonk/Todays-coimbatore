@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -52,13 +52,13 @@ export default function AdminReviewPage() {
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const addToast = (text: string, type: 'success' | 'error' | 'info' = 'success') => {
+  const addToast = useCallback((text: string, type: 'success' | 'error' | 'info' = 'success') => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     setToasts((prev) => [...prev, { id, type, text }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
     }, 4000);
-  };
+  }, []);
 
   const removeToast = (id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -75,7 +75,7 @@ export default function AdminReviewPage() {
   };
 
   // 1. Fetch Drafts on Component Mount from Supabase `rss_drafts` table
-  const loadDrafts = async () => {
+  const loadDrafts = useCallback(async () => {
     setIsLoading(true);
     try {
       // Primary: Load pending drafts from Supabase `rss_drafts` table
@@ -120,11 +120,11 @@ export default function AdminReviewPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [addToast]);
 
   useEffect(() => {
     loadDrafts();
-  }, []);
+  }, [loadDrafts]);
 
   // 2. Trigger RSS Ingestion: Upserts to `rss_drafts` with ZERO inserts into `news`
   const handleTriggerRss = async () => {

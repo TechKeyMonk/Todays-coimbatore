@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import DynamicHeader from '@/components/layout/DynamicHeader';
@@ -10,11 +10,13 @@ import EventCard from '@/components/EventCard';
 import { supabase } from '@/lib/supabaseClient';
 import dbService, { EventRecord, mapNewsRowToEvent, mapDedicatedEventToEvent } from '@/services/db';
 
-export default function EventsClient({ initialEvents = [] }: { initialEvents?: EventRecord[] }) {
+const DEFAULT_INITIAL_EVENTS: EventRecord[] = [];
+
+export default function EventsClient({ initialEvents = DEFAULT_INITIAL_EVENTS }: { initialEvents?: EventRecord[] }) {
   const [events, setEvents] = useState<EventRecord[]>(initialEvents);
   const [activeVideoModal, setActiveVideoModal] = useState<string | null>(null);
 
-  const loadEvents = async () => {
+  const loadEvents = useCallback(async () => {
     try {
       // 1. Primary Query: Fetch records directly from Supabase `events` table
       let dedicatedEvents: any[] = [];
@@ -96,7 +98,7 @@ export default function EventsClient({ initialEvents = [] }: { initialEvents?: E
         setEvents(initialEvents);
       }
     }
-  };
+  }, [initialEvents]);
 
   useEffect(() => {
     loadEvents();
@@ -116,7 +118,7 @@ export default function EventsClient({ initialEvents = [] }: { initialEvents?: E
       window.removeEventListener('todayscoimbatore:db-updated', handleSync);
       window.removeEventListener('storage', handleSync);
     };
-  }, []);
+  }, [loadEvents]);
 
   const featuredEvent = events.find((e) => e.featured) || events[0];
 

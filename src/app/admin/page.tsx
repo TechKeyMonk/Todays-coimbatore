@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -277,6 +277,29 @@ const INITIAL_ADS: AdSlotSetting[] = [
       }
     ]
   },
+];
+
+const DIR_CATEGORY_OPTIONS = [
+  { name: 'Hospitals & Clinics', slug: 'hospitals-clinics', icon: '🏥' },
+  { name: 'Textiles & Garments', slug: 'textiles-garments', icon: '🧵' },
+  { name: 'Restaurants & Cafes', slug: 'restaurants-cafes', icon: '🍽️' },
+  { name: 'IT & Software', slug: 'it-software', icon: '💻' },
+  { name: 'Colleges & Universities', slug: 'colleges-universities', icon: '🎓' },
+  { name: 'Real Estate', slug: 'real-estate', icon: '🏢' },
+  { name: 'Jewellery', slug: 'jewellery', icon: '💎' },
+  { name: 'Automobile', slug: 'automobile', icon: '🚗' },
+  { name: 'Supermarkets', slug: 'supermarkets', icon: '🛒' },
+  { name: 'Hotels', slug: 'hotels', icon: '🏨' },
+  { name: 'Salons & Spas', slug: 'salons-spas', icon: '✂️' },
+  { name: 'Gyms & Fitness', slug: 'gyms-fitness', icon: '💪' },
+  { name: 'Electronics', slug: 'electronics', icon: '📱' },
+  { name: 'Schools', slug: 'schools', icon: '📚' },
+  { name: 'Event Planners', slug: 'event-planners', icon: '🎉' },
+  { name: 'Logistics', slug: 'logistics', icon: '🚚' },
+  { name: 'Pharmacies', slug: 'pharmacies', icon: '💊' },
+  { name: 'Bakeries', slug: 'bakeries', icon: '🥐' },
+  { name: 'Furniture', slug: 'furniture', icon: '🛋️' },
+  { name: 'Travel Agencies', slug: 'travel-agencies', icon: '✈️' },
 ];
 
 export default function AdminPage() {
@@ -565,7 +588,7 @@ export default function AdminPage() {
   const [editingDirImageSlots, setEditingDirImageSlots] = useState<ImageSlotItem[]>([]);
 
   // Load all data from DB Service
-  const refreshAllData = async () => {
+  const refreshAllData = useCallback(async () => {
     try {
       const artList = await dbService.getArticles();
       setArticles(artList);
@@ -720,7 +743,7 @@ export default function AdminPage() {
     } catch (err) {
       console.error('Error loading DB records', err);
     }
-  };
+  }, []);
 
   useEffect(() => {
     refreshAllData();
@@ -742,7 +765,7 @@ export default function AdminPage() {
         window.removeEventListener('enquiriesStorageUpdate', refreshAllData);
       }
     };
-  }, []);
+  }, [refreshAllData]);
 
   // Check auth session
   useEffect(() => {
@@ -1513,29 +1536,6 @@ export default function AdminPage() {
     setEventSuccess('Updated event featured status!');
     setTimeout(() => setEventSuccess(''), 2000);
   };
-
-  const DIR_CATEGORY_OPTIONS = [
-    { name: 'Hospitals & Clinics', slug: 'hospitals-clinics', icon: '🏥' },
-    { name: 'Textiles & Garments', slug: 'textiles-garments', icon: '🧵' },
-    { name: 'Restaurants & Cafes', slug: 'restaurants-cafes', icon: '🍽️' },
-    { name: 'IT & Software', slug: 'it-software', icon: '💻' },
-    { name: 'Colleges & Universities', slug: 'colleges-universities', icon: '🎓' },
-    { name: 'Real Estate', slug: 'real-estate', icon: '🏢' },
-    { name: 'Jewellery', slug: 'jewellery', icon: '💎' },
-    { name: 'Automobile', slug: 'automobile', icon: '🚗' },
-    { name: 'Supermarkets', slug: 'supermarkets', icon: '🛒' },
-    { name: 'Hotels', slug: 'hotels', icon: '🏨' },
-    { name: 'Salons & Spas', slug: 'salons-spas', icon: '✂️' },
-    { name: 'Gyms & Fitness', slug: 'gyms-fitness', icon: '💪' },
-    { name: 'Electronics', slug: 'electronics', icon: '📱' },
-    { name: 'Schools', slug: 'schools', icon: '📚' },
-    { name: 'Event Planners', slug: 'event-planners', icon: '🎉' },
-    { name: 'Logistics', slug: 'logistics', icon: '🚚' },
-    { name: 'Pharmacies', slug: 'pharmacies', icon: '💊' },
-    { name: 'Bakeries', slug: 'bakeries', icon: '🥐' },
-    { name: 'Furniture', slug: 'furniture', icon: '🛋️' },
-    { name: 'Travel Agencies', slug: 'travel-agencies', icon: '✈️' },
-  ];
 
   const dynamicAdminCategoryOptions = useMemo(() => {
     const map = new Map<string, { name: string; slug: string; icon: string }>();

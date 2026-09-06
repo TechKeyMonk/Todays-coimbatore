@@ -1,0 +1,337 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - banner [ref=e3]:
+      - generic [ref=e4]:
+        - generic [ref=e5]:
+          - link "Admin CMS" [ref=e6] [cursor=pointer]:
+            - /url: /admin?tab=articles
+          - generic [ref=e10]: /
+          - generic [ref=e11]:
+            - heading "AI Draft Review & Publishing Queue" [level=1] [ref=e13]
+            - generic [ref=e14]: 17 PREVIEW DRAFTS
+        - button "Fetch Latest RSS" [ref=e16] [cursor=pointer]
+    - main [ref=e23]:
+      - generic [ref=e24]:
+        - generic [ref=e29]:
+          - text: "In-Memory Preview Queue:"
+          - generic [ref=e30]:
+            - text: Fetched RSS stories are stored in
+            - strong [ref=e31]: memory / preview state only
+            - text: and are
+            - strong [ref=e32]: NOT inserted into the database
+            - text: automatically. Click
+            - strong [ref=e33]: "\"Publish\""
+            - text: on any card to insert and publish it live, or
+            - strong [ref=e34]: "\"Copy Draft\""
+            - text: to edit manually in
+            - link "Admin CMS" [ref=e35] [cursor=pointer]:
+              - /url: /admin?tab=articles
+            - text: .
+        - generic [ref=e36]:
+          - button "Clear Queue" [ref=e59] [cursor=pointer]
+          - button "↻ Refresh" [ref=e37] [cursor=pointer]
+      - generic [ref=e38]:
+        - generic [ref=e39]:
+          - button "All" [ref=e40] [cursor=pointer]
+          - button "News" [ref=e41] [cursor=pointer]
+          - button "Our City" [ref=e42] [cursor=pointer]
+          - button "Business" [ref=e43] [cursor=pointer]
+          - button "Tech" [ref=e44] [cursor=pointer]
+          - button "Infrastructure" [ref=e45] [cursor=pointer]
+          - button "CEO" [ref=e46] [cursor=pointer]
+          - button "Sports" [ref=e47] [cursor=pointer]
+          - button "Education" [ref=e48] [cursor=pointer]
+          - button "E-Paper" [ref=e49] [cursor=pointer]
+        - textbox "Search headline or content..." [ref=e51]
+      - generic [ref=e52]:
+        - generic [ref=e60]:
+          - generic [ref=e61]:
+            - generic [ref=e62]:
+              - generic [ref=e63]: News
+              - generic [ref=e65]: 26 mins ago
+            - heading "Coimbatore Police Launch Probe After Hyderabad Businessman Robbed of ₹1 Crore in City" [level=3] [ref=e70]
+            - paragraph [ref=e71]: The Coimbatore city police have initiated a comprehensive investigation following an incident in which a Hyderabad-based businessman was reportedly ambushed and robbed of ₹1 crore...
+            - generic [ref=e72]:
+              - generic [ref=e73]: "Source: news.google.com"
+              - link "Original" [ref=e74] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMixwFBVV95cUxPTjdnaTlIZ0xoZm9tbWhFWWpFeU9rbmpDSEFmUm41bWpJelljTW9YaVBiNmFlYS1Xd3l0RE5qOUZRbkRBMFduUlRTMDN4UXo4aGRUTjBKVHhQM3lFNkZLNnJxSm9wdUZmUnpLTU12Y1NaRWZPdTd4TFhTRGp4TG9UQ2ktNHJtT0pob0JndjFab1pibkw3TVNRa1J3TEw3V0ZGeHROVGtaNGJQMTZwb0F0QVVUdmJGMlEwYUoxUVp0OHVVUDMwRlc40gHUAUFVX3lxTE44eXUxc0NMS0hpcDd4cVFRTXppOUd3S09aM3ZYNGFMV3YtdmMwNmpkLUtMQzFvSjdZNkgyVkZGdUFkN0NpNW5BSjdDbTZYN1JkNnhid1R2bTczWXlpUldDakVDYVZfYmgtZW41Z3dZTTZVZ0lTN3l5dmt0M3V4bnlYYXBhdzU3OUxWeWpZdGlpdExLd0wtZzFtQTlWQVZuNXpQQS1yRXdEWC1RQWE0MEpaNVVsWWZ0TWJvbml4SFAxX3p6TXBrbHR0cTVoSFhDNDItRE9r?oc=5
+          - generic [ref=e80]:
+            - button "View" [ref=e81] [cursor=pointer]
+            - generic [ref=e86]:
+              - button "Dismiss & Remove draft" [ref=e87] [cursor=pointer]
+              - button "Copy" [ref=e91] [cursor=pointer]
+              - button "Publish" [ref=e96] [cursor=pointer]
+        - generic [ref=e101]:
+          - generic [ref=e102]:
+            - generic [ref=e103]:
+              - generic [ref=e104]: Our City
+              - generic [ref=e106]: 1 hour ago
+            - heading "Coimbatore Police Arrest Suspect After Street Dogs Thwart Assault Attempt" [level=3] [ref=e111]
+            - paragraph [ref=e112]: In an unusual turn of events in Coimbatore, an attempted assault on a woman was successfully thwarted when a pack of local street dogs intervened, alerting nearby residents and dri...
+            - generic [ref=e113]:
+              - generic [ref=e114]: "Source: news.google.com"
+              - link "Original" [ref=e115] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMiwwFBVV95cUxQemxkSG9FVmMxZUpsWjIwY3pCWEZoQTV4OXhFbl96QkNzWGlYVFJfWG4zRldnMUZKRDI0bmZxVi01Y3FaRmNtSnJrZ21qYlEtVkV6Z3ZkVjNmLTNoSF9FQ2xhRThGQkdzWHYtbEpTcjN5NEhDR0xBRUtteXBac3F5VWgxWFlDeDVBOUVjR19mM0pTdmoyZHNObmZQb21CWmM3OFhfa2o1NEpRazAyLWEtck9CUWROaVJNbW91SEZLNFM1T1nSAcoBQVVfeXFMTmZYaU9va0RIaDFVUlpFcTRIZDZjMkVVZ2h4Umd2ODFLQnNnQ0c3RkQwM2pheHZnOUR5OGNlUjUwVXNzZzgwYzBBdnhwYUlUbjJvTW1OMXd6MW9GREdBNjNvR2lKdTZwS0puTGtabm42aEwxUk1TbE5LZjZXTEFxMU13V1BENzl0UEV4QmxqZTBPcmV4T001M2NnREQzS254TzJ3cERWU3liUzRHMHowcUh0X2plSTlWOWpyVmRvUDFlRGwwNUs3bXpZUQ?oc=5
+          - generic [ref=e121]:
+            - button "View" [ref=e122] [cursor=pointer]
+            - generic [ref=e127]:
+              - button "Dismiss & Remove draft" [ref=e128] [cursor=pointer]
+              - button "Copy" [ref=e132] [cursor=pointer]
+              - button "Publish" [ref=e137] [cursor=pointer]
+        - generic [ref=e142]:
+          - generic [ref=e143]:
+            - generic [ref=e144]:
+              - generic [ref=e145]: OUR CITY
+              - generic [ref=e147]: 1 hour ago
+            - heading "Coimbatore District Administration Issues Guidelines for Eco-Friendly and Safe Vinayaka Chaturthi Celebrations" [level=3] [ref=e152]
+            - paragraph [ref=e153]: In preparation for the upcoming Vinayaka Chaturthi festivities, the Coimbatore District Collector convened a high-level coordination meeting with local authorities, public safety o...
+            - generic [ref=e154]:
+              - generic [ref=e155]: "Source: news.google.com"
+              - link "Original" [ref=e156] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMi5AFBVV95cUxOZ0M1T2RMa1NJOU9weV9uREhGSWQ2ZFI1NHhJWVVYaXZnMFRTNTBaa29jWWNDY0tEN0stOUFVQUtSV05aOFFaNDZrek13alotQ2o5TGxLdUFfcFZBT1NLUlpITVVTeVcwdzZZWTkwODBqS0RTbUVXc2xsWDB2ajVJZlVFamdxM05Xa0FadGV0cXN4YkZxcm8xZnZNMGRlR0d1UGVZLVB3c1h5TUpobHVtUnRydTlGWkdsZ19vQmIyRHNVdXcxQTIyQWFtTm5hVmZiZHJteW1sNnhOcXNWdnk4TVpyRE7SAesBQVVfeXFMT01tVkVVenFRSE53NEx1ckwyQlFRUGRyU1E0Uk1kSFJlUlFXSGk0OUF5XzBIdDFuY3RiWnNXTzI1UHdYZVJfUTRlTENCR1VwUU5OYjFpUnRrMWhya01EajlQTTRsa0lYdTQ4alVUYy1fVW0zamdQaEVvb0ZNWG93TDRFYnkyOFhrZmFPaGNwTWRPSUw5RTFQcG53eWx3c0t4VlZGUEVxV3kyaFdwelJSbkJsX2lNVTQ5Vm9JZW8yWjQ0cjhNdUN5U0M1TllyTXN4NVo1eXkwOUdfZHR2VnktVlFFN04zTExFNTZFbw?oc=5
+          - generic [ref=e162]:
+            - button "View" [ref=e163] [cursor=pointer]
+            - generic [ref=e168]:
+              - button "Dismiss & Remove draft" [ref=e169] [cursor=pointer]
+              - button "Copy" [ref=e173] [cursor=pointer]
+              - button "Publish" [ref=e178] [cursor=pointer]
+        - generic [ref=e183]:
+          - generic [ref=e184]:
+            - generic [ref=e185]:
+              - generic [ref=e186]: Our City
+              - generic [ref=e188]: 1 hour ago
+            - heading "Coimbatore City Police Commemorate Police Day with Solemn Tributes and Civic Engagement Focus" [level=3] [ref=e193]
+            - paragraph [ref=e194]: The Coimbatore City and District Police departments observed Police Commemoration Day with solemn ceremonial parades and floral tributes dedicated to personnel who sacrificed their...
+            - generic [ref=e195]:
+              - generic [ref=e196]: "Source: news.google.com"
+              - link "Original" [ref=e197] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMipgFBVV95cUxPUE9Vb1NUTHZTSGc2TWMxVTViemZDTXBFaTBfb0pGY3dpc2FNLWhjS0VvRTVEMkcyX0c5a281ZHk3RHd0TE9HbWxuQnhQNDg1MHR6UDlMb0lYY0xSeWVDdUZKSzZzakZCN21fR3dRTGw0aUdYNWE5NVpnR01CRUMtSEhnd0tHWjQ3VVQ2SFNnS2QwWUFrOEwweXMwREt4NUQ0V0RWS1pB0gGsAUFVX3lxTE9jN3AyNFFMZEF1WDZxLTNnZXYyZzI4VmkyUW05anVOakdySWNiYkdOcUg3c2lSWlVWajc0ZHVBOVZzRUlPakpXSGlBMTBxTnR6SnRTTFRJWDZVeTJla1NhcndlSjk1RWZuRTF4MEcxR3JOTUFVUDNmNndncjJQUngzSk9sWmdQMFdkZVZWUW10ODdJZG80ZnhiRVNzRnYyeExNYnpFNmlVMlo3cjY?oc=5
+          - generic [ref=e203]:
+            - button "View" [ref=e204] [cursor=pointer]
+            - generic [ref=e209]:
+              - button "Dismiss & Remove draft" [ref=e210] [cursor=pointer]
+              - button "Copy" [ref=e214] [cursor=pointer]
+              - button "Publish" [ref=e219] [cursor=pointer]
+        - generic [ref=e224]:
+          - generic [ref=e225]:
+            - generic [ref=e226]:
+              - generic [ref=e227]: Infrastructure
+              - generic [ref=e229]: 1 hour ago
+            - heading "Coimbatore Corporation to Deploy Thermal Drones to Curb Fires at Vellalore Dumpyard" [level=3] [ref=e234]
+            - paragraph [ref=e235]: To tackle the chronic problem of subsurface fires and air pollution at the primary waste disposal site in Vellalore, the Coimbatore City Municipal Corporation is preparing to launc...
+            - generic [ref=e236]:
+              - generic [ref=e237]: "Source: news.google.com"
+              - link "Original" [ref=e238] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMi2wFBVV95cUxQUUZER1hBcWdVVDhzUUc2dmozbzRRWFBtZ2pJeWhTZTE2dEV1RElyQmFXVWZBV0cxQ3ZyZnk1X3plQlBlOVljYXUyMmthRjRYb3NtMWVkQVNuZ0Rya2tXNU9BdERZclBGRU9jZTdOcnY3bkE3MGo3ck9uUDlQV05wVHRMZ1RHcmI2R3FBWjFZSlFGVFdrNWd4SFlINWtack5hSUtFOGZfU2pLWTNhNXZJWlkxY1FqWFJrZWgzcTVlUGhndTB2bW0xS3RfVUU3czlSWVdrejAtSzZXdFnSAeIBQVVfeXFMTlVfaVN0Q0R0M1BHSnB0Qk9uNmJNcmJjWHFoblEtSFZYMER3T2w3b0E0Ym5XSnFQQm04S2M2SVZ3WkNJRDRjNDFnUFpCTFZhbURwV1RaRFpuRzdUc25WYnltbnJ0NUdQbHd2cnVxQXlLQVZTMURXanhldURmYXZjeHJVeXRXN1Jzd3ZvTWlUMnM3UkZuRTdQdVFEa1RVaklSaURTei1IXzRLS0xKR3dPc2kta2NUc2Y0SW1DVGROVkFXV0RwMWpoRnloWW5DS2pJUUhCN2lRN1RlQzQyOGVkSmxLZw?oc=5
+          - generic [ref=e244]:
+            - button "View" [ref=e245] [cursor=pointer]
+            - generic [ref=e250]:
+              - button "Dismiss & Remove draft" [ref=e251] [cursor=pointer]
+              - button "Copy" [ref=e255] [cursor=pointer]
+              - button "Publish" [ref=e260] [cursor=pointer]
+        - generic [ref=e265]:
+          - generic [ref=e266]:
+            - generic [ref=e267]:
+              - generic [ref=e268]: News
+              - generic [ref=e270]: 16 hours ago
+            - heading "Tamil Nadu Excise Minister Defends Disciplinary Action Against Tasmac Staff" [level=3] [ref=e275]
+            - paragraph [ref=e276]: Tamil Nadu Excise Minister S. Muthusamy has formally defended the state government's decision to suspend several Tasmac (Tamil Nadu State Marketing Corporation) employees. Speaking...
+            - generic [ref=e277]:
+              - generic [ref=e278]: "Source: news.google.com"
+              - link "Original" [ref=e279] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMi3gFBVV95cUxPU3hwZy1EWEhEWXVNV1l5WUFyN2EtVlhIcDVmeDUxcmN5TzcwVk5LR2RpdVBkbDRxUlNyY1R1aTlNZTIxbmI0WXd3blFLUTZLMmU4eVRZa2dpVzF2T19MNDFqbGR5Rnl4R0l2cnF5S1lLNDdBbEVxMlpHdGxnUU03QVVObS1NU3hwS2tGd0RuUkFYanMxX2ZVODhyd1lwMzkzYlVKZmJRdGdRZ0RPY1RESUF3ZDVOVEpTOUU2QkQ2QW9zQWtxaFFDLU1qaG5SOXBrUlVwa20yNE8zSmVtT3fSAeMBQVVfeXFMT2VuU1AxeHpPOWV0dnNweVF6ZmFmeTZIaTcxNnZnT042M3FVMW43Sm1SZjVrbE9vY01MaFNRMU8tR3luVnRSNVNtdTVNVTJkSF9LN1F1anlIaU5lXzBVMnlJaXE0bVRjZ3R3UV9OREV1UFEzTFpIYm9yX2VqNmpJSVk4VUY0LWRPZ0tuV2dlYnY2SU5YTUR3M2pDc2xaWDNtY0lwZ2xfYkJ3U0RwU2syVmhNaEJoTzM4N2tXZDZoOGdnUERua1dBVHFoTE9udXZ6TFdWTzk4QlRWbWRhOE5LSi1PUW8?oc=5
+          - generic [ref=e285]:
+            - button "View" [ref=e286] [cursor=pointer]
+            - generic [ref=e291]:
+              - button "Dismiss & Remove draft" [ref=e292] [cursor=pointer]
+              - button "Copy" [ref=e296] [cursor=pointer]
+              - button "Publish" [ref=e301] [cursor=pointer]
+        - generic [ref=e306]:
+          - generic [ref=e307]:
+            - generic [ref=e308]:
+              - generic [ref=e309]: News
+              - generic [ref=e311]: 16 hours ago
+            - heading "Local Teenager Apprehended Following Theft of Family Gold for Extravagant Purchase" [level=3] [ref=e316]
+            - paragraph [ref=e317]: Local law enforcement in Coimbatore have initiated legal proceedings against a teenage girl following the discovery of a theft involving significant quantities of family gold. The...
+            - generic [ref=e318]:
+              - generic [ref=e319]: "Source: news.google.com"
+              - link "Original" [ref=e320] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMiywFBVV95cUxQblNFSzJvWmhxTmdOOE9wMl8xcE9kcW1LSTF0b3ZqM2hFSmpjNUQ3SjRxbVJqczI5eXBibGx5LUtFaDNnZDBXNzdDNU9WajRNVUQwU3FDTlBGVE9oVkpjYXdDRy1lWUVPc0ZPX3kwTkhld1Q0LVlYemJOSXNVSmpDczhoUFJxQWtPTE9teGNTSk04cElfTmoyamNNSElkQ1dMUWdqREhUUW1WRVJZV2NqeFEzVnZTbUNHeVBKbkN3dHVQcjF1YWtwdnNZUdIB0AFBVV95cUxNeFR5NUQ4RURaQ1FQMWZpUktmN0FMYjR4M3VjTmhYUU83SzN6U2M4QVcyclA4NkJhVGV4dzd1Zl9ZUEhFdzNqRTNiM2dKUmJVUmhSYmQ3QVExbFJUc0pKX1pSQnVOQ3g1TlRMYWpTdmRXM0dXWi1LcksyM3pXMjJEcERCNzBYWDJVX29oeVBoME5xMV9YRURDeTlLOWtZOVFJdW9KV05naXF3QWVlQU16RG1tMzdXUmtUaXNCTDVxbGt1OWZBaEhqUVlONjJuUVpl?oc=5
+          - generic [ref=e326]:
+            - button "View" [ref=e327] [cursor=pointer]
+            - generic [ref=e332]:
+              - button "Dismiss & Remove draft" [ref=e333] [cursor=pointer]
+              - button "Copy" [ref=e337] [cursor=pointer]
+              - button "Publish" [ref=e342] [cursor=pointer]
+        - generic [ref=e347]:
+          - generic [ref=e348]:
+            - generic [ref=e349]:
+              - generic [ref=e350]: News
+              - generic [ref=e352]: 16 hours ago
+            - heading "Coimbatore Police Apprehend Woman for Gold Theft to Fund Boyfriend's Vehicle Purchase" [level=3] [ref=e357]
+            - paragraph [ref=e358]: Coimbatore city police have successfully apprehended a woman accused of orchestrating a gold theft to secure funds for purchasing a motorcycle for her boyfriend. The arrest follows...
+            - generic [ref=e359]:
+              - generic [ref=e360]: "Source: news.google.com"
+              - link "Original" [ref=e361] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMi2gFBVV95cUxOZ216RFV1RnY0Szl6VS1nampFUUF5TGVxOGpkTzlBNnpLMVo4MFZZSWU0NEVWMEtQMHJFWU4wM0IwaVRveDNyUUZKZFZqVHBpOXFldDFiS3F3NDVpNTdZYmJtVGdxNHo0VHIzVGdMYUdpR0pxVkxYeDVvZUtYekdVMG5XSXBsWUlvWE9ELWw5MzhMVkhDb0hXMlZBc0JvcUppamxESTlua2tLdENmcEZheEhaMW5QTjZuZGlhRlNzRXl6WE16MXV5cExZQ0UxYVFsTGRCYmd0QURaZ9IB3wFBVV95cUxOWFhtNG5WTmRKeHdLNkFYT0sxZHlqNmRKS0FZbmdOX3pZX0ZHSXRmWmpFVjlMZEJqcU4zSEwtSmpaRGdpbXNNbC1hYXVFM2o5ODhSc3lOZnBfRmx6TGVyV1lTYmtOdWJ1Q0JacU16d2dYb2kzTFhfWUtsVVEyVUxybHQ3ajdwcERPT3lIUEN6bEowOEVLcGpnZUlQeWgtdElIZjdzanRvWUdOZHZwZUthWnJzQXJJLS1wWlNkZ3VkaGk2ek1jd3JMTVVSRVNzUFZmSllGUVc0UTFtQWJFc2Vj?oc=5
+          - generic [ref=e367]:
+            - button "View" [ref=e368] [cursor=pointer]
+            - generic [ref=e373]:
+              - button "Dismiss & Remove draft" [ref=e374] [cursor=pointer]
+              - button "Copy" [ref=e378] [cursor=pointer]
+              - button "Publish" [ref=e383] [cursor=pointer]
+        - generic [ref=e388]:
+          - generic [ref=e389]:
+            - generic [ref=e390]:
+              - generic [ref=e391]: News
+              - generic [ref=e393]: 16 hours ago
+            - heading "Local Teen Detained Following Gold Theft Incident in Coimbatore" [level=3] [ref=e398]
+            - paragraph [ref=e399]: Local law enforcement officials in Coimbatore have apprehended a teenage girl following an investigation into the disappearance of gold valuables from her residence. Preliminary re...
+            - generic [ref=e400]:
+              - generic [ref=e401]: "Source: news.google.com"
+              - link "Original" [ref=e402] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMitwFBVV95cUxOcld3dmlpaTlkVjI4QklETzVYT3FtMUtHRGtqRnlENDNYaDViUUFHS0NjVGZvaFdraUp6NFNxcGJqT1VBNGFEYXppbUFRRkRjWlpoM3VKUGNmcE5ISmE5ZnhuOWw3RmdLUHd6eWlDQXJHckp3RVZKRTRiTmVjLVQ4aHU1V0d5UWY0ZGVzUEdUUTlEVi1oc29yXzhnYV9JLUs1MXNlTlAyYU9CSlRKTkFBQ0dUa2ZtRDTSAcQBQVVfeXFMTVZBZExFczFBb0VsYjdxek9iS3E4Yk1XZHgwY3haeTA4bUxZTWV2Yy1adlNST19EeEQ5ZlZXSEkySU1jdndmMk1tc24wVlFfTHlhTHlBeUJkSW5FZlJ2NEp5LWlOdGNrcVpkZHNOclY3ZWR0MjV1eHhlemIwNFZNY3BDTmxYUFk1Q2dhWHNaWkpaVGVub1ZQS2pNQW9laWU4TU5pREZaNlhiVGpweTdEZW1udlJ1VjZRSmVrRUFIdTRQUGMtWg?oc=5
+          - generic [ref=e408]:
+            - button "View" [ref=e409] [cursor=pointer]
+            - generic [ref=e414]:
+              - button "Dismiss & Remove draft" [ref=e415] [cursor=pointer]
+              - button "Copy" [ref=e419] [cursor=pointer]
+              - button "Publish" [ref=e424] [cursor=pointer]
+        - generic [ref=e429]:
+          - generic [ref=e430]:
+            - generic [ref=e431]:
+              - generic [ref=e432]: News
+              - generic [ref=e434]: 16 hours ago
+            - heading "Minor Apprehended Following Public Harassment Incident in Coimbatore" [level=3] [ref=e439]
+            - paragraph [ref=e440]: A disturbing incident of public harassment occurred recently in Coimbatore, involving a minor who allegedly molested a woman on a public thoroughfare. The situation took an unexpec...
+            - generic [ref=e441]:
+              - generic [ref=e442]: "Source: news.google.com"
+              - link "Original" [ref=e443] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMiqgFBVV95cUxNZkpBM1FvWWRMODk3Y3ZObnowTDZ4N2c2TlF5SC1hZUg1ajZMWVlMT3pqR3FkZC0xa1ZGRGF0eWR2YUlWM05iVWxSQ3Y1UTdvM3NyZ0JjYjV5MUNJNmd2enZhQ2RVWFB1NjJsV3oweTc0SEtMNm9oZlFzSXdoaXEyU0ZGMDRGN3VrLVFhNF9RWktIcEFDejZsdEFHVWNPM3RYRnFEV3REcE1LQdIBsgFBVV95cUxQVFNwX0JOOUR4cmNMM1hrRGN3TDlrLUV1alVUcFhUYVBLT2ptT3B6X01kMF9lMjNqRnhHNVFlRWpvQ3JkcUpUTGFCT043VG8tX0MxTkFFSmVRcTl0RVVHWi1neEJqTlZXOEJodG9ySVYySlZkbmFqVS1WbTdOVXV5eVV5MU4tZV9IQTFvVFNIVm9UeEVGMWxXWlBlSFVrd1lXZjhGYURTdkR2ZUhwVktHSHlB?oc=5
+          - generic [ref=e449]:
+            - button "View" [ref=e450] [cursor=pointer]
+            - generic [ref=e455]:
+              - button "Dismiss & Remove draft" [ref=e456] [cursor=pointer]
+              - button "Copy" [ref=e460] [cursor=pointer]
+              - button "Publish" [ref=e465] [cursor=pointer]
+        - generic [ref=e470]:
+          - generic [ref=e471]:
+            - generic [ref=e472]:
+              - generic [ref=e473]: News
+              - generic [ref=e475]: 1 day ago
+            - heading "Nagpur Police Dismantle Cybercrime Mule Network Operating from Coimbatore" [level=3] [ref=e480]
+            - paragraph [ref=e481]: In a significant cross-state law enforcement operation, Nagpur police conducted targeted raids within Coimbatore, successfully dismantling a criminal network specialized in the ope...
+            - generic [ref=e482]:
+              - generic [ref=e483]: "Source: news.google.com"
+              - link "Original" [ref=e484] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMi7AFBVV95cUxPVTBHS0oweTFqQ05Md3ZDSXJCTUJSbHg4cnJiNl9RX1ZkZEQyanR3cGlxaE5ncHpYOWZVcWNqSzlXS0UzNmI3N0ZydW9KT2ZLTy1La2dnSjlaYi1iZkpKQ1VHVUwzZFhLUmZteUNJREo0YmdBUVpuVF95YzlBbWZlQ3NpRzFVUTNMMDNSVW8wZXVBV0tpRGtoZzEyeVo2dXFKOUtpTzJkaEtLdF92X0M4ZXBNeVNCQXlOa2NoZ3RPak81UFplNzFlRnRJLTd1amJaY3c0WjhRbFo0LVZXaW1lVHpENUpvX2gydW5ibdIB8gFBVV95cUxOaEdHRTQwUFVTRW9TeHNINmYwNmNEdHNtRkFBc3pVMnllMGloUXlDaFpCQnA1aU1YWDByNW5uOGt0RTVkaG1hS3FZeXAyd1ZZbUZvQjNjc2hNT3poRDJLTS1qNGFIV05lVE0tZGFTVzlPbHpiUWRKbFhLdFNsNGxMcFN0TEowajFPdWFaRlRyX3RUTHllMlJ6VTBubW93ZHJqbS1HaW1lZ2JlSnFaVEoxMElWUVJ4UXp1TUtwVDJaX3l4RFdJTUF4ZDNXMm8xd1ZIV2NrZWxEWXpiY1l1YkFya2FuTGtxRDhFUnN0SC04dHQxZw?oc=5
+          - generic [ref=e490]:
+            - button "View" [ref=e491] [cursor=pointer]
+            - generic [ref=e496]:
+              - button "Dismiss & Remove draft" [ref=e497] [cursor=pointer]
+              - button "Copy" [ref=e501] [cursor=pointer]
+              - button "Publish" [ref=e506] [cursor=pointer]
+        - generic [ref=e511]:
+          - generic [ref=e512]:
+            - generic [ref=e513]:
+              - generic [ref=e514]: News
+              - generic [ref=e516]: 1 day ago
+            - heading "Local Intervention Saves Vulnerable Woman from Assault in Coimbatore" [level=3] [ref=e521]
+            - paragraph [ref=e522]: A distressing incident occurred in Coimbatore recently when a woman suffering from a mental disability was targeted by an unidentified assailant. The situation, which could have es...
+            - generic [ref=e523]:
+              - generic [ref=e524]: "Source: news.google.com"
+              - link "Original" [ref=e525] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMi7gFBVV95cUxNOV9fUC1BYWNPamFMSDRYSEpxcG9fbDVxY3F5NHgtS2tuYUZLeWRvcERyMTJZbzlYWFNLVGdabGtkWFM1eEVCTU85RlE5VUZiSXIwU0Z4dlo2VFpvUExkRFBTVl9Ib0M3OVVtWURjZC1nWm9RdnBCQm9haVJEMm1RRjRXTWhmRER6NWZLYWRsYTQ3Q0JqRGRER2h0YlJpUTF0dzdFeFZTcmhPa2lhcFRnSG5jTzNMaFJJcFNUalo3Y2tXT0I5MFZ4dG9sNTRXOFJBUnNHTE95ZWNHUG90ekNUTXczQUtFQVJGcWowOVlB0gHzAUFVX3lxTFBCMzJnVUVtS1A1YjZhOEFqN0VxRGtXaDdyYlAzZlpHQm4yYUM4MmY1WlFiRXZyclBTQ2JhZjhyZ1YtN2pjQ1R6SW84ZlVZY0h1RUJjeUNpc0sybGdKdFlvWVA2RVJnVlN6Wjd6U2cxdGpsaXJxNVdsVDlLR2JRR2JVWFFfRjYwT0FXR1M1WTJFNE9IRFNfeml5RTM5ZERBRVIwaE9XN0tJWVJyR0YyQjdiMTgxRTBQUmtRZkg5b1RuZ3NzZlpTNEZyTDVFOUhYT2ZILTZKbnFVUlJraWJuU2VvMFVsa3NmMUZQbEo2czMzV2dROA?oc=5
+          - generic [ref=e531]:
+            - button "View" [ref=e532] [cursor=pointer]
+            - generic [ref=e537]:
+              - button "Dismiss & Remove draft" [ref=e538] [cursor=pointer]
+              - button "Copy" [ref=e542] [cursor=pointer]
+              - button "Publish" [ref=e547] [cursor=pointer]
+        - generic [ref=e552]:
+          - generic [ref=e553]:
+            - generic [ref=e554]:
+              - generic [ref=e555]: News
+              - generic [ref=e557]: 1 day ago
+            - heading "Stray Dogs Intervene to Thwart Molestation Attempt in Coimbatore" [level=3] [ref=e562]
+            - paragraph [ref=e563]: A harrowing incident of molestation was averted in Coimbatore this week when a local woman was rescued by a pack of stray dogs. The victim was accosted by an assailant while walkin...
+            - generic [ref=e564]:
+              - generic [ref=e565]: "Source: news.google.com"
+              - link "Original" [ref=e566] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMixwFBVV95cUxPMXJaT3haRG8xanoybE9HaTZCZXBNVTdUeXZ1MUthaFRibW04RG1ZbEE3YXpGNTJFcElEQUVtRkNFOVA1QXY1V1A4Si1sT20yd0hXNXNoU0hjNjZzanhCNjhFTVVULXp2TGRuX0o1TUthak5PYm9RTTI3NEl2ekNjQlp1bEdmNXVpTWZJay1WRG95N24zcXFBcTJEakFPeHNlVXlWNHRCZjV1MVIxQTFMNGtZVS13Sk1SWU55MjN3R3c2ZkFGX25B0gHOAUFVX3lxTE9EOUs4cDl1Xy1ZQzFueHJ2MmF2elRBWTNKRDh2RHcyaTg2REN1WEVIbVBmbHY1MmV6aEcwbHduOThEVTBlZFhoOV80ZXAtV2lrTmdGd0FJOHZodGlsWEdZMVZNVVhzaVNVZnlfNXRQdTUzbTBBSEtWcmxYTTFvci1XeE5qWkU2SzJxSEVVdndfOWFHZkFWYU4tc1dhdjItODNlVTNlNlV2VHc4S3ZhRldxWEwzLXdGVXR2Z1NtXzl1c28yZW9PMGxLV3MyWm9R?oc=5
+          - generic [ref=e572]:
+            - button "View" [ref=e573] [cursor=pointer]
+            - generic [ref=e578]:
+              - button "Dismiss & Remove draft" [ref=e579] [cursor=pointer]
+              - button "Copy" [ref=e583] [cursor=pointer]
+              - button "Publish" [ref=e588] [cursor=pointer]
+        - generic [ref=e593]:
+          - generic [ref=e594]:
+            - generic [ref=e595]:
+              - generic [ref=e596]: News
+              - generic [ref=e598]: 2 days ago
+            - heading "Police Launch Manhunt Following Assault on Malaysian Tourists Near Coimbatore" [level=3] [ref=e603]
+            - paragraph [ref=e604]: Authorities in Coimbatore have launched a rigorous investigation following a disturbing incident involving the assault of two Malaysian tourists. The victims, who were traveling th...
+            - generic [ref=e605]:
+              - generic [ref=e606]: "Source: news.google.com"
+              - link "Original" [ref=e607] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMiwAFBVV95cUxQRUFFQjBRdUNUNWxJc19sWVBuY3VtVFJPb2xwWlh1bHh5UVpXYmNXUW1LYnlURHFoczRTbGtTYklzLVhlOWlIQ1REbDdGamNnZXJEcV9acmFnbnpVN3BnV01ablRoa0NqdmxORE9yaUZ5bldHT01QbnNzMU1PZU1jWC1NQTZzTk5KcTRaQmY5RW5FS2xYb0dHaFc0UTNMMVBQM1VGUUMtTVBqT24yUVNhaWlKaVp5bjBCT1VBd2VlU2vSAcYBQVVfeXFMT2dLaTNxUDlVZHZZdUMtbGgtUU1FWFJQV2VDYm1xcmpMME1RQ1p5X2tsNGJhV2VneFc3YlNKcVdFdG5ZRlRQTFBETjA2dGlleEhjdXp5VDNFOHluRktqVjlfd3dkRGtOYXdHZmVROUZzXy1aWnNEY2NJTGo0dVkwTUtmUkNkUUQ0NERHYlVSUkR5cnpnM3J4RjlLZTVCTkFfYnRRMEpMQmJyN2JwTlVwZUhMRVJ5VU51Nk1fYTBIZTI3QThkU0tR?oc=5
+          - generic [ref=e613]:
+            - button "View" [ref=e614] [cursor=pointer]
+            - generic [ref=e619]:
+              - button "Dismiss & Remove draft" [ref=e620] [cursor=pointer]
+              - button "Copy" [ref=e624] [cursor=pointer]
+              - button "Publish" [ref=e629] [cursor=pointer]
+        - generic [ref=e634]:
+          - generic [ref=e635]:
+            - generic [ref=e636]:
+              - generic [ref=e637]: News
+              - generic [ref=e639]: 2 days ago
+            - heading "Tragic Road Accident Claims Four Young Lives in Tamil Nadu" [level=3] [ref=e644]
+            - paragraph [ref=e645]: A harrowing road tragedy unfolded in Tamil Nadu when a state transport bus collided with a moped, resulting in the immediate death of four young relatives. The victims, comprising...
+            - generic [ref=e646]:
+              - generic [ref=e647]: "Source: news.google.com"
+              - link "Original" [ref=e648] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMi8AFBVV95cUxQaDVuaHltbWFHbWotdllGanYyeXVfZVVncVg0TWhITFhRLWlGOUNOcG4xSkd1QkxTNGJWbGo3WDd0TVM2aVdBOVFpSzBfWFItTUxmOTBKbVQxQnNyczBDdXJFRGVLTTMweTVnWktYZTJ6WFRtak1VdEE3U3RxZHM5a1l5MjVXdHU3OTBsRk5fbmItTHdwVGNvWXhOSVdtNU9hMWlsREJDeExOeUpibjRhUEJ0cTRFektZeG9HTEhjMnRIeElTZmV4NUN3alJadnJHRUE4SndlSHdmczZHbXVQYW5lb1BtVTRLUnVIUlJ4U3bSAfYBQVVfeXFMTl8tZmF4Y1pkSzZ2dnNMMGdPQzFCWlNoMHRHOU1zVnkxMDlaZjhkcHd2TVFxZWdFdWJDNnRkVE02YWpVdlBuSTJXSUNfb1hfMGcxeTIyV1o1WmNRcHFtNnJOWUZXTGJZMkg2NlpKam9lZnJ2bG5rUlFkLVVsektwVkRON2o0aGhpODdGenZZS2pLTjJLeTdwemk1ZHdpbERJQWZFTTRPNUhIcUI4bEwzUWE0d0tKcjdoYTVMOHpkSjJZdklxSWtxbjhXODNKSEdqMG9JOVRIdDB4Mml0Y1VCSmk3Rm9wVGFzdmd4VTV1QVdsS0xGUjh3?oc=5
+          - generic [ref=e654]:
+            - button "View" [ref=e655] [cursor=pointer]
+            - generic [ref=e660]:
+              - button "Dismiss & Remove draft" [ref=e661] [cursor=pointer]
+              - button "Copy" [ref=e665] [cursor=pointer]
+              - button "Publish" [ref=e670] [cursor=pointer]
+        - generic [ref=e675]:
+          - generic [ref=e676]:
+            - generic [ref=e677]:
+              - generic [ref=e678]: News
+              - generic [ref=e680]: 2 days ago
+            - heading "Stray Dogs Intervene to Thwart Assault Attempt in Coimbatore" [level=3] [ref=e685]
+            - paragraph [ref=e686]: In a remarkable display of animal instinct, a pack of stray dogs in Coimbatore acted as unexpected protectors when they intervened to stop a man from assaulting a woman. The incide...
+            - generic [ref=e687]:
+              - generic [ref=e688]: "Source: news.google.com"
+              - link "Original" [ref=e689] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMi4AFBVV95cUxNcmFONTA0Y05hRzIxa2ZQYmF2MzNjSklybTZMUkVOV0NmQ0JadlZVODZrbzR6Rk9rQnZOZXF5a3JyeFhvZm1iOEtOV1dQSXVTbFlfUkR3alpjdDc3NFNJY2E2UmtfckZBNUpFMHBNN3J0MnFpSkFmVWF0Y0gwLS15a2lkWGJPajdaTlc0b0FJcGVaS29uNEZveC1SZXVMZzNjcGdkeHhmWWUwLTNfVjV3aHhDdVJEQzk1NXhFSUZCVERYYjNrZ0ZueWxJRVUzazM2QXVfYnhrVmtMVk9nNmZWddIB5gFBVV95cUxPQWd3TVFsczlUT2VMX2xvQUYyUjdwOXNTdlViQ0V6aWFyWkNxUTZUSjlFWkJwd2RHUXAtcTc2WWFSYnkzaWVXeU1IMkhqUl9udGVEVGRHcXFuTnAyNHBNaG5NNTFrTThMVDQ0dnR6R19tMWVFMVppRDdqamdBNjd4eE1OWXZyd19xQmFVeTlkcXItVkNUSko0WHpNTzAxZnNkOEZuRGNjS19TWW4yNG5hNXF1YmQ1eEtwQWNucEpJMFh6UGF3Y3lrckNFQ2c2SlppMXcxendaRE5TcW9OZFVEYjQwS2xDdw?oc=5
+          - generic [ref=e695]:
+            - button "View" [ref=e696] [cursor=pointer]
+            - generic [ref=e701]:
+              - button "Dismiss & Remove draft" [ref=e702] [cursor=pointer]
+              - button "Copy" [ref=e706] [cursor=pointer]
+              - button "Publish" [ref=e711] [cursor=pointer]
+        - generic [ref=e716]:
+          - generic [ref=e717]:
+            - generic [ref=e718]:
+              - generic [ref=e719]: News
+              - generic [ref=e721]: 2 days ago
+            - heading "Stray Dogs Intervene to Prevent Assault on Vulnerable Woman in Coimbatore" [level=3] [ref=e726]
+            - paragraph [ref=e727]: A harrowing incident was narrowly averted in Coimbatore when a pack of stray dogs acted as unlikely protectors for a mentally ill woman facing an attempted sexual assault. The inte...
+            - generic [ref=e728]:
+              - generic [ref=e729]: "Source: news.google.com"
+              - link "Original" [ref=e730] [cursor=pointer]:
+                - /url: https://news.google.com/rss/articles/CBMi8gFBVV95cUxNel92dGxVZk5CYkVPdzlGNnE3QzdlRUNkLUR2ejUxMEZwcnVaa3dES3UtTjZIczBWLXlyTlRJVGN4cGx2QkhXVHdVUkxWYlVtRW9DOUJUMkRSV1FjM3VIM1F1Q0xTLXBFbXA0ZlAxVFc0NzV2VkdvaDMyaG9oM0ZMdTdVanVIVEJ0QzBmOGpfZzdpTG9zNmNYTFhjOTkzZWZDR0YzUWQ3b0xuWVNjUF90dDFFMlR0NmhDNWNwV2NzNXRrNkVlSW53RWZCQTQ5QjEyeDlmYnlwR21HaUppV3BhT1RkdkRvMGNBeHZLb2dncTlPd9IB9wFBVV95cUxOSHZ3LUZRMG5KRU5XdVd3QWVSX1ExVi1yNVdFbF9jMm9NUDZuYmp5ZkxKNVpHZTlsUHJkb3hRTTIxekxiYzVpemsyTXpzZEFVRlpJVHdGbGpRS3RFUEc1UkNJMFNiYnFFOTl6SWQxbnQySy1hMWZJeEo3d1pENzJaSVdoSmJUWmJOajJzWVZBbE96a2V6V09SUDlzaW1EcU5wX2FSOEpldWZGd1V5Z2VoLXNiSk1uRDN6ZVV6ZkI0LUxkS2M5Szl6NFNwMVB0UkpHTUROcml5aE1YTTB4RnFqdWxtZWZBbFF2cWxOREt0WG1fUmxvTzc0?oc=5
+          - generic [ref=e736]:
+            - button "View" [ref=e737] [cursor=pointer]
+            - generic [ref=e742]:
+              - button "Dismiss & Remove draft" [ref=e743] [cursor=pointer]
+              - button "Copy" [ref=e747] [cursor=pointer]
+              - button "Publish" [ref=e752] [cursor=pointer]
+  - button "Open Next.js Dev Tools" [ref=e762] [cursor=pointer]
+  - alert [ref=e766]

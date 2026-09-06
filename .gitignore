@@ -38,8 +38,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# ide & temporary
-.vscode/
-.playwright-mcp/
-admin_review_*.png

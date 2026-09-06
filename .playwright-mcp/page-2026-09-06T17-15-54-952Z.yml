@@ -1,0 +1,43 @@
+- generic [ref=e2]:
+  - banner [ref=e3]:
+    - generic [ref=e4]:
+      - generic [ref=e5]:
+        - link "Admin CMS" [ref=e6] [cursor=pointer]:
+          - /url: /admin?tab=articles
+        - generic [ref=e10]: /
+        - generic [ref=e11]:
+          - heading "AI Draft Review & Publishing Queue" [level=1] [ref=e13]
+          - generic [ref=e14]: 0 PREVIEW DRAFTS
+      - button "Fetch Latest RSS" [ref=e16] [cursor=pointer]
+  - main [ref=e23]:
+    - generic [ref=e24]:
+      - generic [ref=e29]:
+        - text: "In-Memory Preview Queue:"
+        - generic [ref=e30]:
+          - text: Fetched RSS stories are stored in
+          - strong [ref=e31]: memory / preview state only
+          - text: and are
+          - strong [ref=e32]: NOT inserted into the database
+          - text: automatically. Click
+          - strong [ref=e33]: "\"Publish\""
+          - text: on any card to insert and publish it live, or
+          - strong [ref=e34]: "\"Copy Draft\""
+          - text: to edit manually in
+          - link "Admin CMS" [ref=e35] [cursor=pointer]:
+            - /url: /admin?tab=articles
+          - text: .
+      - button "↻ Refresh" [ref=e37] [cursor=pointer]
+    - generic [ref=e38]:
+      - generic [ref=e39]:
+        - button "All" [ref=e40] [cursor=pointer]
+        - button "News" [ref=e41] [cursor=pointer]
+        - button "Our City" [ref=e42] [cursor=pointer]
+        - button "Business" [ref=e43] [cursor=pointer]
+        - button "Tech" [ref=e44] [cursor=pointer]
+        - button "Infrastructure" [ref=e45] [cursor=pointer]
+        - button "CEO" [ref=e46] [cursor=pointer]
+        - button "Sports" [ref=e47] [cursor=pointer]
+        - button "Education" [ref=e48] [cursor=pointer]
+        - button "E-Paper" [ref=e49] [cursor=pointer]
+      - textbox "Search headline or content..." [ref=e51]
+    - paragraph [ref=e58]: Loading pending drafts from database...
