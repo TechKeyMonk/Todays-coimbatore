@@ -11,7 +11,6 @@ export const maxDuration = 60; // Max execution timeout
 // Permitted editorial categories
 const VALID_CATEGORIES = [
   'News',
-  'Our City',
   'Business',
   'Tech',
   'Infrastructure',
@@ -448,7 +447,7 @@ STRICT COPYRIGHT & ORIGINALITY DIRECTIVES:
 4. TONE: Objective, balanced, authoritative, and engaging professional English journalism.
 5. REQUIRED STRUCTURE:
    - "title": A powerful, clear, authoritative headline in English (NO clickbait, NO quotes).
-   - "category": MUST be EXACTLY one of: ["News", "Our City", "Business", "Tech", "Infrastructure", "CEO", "Sports", "Education", "E-Paper"].
+   - "category": MUST be EXACTLY one of: ["News", "Business", "Tech", "Infrastructure", "CEO", "Sports", "Education", "E-Paper"].
    - "excerpt": A concise 1-2 sentence preview providing a crisp summary of the development.
    - "content": A rich, structured 3 to 4 paragraph news story detailing:
        Paragraph 1: Core development, who, what, when, and immediate impact.
@@ -501,7 +500,7 @@ Respond ONLY with valid JSON matching this exact structure:
             if (lowerTitle.includes('flyover') || lowerTitle.includes('road') || lowerTitle.includes('metro') || lowerTitle.includes('corporation')) {
               finalCategory = 'Infrastructure';
             } else if (lowerTitle.includes('police') || lowerTitle.includes('traffic') || lowerTitle.includes('temple') || lowerTitle.includes('city')) {
-              finalCategory = 'Our City';
+              finalCategory = 'News';
             } else if (lowerTitle.includes('business') || lowerTitle.includes('market') || lowerTitle.includes('crore') || lowerTitle.includes('gold')) {
               finalCategory = 'Business';
             }

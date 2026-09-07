@@ -7,20 +7,30 @@ import { EventRecord } from '@/services/db';
 export interface EventCardProps {
   event: EventRecord;
   onOpenVideo?: (videoUrl: string) => void;
+  onViewDetails?: (event: EventRecord) => void;
 }
 
-export default function EventCard({ event: ev, onOpenVideo }: EventCardProps) {
-  const fallbackImg =
-    'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80';
+export default function EventCard({ event: ev, onOpenVideo, onViewDetails }: EventCardProps) {
+  const hasPoster = Boolean(
+    ev.posterUrl &&
+    typeof ev.posterUrl === 'string' &&
+    ev.posterUrl.trim() !== '' &&
+    ev.posterUrl.trim() !== 'null' &&
+    ev.posterUrl.trim() !== 'undefined' &&
+    !ev.posterUrl.includes('photo-1511578314322-379afb476865')
+  );
 
   return (
     <div className="bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 rounded-2xl overflow-hidden shadow-xs flex flex-col h-full justify-between hover:border-[#153d3b] dark:hover:border-emerald-600 transition-all group">
       <div className="flex flex-col flex-1">
-        {/* Responsive 16:9 Image Container with Centered Fit & Fallback Protection */}
-        <div className="relative w-full aspect-[16/9] bg-slate-900/90 overflow-hidden rounded-t-xl flex items-center justify-center">
-          {ev.posterUrl ? (
+        {/* Responsive 16:9 Image Container: only shows poster if admin uploaded an image */}
+        <div 
+          onClick={() => onViewDetails && onViewDetails(ev)}
+          className={`relative w-full aspect-[16/9] bg-slate-900/90 overflow-hidden rounded-t-xl flex items-center justify-center ${onViewDetails ? 'cursor-pointer' : ''}`}
+        >
+          {hasPoster ? (
             <>
-              {/* Subtle ambient backdrop for portrait / square poster variations */}
+              {/* Ambient backdrop */}
               <img
                 src={ev.posterUrl}
                 alt=""
@@ -32,12 +42,12 @@ export default function EventCard({ event: ev, onOpenVideo }: EventCardProps) {
                 alt={ev.title || 'Event poster'}
                 className="relative z-10 w-full h-full object-contain group-hover:scale-105 transition-transform duration-300 p-1"
                 onError={(e) => {
-                  (e.currentTarget as HTMLImageElement).src = fallbackImg;
+                  (e.currentTarget as HTMLElement).style.display = 'none';
                 }}
               />
             </>
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-4xl text-stone-600">
+            <div className="w-full h-full flex items-center justify-center text-4xl text-stone-600 select-none">
               🎟️
             </div>
           )}
@@ -46,7 +56,10 @@ export default function EventCard({ event: ev, onOpenVideo }: EventCardProps) {
           {ev.videoUrl && onOpenVideo && (
             <button
               type="button"
-              onClick={() => onOpenVideo(ev.videoUrl!)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenVideo(ev.videoUrl!);
+              }}
               className="absolute inset-0 z-20 bg-black/30 flex items-center justify-center group-hover:bg-black/20 transition-colors cursor-pointer"
               aria-label="Play promo video"
             >
@@ -61,7 +74,7 @@ export default function EventCard({ event: ev, onOpenVideo }: EventCardProps) {
               {ev.category || 'EVENT'}
             </span>
             {ev.featured && (
-              <span className="px-2 py-0.5 rounded-md bg-amber-400 text-stone-900 text-[10px] font-black uppercase shadow-xs">
+              <span className="px-2.5 py-0.5 rounded-md bg-amber-400 text-stone-900 text-[10px] font-black uppercase shadow-xs">
                 ⭐ Featured
               </span>
             )}
@@ -77,14 +90,26 @@ export default function EventCard({ event: ev, onOpenVideo }: EventCardProps) {
               <span>⏰ {ev.time || '10:00 AM – 06:00 PM'}</span>
             </div>
 
-            <Link
-              href={ev.slug ? `/news/${ev.slug}` : `/article/${ev.id}`}
-              className="block group/title"
-            >
-              <h3 className="text-base font-black text-stone-900 dark:text-white leading-snug group-hover/title:text-red-600 transition-colors line-clamp-2 cursor-pointer">
-                {ev.title || 'Coimbatore Event'}
-              </h3>
-            </Link>
+            {onViewDetails ? (
+              <button
+                type="button"
+                onClick={() => onViewDetails(ev)}
+                className="block text-left group/title w-full cursor-pointer"
+              >
+                <h3 className="text-base font-black text-stone-900 dark:text-white leading-snug group-hover/title:text-red-600 transition-colors line-clamp-2">
+                  {ev.title || 'Coimbatore Event'}
+                </h3>
+              </button>
+            ) : (
+              <Link
+                href={`/events?id=${encodeURIComponent(ev.id)}`}
+                className="block group/title"
+              >
+                <h3 className="text-base font-black text-stone-900 dark:text-white leading-snug group-hover/title:text-red-600 transition-colors line-clamp-2 cursor-pointer">
+                  {ev.title || 'Coimbatore Event'}
+                </h3>
+              </Link>
+            )}
 
             <p className="text-xs text-stone-500 dark:text-gray-400 line-clamp-2 leading-relaxed">
               {ev.description || 'Public exhibition and community festival in Coimbatore.'}
@@ -107,12 +132,22 @@ export default function EventCard({ event: ev, onOpenVideo }: EventCardProps) {
 
       {/* Footer Actions */}
       <div className="p-5 pt-0 flex items-center justify-between gap-2">
-        <Link
-          href={ev.slug ? `/news/${ev.slug}` : `/article/${ev.id}`}
-          className="text-xs font-black text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 shrink-0"
-        >
-          <span>Read Details &rarr;</span>
-        </Link>
+        {onViewDetails ? (
+          <button
+            type="button"
+            onClick={() => onViewDetails(ev)}
+            className="text-xs font-black text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 shrink-0 cursor-pointer"
+          >
+            <span>Read Details &rarr;</span>
+          </button>
+        ) : (
+          <Link
+            href={`/events?id=${encodeURIComponent(ev.id)}`}
+            className="text-xs font-black text-red-600 dark:text-red-400 hover:underline flex items-center gap-1 shrink-0"
+          >
+            <span>Read Details &rarr;</span>
+          </Link>
+        )}
 
         <div className="flex items-center gap-2 ml-auto">
           {ev.videoUrl && onOpenVideo && (

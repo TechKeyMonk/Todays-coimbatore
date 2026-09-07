@@ -191,7 +191,7 @@ export async function POST(request: Request) {
       if (error) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
       }
-      try { revalidatePath('/', 'layout'); revalidatePath('/admin', 'layout'); revalidatePath('/directory', 'layout'); } catch {}
+      try { revalidatePath('/'); revalidatePath('/admin'); revalidatePath('/directory'); } catch {}
       return NextResponse.json({ success: true, listing: mapRowToListing(upserted) }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
     }
 
@@ -219,7 +219,7 @@ export async function POST(request: Request) {
       }
       const { data: updated, error } = await supabaseAdmin.from('listings').update(p).eq('id', toUuid(id)).select().single();
       if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-      try { revalidatePath('/admin', 'layout'); } catch {}
+      try { revalidatePath('/admin'); revalidatePath('/directory'); } catch {}
       return NextResponse.json({ success: true, listing: mapRowToListing(updated) }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
     }
 
@@ -228,7 +228,7 @@ export async function POST(request: Request) {
       if (!id) return NextResponse.json({ success: false, error: 'Listing ID is required' }, { status: 400 });
       const { error } = await supabaseAdmin.from('listings').delete().eq('id', toUuid(id));
       if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-      try { revalidatePath('/admin', 'layout'); } catch {}
+      try { revalidatePath('/admin'); revalidatePath('/directory'); } catch {}
       return NextResponse.json({ success: true }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
     }
 
@@ -275,7 +275,7 @@ export async function PUT(request: Request) {
     }
     const { data: updated, error } = await supabaseAdmin.from('listings').update(p).eq('id', toUuid(id)).select().single();
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-    try { revalidatePath('/admin', 'layout'); } catch {}
+    try { revalidatePath('/admin'); revalidatePath('/directory'); } catch {}
     return NextResponse.json({ success: true, listing: updated ? mapRowToListing(updated) : null }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error: any) {
     console.error('[directory PUT] Unhandled error:', error);
@@ -291,7 +291,7 @@ export async function DELETE(request: Request) {
     if (!id) return NextResponse.json({ success: false, error: 'Listing ID is required' }, { status: 400 });
     const { error } = await supabaseAdmin.from('listings').delete().eq('id', toUuid(id));
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-    try { revalidatePath('/admin', 'layout'); } catch {}
+    try { revalidatePath('/admin'); revalidatePath('/directory'); } catch {}
     return NextResponse.json({ success: true }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error: any) {
     console.error('[directory DELETE] Unhandled error:', error);

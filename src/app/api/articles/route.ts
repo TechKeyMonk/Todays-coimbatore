@@ -242,10 +242,11 @@ export async function POST(request: Request) {
     }
 
     try {
-      revalidatePath('/', 'layout');
-      revalidatePath('/admin', 'layout');
-      revalidatePath('/news', 'layout');
-      revalidatePath(`/news/${slug}`, 'layout');
+      revalidatePath('/');
+      revalidatePath('/admin');
+      revalidatePath('/news');
+      revalidatePath(`/news/${slug}`);
+      revalidatePath(`/article/${slug}`);
     } catch (e) {
       console.warn('[articles POST] Revalidation warning:', e);
     }
@@ -342,10 +343,11 @@ export async function PUT(request: Request) {
     }
 
     try {
-      revalidatePath('/', 'layout');
-      revalidatePath('/admin', 'layout');
-      revalidatePath('/news', 'layout');
-      revalidatePath(`/news/${articleId}`, 'layout');
+      revalidatePath('/');
+      revalidatePath('/admin');
+      revalidatePath('/news');
+      revalidatePath(`/news/${articleId}`);
+      revalidatePath(`/article/${articleId}`);
     } catch (e) {
       console.warn('[articles PUT] Revalidation warning:', e);
     }
@@ -384,10 +386,11 @@ export async function DELETE(request: Request) {
     }
 
     try {
-      revalidatePath('/', 'layout');
-      revalidatePath('/admin', 'layout');
-      revalidatePath('/news', 'layout');
-      revalidatePath(`/news/${articleId}`, 'layout');
+      revalidatePath('/');
+      revalidatePath('/admin');
+      revalidatePath('/news');
+      revalidatePath(`/news/${articleId}`);
+      revalidatePath(`/article/${articleId}`);
     } catch (e) {
       console.warn('[articles DELETE] Revalidation warning:', e);
     }

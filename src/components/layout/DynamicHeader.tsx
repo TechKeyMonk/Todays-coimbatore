@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useTheme } from '../../context/ThemeContext';
-import dbService, { Article, OutageRecord, AdSlotRecord, EventRecord, mapDedicatedEventToEvent, INITIAL_ADS_DB } from '../../services/db';
+import dbService, { Article, OutageRecord, AdSlotRecord, EventRecord, mapDedicatedEventToEvent, INITIAL_ADS_DB, SocialLinksRecord, INITIAL_SOCIAL_LINKS_DB } from '../../services/db';
 import { supabase } from '@/lib/supabaseClient';
 import {
   MapPin,
@@ -39,7 +39,6 @@ export interface NavCategory {
 
 export const EDITORIAL_CATEGORIES: NavCategory[] = [
   { id: 'news', name: 'NEWS', href: '/news' },
-  { id: 'our-city', name: 'OUR CITY', href: '/our-city' },
   { id: 'business', name: 'BUSINESS', href: '/business' },
   { id: 'tech', name: 'TECH', href: '/tech' },
   { id: 'infrastructure', name: 'INFRASTRUCTURE', href: '/infrastructure' },
@@ -301,6 +300,7 @@ export default function DynamicHeader() {
   const [liveEvents, setLiveEvents] = useState<EventRecord[]>([]);
   const [dbOutages, setDbOutages] = useState<OutageRecord[]>([]);
   const [topLeaderboardAd, setTopLeaderboardAd] = useState<AdSlotRecord | null>(INITIAL_ADS_DB[0] || null);
+  const [socialLinks, setSocialLinks] = useState<SocialLinksRecord>(INITIAL_SOCIAL_LINKS_DB);
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [headerWeather, setHeaderWeather] = useState<{
     temp: number;
@@ -445,6 +445,11 @@ export default function DynamicHeader() {
             setLiveEvents(fallbackEvts.slice(0, 3));
           }
         }
+        // Fetch dynamic social links
+        try {
+          const sLinks = await dbService.getSocialLinks();
+          if (sLinks && isMounted) setSocialLinks(sLinks);
+        } catch {}
       } catch (e) {
         console.warn('Header data load warning:', e);
       }
@@ -1098,12 +1103,12 @@ export default function DynamicHeader() {
             {/* Drawer Social Media Links */}
             <div className="pt-3 border-t border-gray-100 dark:border-slate-800 space-y-1.5">
               <span className="text-[10px] font-black uppercase tracking-wider text-gray-400 block px-1">
-                Follow TechKeyMonk
+                Follow Today&apos;s Coimbatore
               </span>
               <div className="flex items-center justify-around py-1.5 bg-gray-50 dark:bg-slate-800/80 rounded-xl px-2">
                 {/* Instagram */}
                 <a
-                  href="https://www.instagram.com/tech_key_monk/"
+                  href={socialLinks.instagram || INITIAL_SOCIAL_LINKS_DB.instagram}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Instagram"
@@ -1116,7 +1121,7 @@ export default function DynamicHeader() {
                 </a>
                 {/* YouTube */}
                 <a
-                  href="https://www.youtube.com/@TechKeyMonk-CBE"
+                  href={socialLinks.youtube || INITIAL_SOCIAL_LINKS_DB.youtube}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="YouTube"
@@ -1129,7 +1134,7 @@ export default function DynamicHeader() {
                 </a>
                 {/* Facebook */}
                 <a
-                  href="https://www.facebook.com/p/TechKey-Monk-61554380970425/"
+                  href={socialLinks.facebook || INITIAL_SOCIAL_LINKS_DB.facebook}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Facebook"
@@ -1142,7 +1147,7 @@ export default function DynamicHeader() {
                 </a>
                 {/* X / Twitter */}
                 <a
-                  href="https://x.com/TechKeyMonk"
+                  href={socialLinks.twitter || INITIAL_SOCIAL_LINKS_DB.twitter}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="X (formerly Twitter)"

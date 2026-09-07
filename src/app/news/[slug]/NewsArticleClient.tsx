@@ -134,7 +134,23 @@ export default function NewsArticleClient({ slug }: NewsArticleClientProps) {
           return;
         }
 
-        // 2. Fallback to local dbService articles
+        // 2. Check if rawSlug refers to an event in the events table
+        try {
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawSlug);
+          let evQuery = supabase.from('events').select('id, title');
+          if (isUUID) {
+            evQuery = evQuery.eq('id', rawSlug);
+          } else {
+            evQuery = evQuery.or(`title.ilike.%${rawSlug}%,event_name.ilike.%${rawSlug}%`);
+          }
+          const { data: evMatch } = await evQuery.maybeSingle();
+          if (evMatch && typeof window !== 'undefined') {
+            window.location.replace(`/events?id=${encodeURIComponent(evMatch.id)}`);
+            return;
+          }
+        } catch (evErr) {}
+
+        // 3. Fallback to local dbService articles
         const allArticles = await dbService.getArticles();
         let matched = allArticles.find(
           (a) =>
@@ -142,10 +158,6 @@ export default function NewsArticleClient({ slug }: NewsArticleClientProps) {
             (a.slug && a.slug.toLowerCase() === rawSlug.toLowerCase()) ||
             a.title.toLowerCase().includes(rawSlug.toLowerCase())
         );
-
-        if (!matched && allArticles.length > 0) {
-          matched = allArticles[0];
-        }
 
         if (isMounted) {
           setArticle(matched || null);

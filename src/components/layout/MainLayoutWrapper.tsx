@@ -84,7 +84,6 @@ export default function MainLayoutWrapper({
       '/article',
       '/search',
       '/ceos',
-      '/our-city',
       '/business',
       '/tech',
       '/infrastructure',
@@ -118,7 +117,6 @@ export default function MainLayoutWrapper({
     pathname.startsWith('/article') ||
     pathname.startsWith('/search') ||
     pathname.startsWith('/ceos') ||
-    pathname.startsWith('/our-city') ||
     pathname.startsWith('/business') ||
     pathname.startsWith('/tech') ||
     pathname.startsWith('/infrastructure') ||

@@ -17,15 +17,8 @@ export const CATEGORY_DEFINITIONS: Record<string, CategoryDefinition> = {
     slug: 'news',
     displayName: 'NEWS',
     canonicalDbCategory: 'NEWS',
-    allowedDbCategories: ['NEWS', 'GENERAL', 'HEADLINES', 'TOP STORIES'],
-    aliases: ['news', 'top-stories', 'headlines', 'general'],
-  },
-  'our-city': {
-    slug: 'our-city',
-    displayName: 'OUR CITY',
-    canonicalDbCategory: 'OUR CITY',
-    allowedDbCategories: ['OUR CITY', 'CITY', 'LOCAL', 'CIVIC'],
-    aliases: ['our-city', 'ourcity', 'city', 'local', 'mycity'],
+    allowedDbCategories: ['NEWS', 'GENERAL', 'HEADLINES', 'TOP STORIES', 'TRENDING'],
+    aliases: ['news', 'top-stories', 'headlines', 'general', 'trending', 'trending-now'],
   },
   business: {
     slug: 'business',

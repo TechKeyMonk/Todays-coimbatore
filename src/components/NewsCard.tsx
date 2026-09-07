@@ -6,6 +6,7 @@ import { saveCurrentScrollPosition } from './ScrollRestoration';
 import ShareModal from './ShareModal';
 import { Play, Video, ArrowRight } from 'lucide-react';
 import { formatRelativeTime } from '../services/db';
+import { hasActualVideo } from '@/lib/videoUtils';
 
 export interface NewsCardProps {
   id: string;
@@ -20,6 +21,7 @@ export interface NewsCardProps {
   excerpt?: string;
   mediaType?: 'image' | 'video' | 'text' | string;
   imageUrl?: string;
+  mediaUrl?: string;
   videoUrl?: string;
   videoTitle?: string;
   videoDuration?: string;
@@ -40,6 +42,7 @@ export const NewsCard: React.FC<NewsCardProps> = ({
   excerpt = '',
   mediaType,
   imageUrl,
+  mediaUrl,
   videoUrl,
   videoTitle,
   videoDuration = '02:00',
@@ -61,7 +64,7 @@ export const NewsCard: React.FC<NewsCardProps> = ({
   const getBadgeColor = () => {
     if (categoryBadgeClass) return categoryBadgeClass;
     const c = normCategory;
-    if (c === 'OUR CITY' || c.includes('CITY') || c.includes('CIVIC') || c.includes('INFRA')) return 'bg-blue-600 text-white';
+    if (c.includes('INFRA') || c.includes('CIVIC')) return 'bg-blue-600 text-white';
     if (c === 'TECH') return 'bg-emerald-600 text-white';
     if (c === 'BUSINESS' || c.includes('INDUSTRY') || c.includes('COMMERCE')) return 'bg-amber-600 text-white';
     if (c === 'EVENTS') return 'bg-purple-600 text-white';
@@ -80,14 +83,12 @@ export const NewsCard: React.FC<NewsCardProps> = ({
     }
   };
 
-  // Strict Video Detection: ONLY if mediaType is video and has a valid videoUrl
-  const hasValidVideo = Boolean(
-    mediaType === 'video' &&
-    videoUrl &&
-    typeof videoUrl === 'string' &&
-    videoUrl.trim() !== '' &&
-    (videoUrl.startsWith('http') || videoUrl.startsWith('local-video://') || videoUrl.includes('youtube') || videoUrl.includes('youtu.be'))
-  );
+  // Strict Video Detection: ONLY if the article actually has a genuine playable video
+  const hasValidVideo = hasActualVideo({
+    mediaType,
+    videoUrl,
+    mediaUrl,
+  });
 
   // Strict Image Detection: ONLY if explicitly provided and non-empty/non-null
   const validImageUrl = (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== '' && imageUrl.trim() !== 'null' && imageUrl.trim() !== 'undefined')

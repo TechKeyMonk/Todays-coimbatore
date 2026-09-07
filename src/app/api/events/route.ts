@@ -161,9 +161,9 @@ export async function POST(request: Request) {
     }
 
     try {
-      revalidatePath('/', 'layout');
-      revalidatePath('/events', 'layout');
-      revalidatePath('/admin', 'layout');
+      revalidatePath('/');
+      revalidatePath('/events');
+      revalidatePath('/admin');
     } catch (revalErr) {
       console.warn('[API /api/events POST] Revalidation notice:', revalErr);
     }
@@ -270,9 +270,9 @@ export async function PUT(request: Request) {
     }
 
     try {
-      revalidatePath('/', 'layout');
-      revalidatePath('/events', 'layout');
-      revalidatePath('/admin', 'layout');
+      revalidatePath('/');
+      revalidatePath('/events');
+      revalidatePath('/admin');
     } catch (e) {}
 
     return NextResponse.json({ success: true, data: updated });
@@ -303,9 +303,9 @@ export async function DELETE(request: Request) {
     }
 
     try {
-      revalidatePath('/', 'layout');
-      revalidatePath('/events', 'layout');
-      revalidatePath('/admin', 'layout');
+      revalidatePath('/');
+      revalidatePath('/events');
+      revalidatePath('/admin');
     } catch (e) {}
 
     return NextResponse.json({ success: true, message: 'Event deleted successfully.' });

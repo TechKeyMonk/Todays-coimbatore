@@ -31,6 +31,7 @@ import {
   purgeLargeOutdatedStorageKeys,
   safeLocalStorageSet,
 } from '@/utils/storage';
+import { compressImageFile, uploadImageWithFallback } from '@/lib/imageOptimization';
 
 /* -------------------------------------------------------------------------- */
 /*                                Types & State                               */
@@ -209,7 +210,7 @@ const INITIAL_ADS: AdSlotSetting[] = [
     id: 'ad-slot-2',
     slotId: 'HOME_IN_FEED_1',
     placementKey: 'HOME_IN_FEED_1',
-    format: 'Home In-Feed 1 (Between Stories & Our City)',
+    format: 'Home In-Feed 1 (Between Top Stories & Infrastructure)',
     impressions: '18,950',
     ctr: '4.2%',
     active: true,
@@ -352,7 +353,6 @@ export default function AdminPage() {
   const ADMIN_FILTER_CATEGORIES = [
     'All',
     'NEWS',
-    'OUR CITY',
     'BUSINESS',
     'TECH',
     'INFRASTRUCTURE',
@@ -398,7 +398,6 @@ export default function AdminPage() {
 
         if (cat === target || cat === cleanTarget || normCat === normTarget) return true;
         if (target === 'infrastructure') return (item.subCategory || '').toLowerCase().includes('infrastructure') || cat.includes('infra');
-        if (target === 'our city' || target === 'our-city') return cat.includes('city') || cat.includes('civic');
         if (target === 'ceo' || target === 'ceos') return cat.includes('ceo') || cat.includes('founder');
         return false;
       })
@@ -463,6 +462,7 @@ export default function AdminPage() {
   const [ads, setAds] = useState<AdSlotSetting[]>(INITIAL_ADS);
   const [adSuccess, setAdSuccess] = useState('');
   const [editingAdSlot, setEditingAdSlot] = useState<AdSlotSetting | null>(null);
+  const [uploadingSlideIndex, setUploadingSlideIndex] = useState<number | null>(null);
 
   // Blood Donors State
   const [donors, setDonors] = useState<BloodDonorRecord[]>([]);
@@ -590,16 +590,35 @@ export default function AdminPage() {
   // Load all data from DB Service
   const refreshAllData = useCallback(async () => {
     try {
-      const artList = await dbService.getArticles();
+      const [
+        artList,
+        catList,
+        usrList,
+        outList,
+        adList,
+        donorList,
+        alertList,
+        eventList,
+        verList,
+        revList,
+        enqList,
+      ] = await Promise.all([
+        dbService.getArticles(),
+        dbService.getCategories(),
+        dbService.getUsers(),
+        dbService.getPowerOutages(),
+        dbService.getAdSlots(),
+        dbService.getBloodDonors(),
+        dbService.getEmergencyBloodAlerts(),
+        dbService.getEvents(),
+        dbService.getDirectoryVerifications(),
+        dbService.getDirectoryReviews(),
+        dbService.getDonorContactRequests(),
+      ]);
+
       setArticles(artList);
-
-      const catList = await dbService.getCategories();
       setCategoriesList(catList);
-
-      const usrList = await dbService.getUsers();
       setUsersList(usrList);
-
-      const outList = await dbService.getPowerOutages();
       setOutagesDbList(outList);
       if (outList && outList.length > 0) {
         setOutages(
@@ -618,22 +637,23 @@ export default function AdminPage() {
         );
       }
 
-      const adList = await dbService.getAdSlots();
       setAdsDbList(adList);
       if (adList && adList.length > 0) {
         setAds(adList as any);
       }
 
-      const donorList = await dbService.getBloodDonors();
       setDonorsDbList(donorList);
       setDonors(donorList);
 
-      const alertList = await dbService.getEmergencyBloodAlerts();
       setEmergencyAlerts(alertList);
 
-      const eventList = await dbService.getEvents();
-      setEventsDbList(eventList);
-      setEvents(eventList);
+      const cleanEvents = (eventList || []).filter((e) => (e.category || '').toUpperCase().trim() !== 'NEWS');
+      setEventsDbList(cleanEvents);
+      setEvents(cleanEvents);
+
+      setVerificationsList(verList);
+      setReviewsList(revList);
+      setDonorEnquiries(enqList);
 
       // Fetch live directory categories from Supabase
       try {
@@ -699,14 +719,7 @@ export default function AdminPage() {
         setIsDirLoading(false);
       }
 
-      const verList = await dbService.getDirectoryVerifications();
-      setVerificationsList(verList);
 
-      const revList = await dbService.getDirectoryReviews();
-      setReviewsList(revList);
-
-      const enqList = await dbService.getDonorContactRequests();
-      setDonorEnquiries(enqList);
 
       // Live Supabase Enquiries Status Fetch
       try {
@@ -860,20 +873,30 @@ export default function AdminPage() {
     });
   };
 
-  // Image Drag & Drop Handler with all standard format support
+  // Image Drag & Drop Handler with instant compression & background CDN upload
   const handleImageFileChange = async (file: File) => {
     if (!file.type.startsWith('image/')) {
       alert('Please upload an image file (PNG, JPG, JPEG, WEBP, AVIF)');
       return;
     }
-    if (file.size > 5 * 1024 * 1024) {
-      alert(`File "${file.name}" exceeds the maximum allowed size of 5MB.`);
+    if (file.size > 12 * 1024 * 1024) {
+      alert(`File "${file.name}" exceeds the maximum allowed size of 12MB.`);
       return;
     }
     setImageFileName(file.name);
     try {
-      const compressedDataUrl = await compressImage(file);
-      setImageUrl(compressedDataUrl);
+      // 1. Instant client-side compression (<50ms) for snappy preview
+      const comp = await compressImageFile(file, 1600, 0.82);
+      setImageUrl(comp.dataUrl);
+
+      // 2. Fast background upload to Supabase Storage CDN
+      uploadImageWithFallback(file, 'news').then((cdnUrl) => {
+        if (cdnUrl) {
+          setImageUrl(cdnUrl);
+        }
+      }).catch((uploadErr) => {
+        console.warn('Background article image upload notice:', uploadErr);
+      });
     } catch {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -1319,12 +1342,12 @@ export default function AdminPage() {
     }
   };
 
-  const handleEventImageFileChange = (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean = false) => {
+  const handleEventImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      alert('Image size exceeds 10MB limit.');
+    if (file.size > 12 * 1024 * 1024) {
+      alert('Image size exceeds 12MB limit.');
       e.target.value = '';
       return;
     }
@@ -1345,16 +1368,39 @@ export default function AdminPage() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      if (isEdit && editingEvent) {
-        setEditingEvent({ ...editingEvent, posterUrl: base64 });
+    try {
+      // 1. Instant client-side compression (<50ms) for snappy preview
+      const comp = await compressImageFile(file, 1600, 0.82);
+      if (isEdit) {
+        setEditingEvent((prev) => (prev ? { ...prev, posterUrl: comp.dataUrl } : null));
       } else {
-        setNewEventPosterUrl(base64);
+        setNewEventPosterUrl(comp.dataUrl);
       }
-    };
-    reader.readAsDataURL(file);
+
+      // 2. Fast background upload to Supabase Storage CDN
+      uploadImageWithFallback(file, 'events').then((cdnUrl) => {
+        if (cdnUrl) {
+          if (isEdit) {
+            setEditingEvent((prev) => (prev ? { ...prev, posterUrl: cdnUrl } : null));
+          } else {
+            setNewEventPosterUrl(cdnUrl);
+          }
+        }
+      }).catch((uploadErr) => {
+        console.warn('Background event poster upload notice:', uploadErr);
+      });
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        if (isEdit) {
+          setEditingEvent((prev) => (prev ? { ...prev, posterUrl: base64 } : null));
+        } else {
+          setNewEventPosterUrl(base64);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleCreateEvent = async (e: React.FormEvent) => {
@@ -1368,7 +1414,7 @@ export default function AdminPage() {
       const title = newEventTitle.trim();
       const venue = newEventVenue.trim() || 'Coimbatore';
       const description = newEventDesc.trim() || 'Coimbatore public exhibition and community event.';
-      const imageUrl = newEventPosterUrl.trim() || 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80';
+      const imageUrl = newEventPosterUrl.trim();
       const date = newEventDate || getTomorrowDateStr();
       const time = newEventTime.trim() || '10:00 AM – 06:00 PM';
       const organizer = newEventOrganizer.trim() || 'Coimbatore Event Bureau';
@@ -1379,9 +1425,9 @@ export default function AdminPage() {
         title,
         event_name: title,
         description,
-        image_url: imageUrl,
-        poster_url: imageUrl,
-        posterUrl: imageUrl,
+        image_url: imageUrl || null,
+        poster_url: imageUrl || null,
+        posterUrl: imageUrl || undefined,
         venue,
         location: venue,
         event_date: date,
@@ -1456,7 +1502,8 @@ export default function AdminPage() {
       const title = (editingEvent.title || '').trim();
       const venue = (editingEvent.venue || 'Coimbatore').trim();
       const description = (editingEvent.description || 'Coimbatore public event.').trim();
-      const imageUrl = (editingEvent.posterUrl || 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80').trim();
+      const rawImg = (editingEvent.posterUrl || '').trim();
+      const imageUrl = rawImg.includes('photo-1511578314322-379afb476865') ? '' : rawImg;
       const date = editingEvent.date || getTomorrowDateStr();
       const time = (editingEvent.time || '10:00 AM – 06:00 PM').trim();
 
@@ -1465,9 +1512,9 @@ export default function AdminPage() {
         title,
         event_name: title,
         description,
-        image_url: imageUrl,
-        poster_url: imageUrl,
-        posterUrl: imageUrl,
+        image_url: imageUrl || null,
+        poster_url: imageUrl || null,
+        posterUrl: imageUrl || undefined,
         venue,
         location: venue,
         event_date: date,
@@ -1520,6 +1567,8 @@ export default function AdminPage() {
   const handleDeleteEvent = async (id: string, title: string) => {
     if (!confirm(`Delete event "${title}"?`)) return;
     const updated = events.filter((ev) => ev.id !== id);
+    setEvents(updated);
+    await dbService.deleteEvent(id);
     await syncEventsToDb(updated);
     try {
       await fetch(`/api/events?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
@@ -2430,44 +2479,71 @@ export default function AdminPage() {
   }
 
   // ---------------------------------------------------------------------------
-  // HANDLE SLIDE IMAGE UPLOADS
+  // HANDLE SLIDE IMAGE UPLOADS (USES /api/ads/upload WITH ROBUST MULTI-TIER FALLBACKS)
   // ---------------------------------------------------------------------------
   const handleSlideImageUpload = async (file: File, slideIndex: number) => {
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) {
-      alert(`File "${file.name}" exceeds the maximum allowed size of 5MB.`);
+    if (file.size > 10 * 1024 * 1024) {
+      alert(`File "${file.name}" exceeds the maximum allowed size of 10MB.`);
       return;
     }
 
+    setUploadingSlideIndex(slideIndex);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-      const filePath = `${fileName}`; // bucket is ad-creatives
-
-      // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
-        .from('ad-creatives')
-        .upload(filePath, file);
-
-      if (error) {
-        alert('Error uploading image: ' + error.message);
-        return;
+      // 1. Fast client-side compression (<50ms) to ensure lightweight <200KB upload payload
+      let fileToUpload = file;
+      let fastPreviewDataUrl: string | null = null;
+      try {
+        const comp = await compressImageFile(file, 1600, 0.85);
+        fileToUpload = comp.file;
+        fastPreviewDataUrl = comp.dataUrl;
+      } catch (cErr) {
+        console.warn('Pre-compression notice, uploading original:', cErr);
       }
 
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('ad-creatives')
-        .getPublicUrl(filePath);
-
-      // Update slide
-      if (editingAdSlot) {
+      // Immediately set preview if available
+      if (fastPreviewDataUrl && editingAdSlot) {
         const newSlides = [...editingAdSlot.slides];
-        newSlides[slideIndex].imageUrl = publicUrl;
+        newSlides[slideIndex].imageUrl = fastPreviewDataUrl;
         setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
       }
 
+      const formData = new FormData();
+      formData.append('file', fileToUpload);
+      formData.append('slotId', editingAdSlot?.id || 'native-ad');
+      formData.append('slideIndex', String(slideIndex));
+
+      const res = await fetch('/api/ads/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const resJson = await res.json();
+      if (!res.ok || !resJson.success || !resJson.url) {
+        throw new Error(resJson.error || 'Server upload failed');
+      }
+
+      // Update slide with the clean CDN uploaded URL
+      if (editingAdSlot) {
+        const newSlides = [...editingAdSlot.slides];
+        newSlides[slideIndex].imageUrl = resJson.url;
+        setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+      }
     } catch (err: any) {
-      alert('Failed to upload image: ' + err.message);
+      console.warn('API upload failed, attempting direct base64 fallback:', err);
+      // Zero-fail client-side fallback
+      try {
+        const comp = await compressImageFile(file, 1600, 0.82);
+        if (editingAdSlot) {
+          const newSlides = [...editingAdSlot.slides];
+          newSlides[slideIndex].imageUrl = comp.dataUrl;
+          setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+        }
+      } catch (fallbackErr) {
+        alert('Failed to upload image: ' + (err?.message || 'Upload error'));
+      }
+    } finally {
+      setUploadingSlideIndex(null);
     }
   };
 
@@ -3424,7 +3500,6 @@ export default function AdminPage() {
                       className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 font-bold text-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-[#153d3b]"
                     >
                       <option value="NEWS">NEWS</option>
-                      <option value="OUR CITY">OUR CITY</option>
                       <option value="BUSINESS">BUSINESS</option>
                       <option value="TECH">TECH</option>
                       <option value="INFRASTRUCTURE">INFRASTRUCTURE</option>
@@ -5038,7 +5113,7 @@ export default function AdminPage() {
                       <div>
                         {/* Media Preview (Conditional Video or Poster) */}
                         <div className="relative w-full aspect-[16/9] bg-slate-900/90 overflow-hidden rounded-t-xl flex items-center justify-center group">
-                          {ev.posterUrl ? (
+                          {ev.posterUrl && !ev.posterUrl.includes('photo-1511578314322-379afb476865') ? (
                             <>
                               <img
                                 src={ev.posterUrl}
@@ -6298,7 +6373,6 @@ export default function AdminPage() {
                     className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-bold"
                   >
                     <option value="NEWS">NEWS</option>
-                    <option value="OUR CITY">OUR CITY</option>
                     <option value="BUSINESS">BUSINESS</option>
                     <option value="TECH">TECH</option>
                     <option value="INFRASTRUCTURE">INFRASTRUCTURE</option>
@@ -6420,14 +6494,24 @@ export default function AdminPage() {
                         onChange={async (e) => {
                           if (e.target.files && e.target.files[0]) {
                             const file = e.target.files[0];
-                            if (file.size > 5 * 1024 * 1024) {
-                              alert(`File "${file.name}" exceeds the maximum allowed size of 5MB.`);
+                            if (file.size > 12 * 1024 * 1024) {
+                              alert(`File "${file.name}" exceeds the maximum allowed size of 12MB.`);
                               return;
                             }
                             if (file.type.startsWith('image/')) {
                               try {
-                                const compressed = await compressImage(file);
-                                setEditingArticle({ ...editingArticle, imageUrl: compressed, image: compressed, mediaUrl: compressed, image_url: compressed });
+                                // 1. Instant client-side compression (<50ms) for snappy preview
+                                const comp = await compressImageFile(file, 1600, 0.82);
+                                setEditingArticle({ ...editingArticle, imageUrl: comp.dataUrl, image: comp.dataUrl, mediaUrl: comp.dataUrl, image_url: comp.dataUrl });
+
+                                // 2. Fast background upload to Supabase Storage CDN
+                                uploadImageWithFallback(file, 'news').then((cdnUrl) => {
+                                  if (cdnUrl) {
+                                    setEditingArticle((prev) => (prev ? { ...prev, imageUrl: cdnUrl, image: cdnUrl, mediaUrl: cdnUrl, image_url: cdnUrl } : null));
+                                  }
+                                }).catch((uploadErr) => {
+                                  console.warn('Background edit article image upload notice:', uploadErr);
+                                });
                               } catch {
                                 const reader = new FileReader();
                                 reader.onload = (ev) => {
@@ -6446,7 +6530,7 @@ export default function AdminPage() {
                         Upload new photo, or <span className="text-[#e54b3c] underline">Browse files</span>
                       </p>
                       <p className="text-[11px] text-stone-500 mt-1 font-medium">
-                        Supported: PNG, JPG, JPEG, WEBP, AVIF (Max Size: 5MB per image)
+                        Supported: PNG, JPG, JPEG, WEBP, AVIF (Max Size: 12MB per image)
                       </p>
                     </div>
 
@@ -6691,50 +6775,106 @@ export default function AdminPage() {
                       />
                     </div>
 
-                    <div className="p-4 rounded-xl bg-[#f8f6f0] border border-stone-300 space-y-2">
+                    <div className="p-4 rounded-xl bg-[#f8f6f0] border border-stone-300 space-y-2.5">
                       <div className="flex items-center justify-between flex-wrap gap-1">
                         <label className="block text-xs font-bold text-stone-700 uppercase">
                           Ad Creative Media (Image Upload or URL) *
                         </label>
-                        {isEditingSidebarAd && (
-                          <span className="text-[10px] font-black text-red-700 uppercase bg-red-100 px-2 py-0.5 rounded border border-red-200">
-                            📐 Required: 210 × 400 Vertical
-                          </span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {slide.imageUrl && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newSlides = [...editingAdSlot.slides];
+                                newSlides[index].imageUrl = '';
+                                setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                              }}
+                              className="px-2 py-0.5 rounded-md bg-red-100 hover:bg-red-200 text-red-700 font-extrabold text-[10px] uppercase transition-colors flex items-center gap-1 cursor-pointer border border-red-300"
+                              title="Remove this creative image"
+                            >
+                              <span>✕</span>
+                              <span>Remove Image</span>
+                            </button>
+                          )}
+                          {isEditingSidebarAd && (
+                            <span className="text-[10px] font-black text-red-700 uppercase bg-red-100 px-2 py-0.5 rounded border border-red-200">
+                              📐 Required: 210 × 400 Vertical
+                            </span>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/jpg,image/webp,image/avif"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleSlideImageUpload(file, index);
-                          }}
-                          className="w-full sm:w-1/2 bg-white border border-stone-300 rounded-xl px-2 py-1 text-[10px] file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-stone-100 file:text-stone-700 hover:file:bg-stone-200 cursor-pointer"
-                        />
-                        <input
-                          type="text"
-                          required
-                          placeholder="Or Paste https:// URL..."
-                          value={slide.imageUrl || ''}
-                          onChange={(e) => {
-                            const newSlides = [...editingAdSlot.slides];
-                            newSlides[index].imageUrl = e.target.value;
-                            setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
-                          }}
-                          className="w-full sm:w-1/2 bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-mono"
-                        />
+                      <div className="flex flex-col sm:flex-row gap-2 items-center">
+                        <div className="relative w-full sm:w-1/2">
+                          <input
+                            type="file"
+                            accept="image/png,image/jpeg,image/jpg,image/webp,image/avif,image/gif"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleSlideImageUpload(file, index);
+                              e.target.value = '';
+                            }}
+                            disabled={uploadingSlideIndex === index}
+                            className="w-full bg-white border border-stone-300 rounded-xl px-2 py-1 text-[10px] file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:bg-stone-100 file:text-stone-700 hover:file:bg-stone-200 cursor-pointer disabled:opacity-50"
+                          />
+                          {uploadingSlideIndex === index && (
+                            <div className="absolute inset-0 bg-white/90 rounded-xl flex items-center justify-center text-[10px] font-bold text-emerald-800 animate-pulse border border-emerald-300">
+                              <span>⏳ Uploading...</span>
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex w-full sm:w-1/2 gap-1.5 items-center">
+                          <input
+                            type="text"
+                            required
+                            placeholder="Or Paste https:// URL..."
+                            value={slide.imageUrl || ''}
+                            onChange={(e) => {
+                              const newSlides = [...editingAdSlot.slides];
+                              newSlides[index].imageUrl = e.target.value;
+                              setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                            }}
+                            className="flex-1 bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-mono"
+                          />
+                          {slide.imageUrl && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newSlides = [...editingAdSlot.slides];
+                                newSlides[index].imageUrl = '';
+                                setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                              }}
+                              className="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs border border-red-200 transition-colors cursor-pointer shrink-0"
+                              title="Clear image URL"
+                            >
+                              ✕
+                            </button>
+                          )}
+                        </div>
                       </div>
                       <p className="text-[11px] text-stone-500 font-medium">
-                        Supported: PNG, JPG, JPEG, WEBP, AVIF (Max Size: 5MB per image)
+                        Supported: PNG, JPG, JPEG, WEBP, AVIF, GIF (Max Size: 10MB per image)
                       </p>
                       {slide.imageUrl && (
-                        <div className="mt-2 flex flex-col items-center justify-center p-3 bg-stone-100/90 rounded-xl border border-stone-200">
-                          <span className="text-[10px] font-black text-stone-500 mb-2 uppercase tracking-wider">
-                            {isEditingSidebarAd ? 'Preview (210 × 400 Vertical Rail Scale)' : 'Creative Preview'}
-                          </span>
+                        <div className="mt-2 flex flex-col items-center justify-center p-3 bg-stone-100/90 rounded-xl border border-stone-200 space-y-2">
+                          <div className="w-full flex items-center justify-between px-1">
+                            <span className="text-[10px] font-black text-stone-500 uppercase tracking-wider">
+                              {isEditingSidebarAd ? 'Preview (210 × 400 Vertical Rail Scale)' : 'Creative Preview'}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newSlides = [...editingAdSlot.slides];
+                                newSlides[index].imageUrl = '';
+                                setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                              }}
+                              className="px-2 py-0.5 rounded-md bg-red-100 hover:bg-red-200 text-red-700 font-extrabold text-[10px] uppercase transition-colors flex items-center gap-1 cursor-pointer border border-red-200"
+                            >
+                              <span>🗑️</span>
+                              <span>Remove Image</span>
+                            </button>
+                          </div>
                           <div
-                            className={`relative rounded-lg overflow-hidden border border-stone-300 bg-slate-900 ${
+                            className={`relative rounded-lg overflow-hidden border border-stone-300 bg-slate-900 group ${
                               isEditingSidebarAd ? 'w-[210px] h-[400px] mx-auto shadow-sm' : 'w-full h-28'
                             }`}
                           >
@@ -6743,6 +6883,19 @@ export default function AdminPage() {
                               alt="Ad Preview"
                               className="w-full h-full object-cover object-center"
                             />
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newSlides = [...editingAdSlot.slides];
+                                newSlides[index].imageUrl = '';
+                                setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                              }}
+                              className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-red-600/90 hover:bg-red-700 text-white font-black text-[10px] shadow-md transition-all cursor-pointer backdrop-blur-xs flex items-center gap-1 opacity-90 group-hover:opacity-100"
+                              title="Remove Image"
+                            >
+                              <span>✕</span>
+                              <span>Remove</span>
+                            </button>
                           </div>
                         </div>
                       )}

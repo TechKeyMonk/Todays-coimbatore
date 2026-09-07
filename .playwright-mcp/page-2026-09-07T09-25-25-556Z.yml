@@ -1,0 +1,86 @@
+- generic [ref=f9e2]:
+  - complementary [ref=f9e3]:
+    - generic [ref=f9e4]:
+      - generic [ref=f9e5]:
+        - generic [ref=f9e6]: COVAI TRAFFIC
+        - generic [ref=f9e13]: LIVE
+      - generic [ref=f9e15]:
+        - generic [ref=f9e16]: All Major Corridors Clear
+        - paragraph [ref=f9e17]: Avinashi Rd, Gandhipuram & Ukkadam routes operating with smooth traffic flow.
+    - generic [ref=f9e18]:
+      - generic [ref=f9e19]:
+        - generic [ref=f9e20]: SPONSORED AD
+        - generic [ref=f9e21]: PSG Tech
+      - generic [ref=f9e22]:
+        - img "PSG College of Technology — Autonomous & NIRF Ranked Admissions 2026" [ref=f9e24]
+        - generic [ref=f9e25]:
+          - generic [ref=f9e26]: Admissions 2026
+          - heading "PSG College of Technology — Autonomous & NIRF Ranked Admissions 2026" [level=4] [ref=f9e27]
+  - main [ref=f9e28]:
+    - generic [ref=f9e29]:
+      - generic [ref=f9e31]:
+        - generic [ref=f9e32]:
+          - generic [ref=f9e33]:
+            - generic [ref=f9e34]:
+              - link "Home" [ref=f9e35] [cursor=pointer]:
+                - /url: /
+              - generic [ref=f9e36]: /
+              - generic [ref=f9e37]: Category
+            - heading "NEWS" [level=1] [ref=f9e38]
+          - generic [ref=f9e39]: 0 Stories
+        - paragraph [ref=f9e42]: Loading NEWS Updates...
+      - generic [ref=f9e43]:
+        - generic [ref=f9e44]:
+          - link "Today's Coimbatore Home" [ref=f9e46] [cursor=pointer]:
+            - /url: /
+            - img "Today's Coimbatore" [ref=f9e47]
+          - generic [ref=f9e48]:
+            - generic [ref=f9e49]:
+              - link "About Us" [ref=f9e50] [cursor=pointer]:
+                - /url: /about-us
+              - generic [ref=f9e51]: •
+              - link "Contact Us" [ref=f9e52] [cursor=pointer]:
+                - /url: /contact-us
+            - generic [ref=f9e53]: "|"
+            - generic [ref=f9e54]:
+              - link "Instagram" [ref=f9e55] [cursor=pointer]:
+                - /url: https://www.instagram.com/tech_key_monk/
+              - link "YouTube" [ref=f9e58] [cursor=pointer]:
+                - /url: https://www.youtube.com/@TechKeyMonk-CBE
+              - link "Facebook" [ref=f9e61] [cursor=pointer]:
+                - /url: https://www.facebook.com/p/TechKey-Monk-61554380970425/
+              - link "X (formerly Twitter)" [ref=f9e64] [cursor=pointer]:
+                - /url: https://x.com/TechKeyMonk
+        - generic [ref=f9e67]:
+          - generic [ref=f9e68]: © 2026 TodaysCoimbatore.com. All rights reserved.
+          - generic [ref=f9e69]:
+            - text: Designed and Developed by
+            - link "techkeymonk" [ref=f9e70] [cursor=pointer]:
+              - /url: https://techkeymonk.com
+  - complementary [ref=f9e71]:
+    - generic [ref=f9e72]:
+      - generic [ref=f9e73]:
+        - generic [ref=f9e74]: COVAI PULSE POLL
+        - generic [ref=f9e78]: LIVE
+      - heading "Will Coimbatore Metro Rail Phase-1 significantly ease Avinashi Road traffic congestion?" [level=4] [ref=f9e80]
+      - generic [ref=f9e81]:
+        - button "👍 YES" [ref=f9e82] [cursor=pointer]:
+          - generic [ref=f9e83]:
+            - generic [ref=f9e84]: 👍
+            - generic [ref=f9e85]: "YES"
+        - button "👎 NO" [ref=f9e86] [cursor=pointer]:
+          - generic [ref=f9e87]:
+            - generic [ref=f9e88]: 👎
+            - generic [ref=f9e89]: "NO"
+      - generic [ref=f9e90]:
+        - generic [ref=f9e91]: Tap YES or NO to vote
+        - generic [ref=f9e93]: 0 votes cast
+    - generic [ref=f9e94]:
+      - generic [ref=f9e95]:
+        - generic [ref=f9e96]: FEATURED AD
+        - generic [ref=f9e97]: Kongu Living
+      - generic [ref=f9e98]:
+        - img "Kongu Living Estates — Luxury Smart Villas in Saravanampatti" [ref=f9e100]
+        - generic [ref=f9e101]:
+          - generic [ref=f9e102]: Real Estate
+          - heading "Kongu Living Estates — Luxury Smart Villas in Saravanampatti" [level=4] [ref=f9e103]

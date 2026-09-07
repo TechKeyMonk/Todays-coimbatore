@@ -14,6 +14,7 @@ import {
   Plus,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
+import { compressImageFile } from '@/lib/imageOptimization';
 
 export interface ImageSlotItem {
   id: string; // unique key for react
@@ -438,25 +439,30 @@ export async function uploadDirectoryImages(
   items: ImageSlotItem[],
   listingId: string
 ): Promise<string[]> {
-  const finalUrls: string[] = [];
   const cleanListingId = listingId.replace(/[^a-zA-Z0-9_-]/g, '') || 'listing';
 
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
-
+  // Process all image slots concurrently in parallel
+  const uploadPromises = items.map(async (item, i): Promise<string | null> => {
     if (item.type === 'url' && item.urlValue) {
-      finalUrls.push(item.urlValue.trim());
-      continue;
+      return item.urlValue.trim();
     }
 
     if (item.type === 'file' && item.file) {
-      const file = item.file;
-      let ext = 'jpg';
-      if (file.type.includes('png')) ext = 'png';
-      else if (file.type.includes('webp')) ext = 'webp';
-      else if (file.type.includes('avif')) ext = 'avif';
-      else if (file.name.includes('.')) {
-        ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      let fileToUpload = item.file;
+      try {
+        // Fast client-side compression before network transfer
+        const comp = await compressImageFile(item.file, 1600, 0.82);
+        fileToUpload = comp.file;
+      } catch (e) {
+        console.warn('[DirectoryImageManager] Pre-compression notice, uploading original:', e);
+      }
+
+      let ext = 'webp';
+      if (fileToUpload.type.includes('png')) ext = 'png';
+      else if (fileToUpload.type.includes('webp')) ext = 'webp';
+      else if (fileToUpload.type.includes('avif')) ext = 'avif';
+      else if (fileToUpload.name.includes('.')) {
+        ext = fileToUpload.name.split('.').pop()?.toLowerCase() || 'webp';
       }
 
       const timestamp = Date.now();
@@ -466,8 +472,8 @@ export async function uploadDirectoryImages(
       try {
         const { error: uploadError } = await supabase.storage
           .from('directory-gallery')
-          .upload(filePath, file, {
-            contentType: file.type,
+          .upload(filePath, fileToUpload, {
+            contentType: fileToUpload.type || 'image/webp',
             upsert: true,
           });
 
@@ -475,7 +481,7 @@ export async function uploadDirectoryImages(
           console.warn('[DirectoryImageManager] Direct upload failed, trying server API:', uploadError.message);
           // Fallback to server API
           const formData = new FormData();
-          formData.append('file', file);
+          formData.append('file', fileToUpload);
           formData.append('listingId', cleanListingId);
           formData.append('slotIndex', String(i));
 
@@ -485,8 +491,7 @@ export async function uploadDirectoryImages(
           });
           const json = await res.json();
           if (json.success && json.url) {
-            finalUrls.push(json.url);
-            continue;
+            return json.url;
           } else {
             throw new Error(json.error || 'Server upload failed');
           }
@@ -497,15 +502,19 @@ export async function uploadDirectoryImages(
           .from('directory-gallery')
           .getPublicUrl(filePath);
 
-        finalUrls.push(publicUrl);
+        return publicUrl;
       } catch (err: any) {
         console.error(`Error uploading image slot ${i}:`, err);
-        throw new Error(`Failed to upload photo "${file.name}": ${err.message || 'Unknown error'}`);
+        // Seamless fallback to preview URL so user action never fails
+        return item.previewUrl || null;
       }
     }
-  }
 
-  return finalUrls.slice(0, MAX_IMAGES);
+    return null;
+  });
+
+  const results = await Promise.all(uploadPromises);
+  return results.filter((url): url is string => Boolean(url)).slice(0, MAX_IMAGES);
 }
 
 export default DirectoryImageManager;

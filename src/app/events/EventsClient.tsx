@@ -15,6 +15,7 @@ const DEFAULT_INITIAL_EVENTS: EventRecord[] = [];
 export default function EventsClient({ initialEvents = DEFAULT_INITIAL_EVENTS }: { initialEvents?: EventRecord[] }) {
   const [events, setEvents] = useState<EventRecord[]>(initialEvents);
   const [activeVideoModal, setActiveVideoModal] = useState<string | null>(null);
+  const [selectedEventModal, setSelectedEventModal] = useState<EventRecord | null>(null);
 
   const loadEvents = useCallback(async () => {
     try {
@@ -49,36 +50,26 @@ export default function EventsClient({ initialEvents = DEFAULT_INITIAL_EVENTS }:
       if (dedicatedEvents.length > 0) {
         finalEvents = dedicatedEvents.map(mapDedicatedEventToEvent);
       } else {
-        // 2. Secondary Fallback: Fetch from `news` table where category ILIKE '%event%'
-        let newsEvents: any[] = [];
+        // Fallback to local dbService
         try {
-          const { data: nEvents } = await supabase
-            .from('news')
-            .select('*')
-            .ilike('category', '%event%')
-            .order('created_at', { ascending: false });
-          if (nEvents && Array.isArray(nEvents)) newsEvents = nEvents;
-        } catch (e) {
-          console.warn('News events query warning:', e);
-        }
-
-        if (newsEvents.length > 0) {
-          finalEvents = newsEvents.map(mapNewsRowToEvent);
-        } else {
-          // 3. Fallback to local dbService
-          try {
-            finalEvents = await dbService.getEvents();
-          } catch (e) {}
-        }
+          finalEvents = await dbService.getEvents();
+        } catch (e) {}
       }
 
-      // Unify object attributes cleanly
-      const unified = (finalEvents || []).map((ev) => {
+      // Unify object attributes cleanly without injecting default unsplash stock photos
+      const unified = (finalEvents || [])
+        .filter((ev) => (ev.category || '').toUpperCase().trim() !== 'NEWS')
+        .map((ev) => {
         const rawImg = ev.posterUrl || (ev as any).image_url || (ev as any).poster_url;
         const cleanImg =
-          rawImg && typeof rawImg === 'string' && rawImg.trim() !== '' && rawImg.trim() !== 'null' && rawImg.trim() !== 'undefined'
+          rawImg &&
+          typeof rawImg === 'string' &&
+          rawImg.trim() !== '' &&
+          rawImg.trim() !== 'null' &&
+          rawImg.trim() !== 'undefined' &&
+          !rawImg.includes('photo-1511578314322-379afb476865')
             ? rawImg.trim()
-            : 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80';
+            : undefined;
 
         return {
           ...ev,
@@ -120,6 +111,20 @@ export default function EventsClient({ initialEvents = DEFAULT_INITIAL_EVENTS }:
     };
   }, [loadEvents]);
 
+  // Deep-linking: auto-open modal if ?id= is present in URL
+  useEffect(() => {
+    if (typeof window !== 'undefined' && events.length > 0) {
+      const params = new URLSearchParams(window.location.search);
+      const idParam = params.get('id');
+      if (idParam) {
+        const match = events.find((e) => e.id === idParam || (e.slug && e.slug === idParam));
+        if (match) {
+          setSelectedEventModal(match);
+        }
+      }
+    }
+  }, [events]);
+
   const featuredEvent = events.find((e) => e.featured) || events[0];
 
   const getYoutubeEmbedUrl = (url: string) => {
@@ -133,6 +138,34 @@ export default function EventsClient({ initialEvents = DEFAULT_INITIAL_EVENTS }:
       return `https://www.youtube.com/embed/${id}?autoplay=1`;
     }
     return url;
+  };
+
+  const handleOpenDetails = (ev: EventRecord) => {
+    setSelectedEventModal(ev);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', `/events?id=${encodeURIComponent(ev.id)}`);
+    }
+  };
+
+  const handleCloseDetails = () => {
+    setSelectedEventModal(null);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', '/events');
+    }
+  };
+
+  const handleShareEvent = (ev: EventRecord) => {
+    const url = typeof window !== 'undefined' ? `${window.location.origin}/events?id=${encodeURIComponent(ev.id)}` : '';
+    if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      navigator.share({
+        title: ev.title,
+        text: `Check out ${ev.title} in Coimbatore!`,
+        url,
+      }).catch(() => {});
+    } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(url);
+      alert('Event link copied to clipboard!');
+    }
   };
 
   return (
@@ -175,19 +208,20 @@ export default function EventsClient({ initialEvents = DEFAULT_INITIAL_EVENTS }:
                   <div className="p-3 rounded-xl bg-white/10 border border-white/15 space-y-1">
                     <span className="text-emerald-300 font-bold uppercase text-[10px] block">Venue &amp; Organizer</span>
                     <p className="font-bold text-white text-xs truncate">📍 {featuredEvent.venue}</p>
-                    <p className="text-emerald-200 text-xs font-medium">By {featuredEvent.organizer || 'Coimbatore Event Bureau'}</p>
+                    <p className="text-emerald-200 text-xs font-medium truncate">By {featuredEvent.organizer || 'Coimbatore Event Bureau'}</p>
                   </div>
                 </div>
               </div>
 
               {/* Action Buttons */}
               <div className="pt-2 flex items-center gap-3 flex-wrap">
-                <Link
-                  href={featuredEvent.slug ? `/news/${featuredEvent.slug}` : `/article/${featuredEvent.id}`}
-                  className="px-6 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-2"
+                <button
+                  type="button"
+                  onClick={() => handleOpenDetails(featuredEvent)}
+                  className="px-6 py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-stone-950 font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg transition-all hover:scale-105 active:scale-95 flex items-center gap-2 cursor-pointer"
                 >
-                  <span>Read Event Story &rarr;</span>
-                </Link>
+                  <span>Read Event Details &rarr;</span>
+                </button>
 
                 {featuredEvent.mapLink && (
                   <a
@@ -214,20 +248,18 @@ export default function EventsClient({ initialEvents = DEFAULT_INITIAL_EVENTS }:
               </div>
             </div>
 
-            {/* Right Media Column */}
-            <div className="lg:col-span-5 bg-black relative min-h-[260px] lg:min-h-full overflow-hidden group">
-              {featuredEvent.posterUrl ? (
+            {/* Right Media Column: only shows poster if admin uploaded an image */}
+            <div className="lg:col-span-5 bg-black/40 relative min-h-[260px] lg:min-h-full overflow-hidden group flex items-center justify-center">
+              {featuredEvent.posterUrl && !featuredEvent.posterUrl.includes('photo-1511578314322-379afb476865') ? (
                 <img
                   src={featuredEvent.posterUrl}
                   alt={featuredEvent.title}
                   className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                  onError={(e) => {
-                    (e.currentTarget as HTMLImageElement).src = 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80';
-                  }}
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-5xl">
-                  🎟️
+                <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center space-y-3 bg-gradient-to-t from-black/60 to-transparent">
+                  <span className="text-6xl select-none">🎟️</span>
+                  <span className="text-xs font-bold text-emerald-200/80 uppercase tracking-widest">Coimbatore Event</span>
                 </div>
               )}
 
@@ -246,7 +278,7 @@ export default function EventsClient({ initialEvents = DEFAULT_INITIAL_EVENTS }:
           </div>
         )}
 
-        {/* Section Header: Direct Responsive Grid */}
+        {/* Section Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-200 dark:border-slate-800 pb-4">
           <div>
             <h2 className="text-xl sm:text-2xl font-black text-stone-900 dark:text-white tracking-tight flex items-center gap-2">
@@ -274,6 +306,7 @@ export default function EventsClient({ initialEvents = DEFAULT_INITIAL_EVENTS }:
                 key={ev.id}
                 event={ev}
                 onOpenVideo={(url) => setActiveVideoModal(url)}
+                onViewDetails={(e) => handleOpenDetails(e)}
               />
             ))}
           </div>
@@ -291,6 +324,172 @@ export default function EventsClient({ initialEvents = DEFAULT_INITIAL_EVENTS }:
 
         </div>
       </UniversalSideLayout>
+
+      {/* Comprehensive Event Details Modal */}
+      {selectedEventModal && (
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto"
+          onClick={handleCloseDetails}
+        >
+          <div 
+            className="bg-white dark:bg-slate-900 border border-stone-200 dark:border-slate-800 rounded-3xl max-w-2xl w-full overflow-hidden shadow-2xl space-y-0 my-auto animate-fadeIn"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header Media (Only if image was uploaded by admin) */}
+            {selectedEventModal.posterUrl && !selectedEventModal.posterUrl.includes('photo-1511578314322-379afb476865') ? (
+              <div className="relative w-full aspect-[16/9] bg-slate-950 overflow-hidden">
+                <img
+                  src={selectedEventModal.posterUrl}
+                  alt={selectedEventModal.title}
+                  className="w-full h-full object-contain"
+                />
+                <button
+                  type="button"
+                  onClick={handleCloseDetails}
+                  className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white font-bold text-lg flex items-center justify-center backdrop-blur-xs transition-colors cursor-pointer"
+                  aria-label="Close modal"
+                >
+                  ✕
+                </button>
+              </div>
+            ) : (
+              <div className="p-6 bg-gradient-to-r from-[#153d3b] to-[#0a1f1e] text-white flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-3xl select-none">🎟️</span>
+                  <div>
+                    <span className="px-2.5 py-0.5 rounded-full bg-white/20 text-emerald-300 text-[10px] font-black uppercase">
+                      {selectedEventModal.category || 'EVENT'}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleCloseDetails}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold text-sm flex items-center justify-center transition-colors cursor-pointer"
+                  aria-label="Close modal"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {/* Modal Body Content */}
+            <div className="p-6 sm:p-8 space-y-6 max-h-[75vh] overflow-y-auto">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="px-3 py-1 rounded-full bg-[#153d3b] text-emerald-200 text-xs font-black uppercase">
+                    {selectedEventModal.category || 'EVENT'}
+                  </span>
+                  {selectedEventModal.featured && (
+                    <span className="px-3 py-1 rounded-full bg-amber-400 text-stone-950 text-xs font-black uppercase">
+                      ⭐ Featured
+                    </span>
+                  )}
+                </div>
+
+                <h2 className="text-xl sm:text-2xl font-black text-stone-900 dark:text-white leading-tight">
+                  {selectedEventModal.title}
+                </h2>
+              </div>
+
+              {/* Quick Info Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-slate-800/60 border border-stone-100 dark:border-slate-800 space-y-1">
+                  <span className="text-stone-400 dark:text-gray-500 font-bold uppercase text-[10px] block">Schedule</span>
+                  <p className="font-bold text-stone-900 dark:text-white text-sm">📅 {selectedEventModal.date}</p>
+                  <p className="text-red-600 dark:text-red-400 font-mono font-bold">⏰ {selectedEventModal.time}</p>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-stone-50 dark:bg-slate-800/60 border border-stone-100 dark:border-slate-800 space-y-1">
+                  <span className="text-stone-400 dark:text-gray-500 font-bold uppercase text-[10px] block">Location &amp; Venue</span>
+                  <p className="font-bold text-stone-900 dark:text-white text-xs truncate">📍 {selectedEventModal.venue}</p>
+                  <p className="text-stone-500 dark:text-gray-400 text-[11px]">By {selectedEventModal.organizer || 'Coimbatore Event Bureau'}</p>
+                </div>
+              </div>
+
+              {/* Event Description */}
+              <div className="space-y-2">
+                <h4 className="text-xs font-bold text-stone-400 dark:text-gray-500 uppercase tracking-wider">
+                  Event Details &amp; Summary
+                </h4>
+                <div className="text-sm text-stone-700 dark:text-gray-300 leading-relaxed whitespace-pre-line bg-stone-50 dark:bg-slate-850 p-4 rounded-2xl border border-stone-100 dark:border-slate-800">
+                  {selectedEventModal.description || 'Public exhibition and community festival happening in Coimbatore.'}
+                </div>
+              </div>
+
+              {/* Promo Video Player if available */}
+              {selectedEventModal.videoUrl && (
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-stone-400 dark:text-gray-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>▶</span>
+                    <span>Event Promo Video</span>
+                  </h4>
+                  <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black shadow-md">
+                    {selectedEventModal.videoUrl.includes('youtube') || selectedEventModal.videoUrl.includes('youtu.be') ? (
+                      <iframe
+                        src={getYoutubeEmbedUrl(selectedEventModal.videoUrl)}
+                        title="Event Video"
+                        className="w-full h-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    ) : (
+                      <video
+                        src={selectedEventModal.videoUrl}
+                        controls
+                        className="w-full h-full object-contain"
+                      />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions Footer */}
+              <div className="pt-3 border-t border-stone-100 dark:border-slate-800 flex items-center justify-between gap-3 flex-wrap">
+                {selectedEventModal.mapLink ? (
+                  <a
+                    href={selectedEventModal.mapLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2.5 rounded-xl bg-[#153d3b] hover:bg-[#0f2e2d] text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5"
+                  >
+                    <span>📍</span>
+                    <span>Open in Google Maps &rarr;</span>
+                  </a>
+                ) : (
+                  <a
+                    href={`https://maps.google.com/?q=${encodeURIComponent(selectedEventModal.venue + ' Coimbatore')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-4 py-2.5 rounded-xl bg-[#153d3b] hover:bg-[#0f2e2d] text-white font-bold text-xs shadow-md transition-all flex items-center gap-1.5"
+                  >
+                    <span>📍</span>
+                    <span>Open in Google Maps &rarr;</span>
+                  </a>
+                )}
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleShareEvent(selectedEventModal)}
+                    className="px-4 py-2.5 rounded-xl bg-stone-100 dark:bg-slate-800 hover:bg-stone-200 dark:hover:bg-slate-700 text-stone-800 dark:text-stone-200 font-bold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <span>📤 Share</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleCloseDetails}
+                    className="px-4 py-2.5 rounded-xl bg-stone-200 dark:bg-slate-800 hover:bg-stone-300 dark:hover:bg-slate-700 text-stone-900 dark:text-white font-bold text-xs transition-colors cursor-pointer"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Embedded Video Player Modal */}
       {activeVideoModal && (

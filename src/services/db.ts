@@ -4,7 +4,7 @@ export interface Article {
   id: string;
   title: string;
   slug?: string;
-  category: 'NEWS' | 'OUR CITY' | 'BUSINESS' | 'TECH' | 'EVENTS' | 'SPORTS' | 'CEO' | 'EDUCATION' | 'E-PAPER' | string;
+  category: 'NEWS' | 'BUSINESS' | 'TECH' | 'EVENTS' | 'SPORTS' | 'CEO' | 'EDUCATION' | 'E-PAPER' | string;
   subCategory: string;
   subTag?: string;
   author: string;
@@ -320,7 +320,6 @@ export const INITIAL_DATABASE_ARTICLES: Article[] = [];
 
 export const INITIAL_CATEGORIES: CategoryRecord[] = [
   { id: 'cat-1', name: 'NEWS', slug: 'news', description: 'Hyper-local city and district headlines', totalArticles: 0, status: 'active' },
-  { id: 'cat-2', name: 'OUR CITY', slug: 'our-city', description: 'Corporation, water, sanitation, and citizen alerts', totalArticles: 0, status: 'active' },
   { id: 'cat-3', name: 'BUSINESS', slug: 'business', description: 'MSME, textile, engineering, and commerce', totalArticles: 0, status: 'active' },
   { id: 'cat-4', name: 'TECH', slug: 'tech', description: 'IT corridor, EV startups, and SaaS hubs', totalArticles: 0, status: 'active' },
   { id: 'cat-5', name: 'INFRASTRUCTURE', slug: 'infrastructure', description: 'Flyovers, metro rail, bypass corridors, and civic works', totalArticles: 0, status: 'active' },
@@ -476,7 +475,7 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
     id: 'ad-slot-2',
     slotId: 'HOME_IN_FEED_1',
     placementKey: 'HOME_IN_FEED_1',
-    format: 'Home In-Feed 1 (Between Stories & Our City)',
+    format: 'Home In-Feed 1 (Between Top Stories & Infrastructure)',
     impressions: '18,950',
     ctr: '4.2%',
     active: true,
@@ -832,6 +831,8 @@ class DatabaseService {
   private isSyncing = false;
   private lastServerSyncTime = 0;
   private lastEnquiriesSyncTime = 0;
+  private lastSocialLinksFetchTime = 0;
+  private socialLinksInFlight = false;
 
   constructor() {
     purgeLegacyDuplicateKeys();
@@ -930,8 +931,9 @@ class DatabaseService {
           }
 
           if (Array.isArray(d.events)) {
-            this.events = d.events;
-            const dataStr = JSON.stringify(d.events);
+            const cleanEvents = d.events.filter((e: any) => (e.category || '').toUpperCase().trim() !== 'NEWS');
+            this.events = cleanEvents;
+            const dataStr = JSON.stringify(cleanEvents);
             safeSetItem('t_covai_events', dataStr);
             changed = true;
           }
@@ -951,12 +953,11 @@ class DatabaseService {
           }
 
           if (d.socialLinks && typeof d.socialLinks === 'object') {
-            const isLegacy = (url?: string) => !url || url.includes('todayscoimbatore');
             this.socialLinks = {
-              instagram: isLegacy(d.socialLinks.instagram) ? INITIAL_SOCIAL_LINKS_DB.instagram : d.socialLinks.instagram,
-              youtube: isLegacy(d.socialLinks.youtube) ? INITIAL_SOCIAL_LINKS_DB.youtube : d.socialLinks.youtube,
-              facebook: isLegacy(d.socialLinks.facebook) ? INITIAL_SOCIAL_LINKS_DB.facebook : d.socialLinks.facebook,
-              twitter: isLegacy(d.socialLinks.twitter) ? INITIAL_SOCIAL_LINKS_DB.twitter : d.socialLinks.twitter,
+              instagram: d.socialLinks.instagram || INITIAL_SOCIAL_LINKS_DB.instagram,
+              youtube: d.socialLinks.youtube || INITIAL_SOCIAL_LINKS_DB.youtube,
+              facebook: d.socialLinks.facebook || INITIAL_SOCIAL_LINKS_DB.facebook,
+              twitter: d.socialLinks.twitter || INITIAL_SOCIAL_LINKS_DB.twitter,
             };
             safeSetItem('t_covai_social_links', JSON.stringify(this.socialLinks));
             changed = true;
@@ -1106,27 +1107,29 @@ class DatabaseService {
         localStorage.getItem('covai_db_events') ||
         localStorage.getItem('events_db');
       if (storedEvents) {
-        const parsed = JSON.parse(storedEvents);
-        if (Array.isArray(parsed)) {
-          this.events = parsed;
-        }
+        try {
+          const parsed = JSON.parse(storedEvents);
+          if (Array.isArray(parsed)) {
+            this.events = parsed.filter((e: any) => (e.category || '').toUpperCase().trim() !== 'NEWS');
+          }
+        } catch {}
       }
 
       const storedSocialLinks =
         localStorage.getItem('t_covai_social_links') ||
         localStorage.getItem('covai_db_social_links');
       if (storedSocialLinks) {
-        const parsed = JSON.parse(storedSocialLinks);
-        if (parsed && typeof parsed === 'object') {
-          const isLegacy = (url?: string) => !url || url.includes('todayscoimbatore');
-          this.socialLinks = {
-            instagram: isLegacy(parsed.instagram) ? INITIAL_SOCIAL_LINKS_DB.instagram : parsed.instagram,
-            youtube: isLegacy(parsed.youtube) ? INITIAL_SOCIAL_LINKS_DB.youtube : parsed.youtube,
-            facebook: isLegacy(parsed.facebook) ? INITIAL_SOCIAL_LINKS_DB.facebook : parsed.facebook,
-            twitter: isLegacy(parsed.twitter) ? INITIAL_SOCIAL_LINKS_DB.twitter : parsed.twitter,
-          };
-          safeSetItem('t_covai_social_links', JSON.stringify(this.socialLinks));
-        }
+        try {
+          const parsed = JSON.parse(storedSocialLinks);
+          if (parsed && typeof parsed === 'object') {
+            this.socialLinks = {
+              instagram: parsed.instagram || INITIAL_SOCIAL_LINKS_DB.instagram,
+              youtube: parsed.youtube || INITIAL_SOCIAL_LINKS_DB.youtube,
+              facebook: parsed.facebook || INITIAL_SOCIAL_LINKS_DB.facebook,
+              twitter: parsed.twitter || INITIAL_SOCIAL_LINKS_DB.twitter,
+            };
+          }
+        } catch {}
       }
 
       const storedEnquiries =
@@ -1643,9 +1646,6 @@ class DatabaseService {
         if (targetSlug === 'infrastructure' || targetName === 'infrastructure') {
           return cat.includes('infra') || subCat.includes('infrastructure');
         }
-        if (targetSlug === 'our-city' || targetName === 'our city') {
-          return cat.includes('city') || cat.includes('civic');
-        }
         if (targetSlug === 'ceos' || targetName === 'ceo') {
           return cat.includes('ceo') || cat.includes('founder');
         }
@@ -2114,15 +2114,7 @@ class DatabaseService {
   // Events CRUD
   public async getEvents(): Promise<EventRecord[]> {
     this.reloadFromStorage();
-    const eventArticles = this.articles.filter((a) => isArticleInCategory(a, 'events'));
-    const mappedNewsEvents = eventArticles.map(mapNewsRowToEvent);
-    const combined = [...mappedNewsEvents];
-    for (const e of this.events) {
-      if (!combined.some((c) => c.id === e.id || c.title.toLowerCase() === e.title.toLowerCase())) {
-        combined.push(e);
-      }
-    }
-    return combined;
+    return this.events.filter((e) => (e.category || '').toUpperCase().trim() !== 'NEWS');
   }
 
   public async saveEvents(events: EventRecord[]): Promise<boolean> {
@@ -2180,11 +2172,11 @@ class DatabaseService {
     this.events = this.events.filter((e) => e.id !== id);
     this.persist('events');
     if (this.isClient) {
-      fetch('/api/content', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'delete_event', id }),
-      }).catch((e) => console.error('Failed to delete event on server:', e));
+      try {
+        await fetch(`/api/events?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      } catch (e) {
+        console.error('Failed to delete event on server:', e);
+      }
     }
     return true;
   }
@@ -2192,20 +2184,65 @@ class DatabaseService {
   // Social Links Methods
   public async getSocialLinks(): Promise<SocialLinksRecord> {
     this.reloadFromStorage();
+    const now = Date.now();
+    if (this.isClient && !this.socialLinksInFlight && now - this.lastSocialLinksFetchTime > 60000) {
+      this.socialLinksInFlight = true;
+      this.lastSocialLinksFetchTime = now;
+      // Background sync to ensure fresh server config without request flooding
+      fetch('/api/content?entity=config&key=SOCIAL_LINKS', { cache: 'no-store' })
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.success && json.data && typeof json.data === 'object') {
+            const serverLinks = json.data;
+            const updated = {
+              instagram: serverLinks.instagram || this.socialLinks.instagram,
+              youtube: serverLinks.youtube || this.socialLinks.youtube,
+              facebook: serverLinks.facebook || this.socialLinks.facebook,
+              twitter: serverLinks.twitter || this.socialLinks.twitter,
+            };
+            if (JSON.stringify(updated) !== JSON.stringify(this.socialLinks)) {
+              this.socialLinks = updated;
+              safeSetItem('t_covai_social_links', JSON.stringify(this.socialLinks));
+              this.notify();
+              window.dispatchEvent(new CustomEvent('socialLinksStorageUpdate', { detail: this.socialLinks }));
+            }
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          this.socialLinksInFlight = false;
+        });
+    }
     return { ...this.socialLinks };
   }
 
   public async saveSocialLinks(links: Partial<SocialLinksRecord>): Promise<SocialLinksRecord> {
     this.reloadFromStorage();
-    this.socialLinks = { ...this.socialLinks, ...links };
+    this.socialLinks = {
+      instagram: links.instagram !== undefined ? links.instagram : this.socialLinks.instagram,
+      youtube: links.youtube !== undefined ? links.youtube : this.socialLinks.youtube,
+      facebook: links.facebook !== undefined ? links.facebook : this.socialLinks.facebook,
+      twitter: links.twitter !== undefined ? links.twitter : this.socialLinks.twitter,
+    };
     this.persist('social_links');
+    this.lastSocialLinksFetchTime = Date.now();
+
     if (this.isClient) {
-      fetch('/api/content', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'save_config', entity: 'social_links', data: this.socialLinks }),
-      }).catch((e) => console.error('Failed to sync social links to server:', e));
+      try {
+        await fetch('/api/content', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'save_config', entity: 'social_links', data: this.socialLinks }),
+        });
+      } catch (e) {
+        console.error('Failed to sync social links to server:', e);
+      }
+
+      window.dispatchEvent(new CustomEvent('socialLinksStorageUpdate', { detail: this.socialLinks }));
+      window.dispatchEvent(new Event('todayscoimbatore:db-updated'));
     }
+
+    this.notify();
     return { ...this.socialLinks };
   }
 

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Play } from 'lucide-react';
 import { formatRelativeTime } from '@/services/db';
+import { hasActualVideo } from '@/lib/videoUtils';
 
 export interface SpotlightArticle {
   id: string;
@@ -115,11 +116,7 @@ export default function BreakingSpotlight({ articles = [], onOpenVideo }: Breaki
           const articleHref = article.slug ? `/news/${article.slug}` : `/article/${article.id}`;
           const rawImageUrl = (article.imageUrl || '').trim();
           const hasImage = Boolean(rawImageUrl && rawImageUrl !== 'null' && rawImageUrl !== 'undefined');
-          const hasVideo = Boolean(
-            article.videoUrl &&
-            article.videoUrl.trim() !== '' &&
-            (article.mediaType === 'video' || article.videoUrl.startsWith('http') || article.videoUrl.includes('youtube'))
-          );
+          const hasVideo = hasActualVideo(article);
 
           return (
             <div
@@ -144,23 +141,33 @@ export default function BreakingSpotlight({ articles = [], onOpenVideo }: Breaki
 
               {/* TOP LEFT BADGES (Floating in top-left as in reference screenshot) */}
               <div className="absolute top-3 left-3 sm:top-4 sm:left-4 z-20 flex items-center gap-2 flex-wrap">
+                {/* Primary Category Badge */}
                 <span className="bg-red-600 text-white text-[10px] sm:text-xs font-extrabold px-2.5 py-1 rounded-md uppercase tracking-wider shadow-sm">
                   {article.category || 'COVAI SPOTLIGHTS'}
                 </span>
-                {article.subCategory && article.subCategory !== article.category ? (
-                  <span className="bg-[#8b2323] text-white text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-md uppercase tracking-wider shadow-sm">
-                    {article.subCategory}
-                  </span>
-                ) : (
-                  <span className="bg-[#8b2323] text-white text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-md uppercase tracking-wider shadow-sm">
-                    CEO
-                  </span>
-                )}
-                {article.tags?.map((tag, idx) => (
-                  <span key={idx} className="bg-white/20 backdrop-blur-md text-white text-[10px] sm:text-xs font-semibold px-2.5 py-1 rounded-md uppercase">
-                    {tag}
-                  </span>
-                ))}
+
+                {/* Subcategory Badge (ONLY if genuine and not duplicating the primary category) */}
+                {article.subCategory &&
+                  article.subCategory.trim() !== '' &&
+                  article.subCategory.trim().toUpperCase() !== (article.category || '').trim().toUpperCase() && (
+                    <span className="bg-[#8b2323] text-white text-[10px] sm:text-xs font-bold px-2.5 py-1 rounded-md uppercase tracking-wider shadow-sm">
+                      {article.subCategory}
+                    </span>
+                  )}
+
+                {/* Tags (Filtered to avoid duplicating category or subCategory) */}
+                {article.tags
+                  ?.filter((tag) => {
+                    const t = (tag || '').trim().toUpperCase();
+                    const c = (article.category || '').trim().toUpperCase();
+                    const sc = (article.subCategory || '').trim().toUpperCase();
+                    return t !== '' && t !== c && t !== sc;
+                  })
+                  .map((tag, idx) => (
+                    <span key={idx} className="bg-white/20 backdrop-blur-md text-white text-[10px] sm:text-xs font-semibold px-2.5 py-1 rounded-md uppercase">
+                      {tag}
+                    </span>
+                  ))}
                 {hasVideo && onOpenVideo && (
                   <button
                     type="button"

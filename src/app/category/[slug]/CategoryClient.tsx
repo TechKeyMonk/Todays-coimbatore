@@ -183,7 +183,12 @@ export default function CategoryClient({ slug }: { slug: string }) {
                       author={art.author || 'Editorial Bureau'}
                       excerpt={art.excerpt || (art.content ? art.content.slice(0, 140) + '...' : '')}
                       imageUrl={art.imageUrl}
+                      mediaType={art.mediaType}
+                      videoUrl={art.videoUrl || (art.mediaType === 'video' ? ((art as any).mediaUrl as string) : undefined)}
+                      videoTitle={art.videoTitle}
+                      videoDuration={art.videoDuration}
                       articleHref={linkHref}
+                      onOpenVideo={handleOpenVideoModal}
                     />
                   </div>
                 );

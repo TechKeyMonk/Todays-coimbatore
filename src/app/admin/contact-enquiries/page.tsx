@@ -295,7 +295,7 @@ export default function AdminContactEnquiriesPage() {
   const openNewsConversion = (enquiry: ContactEnquiryRecord) => {
     const resolvedCat = resolveEnquiryCategory(enquiry);
     setNewsHeadline(sanitizeText(enquiry.subject));
-    setNewsCategory(resolvedCat === 'Civic & Traffic Alert' ? 'OUR CITY' : 'NEWS');
+    setNewsCategory('NEWS');
     setNewsAuthor(sanitizeText(enquiry.name) || "Today's Coimbatore Desk");
     setNewsBody(sanitizeText(enquiry.message));
     setIsNewsModalOpen(true);
@@ -1305,7 +1305,6 @@ export default function AdminContactEnquiriesPage() {
                     className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-white font-bold"
                   >
                     <option value="NEWS">NEWS (General &amp; Headlines)</option>
-                    <option value="OUR CITY">OUR CITY (Civic &amp; Corporation)</option>
                     <option value="BUSINESS">BUSINESS &amp; INDUSTRY</option>
                     <option value="TECH">TECH &amp; INNOVATION</option>
                   </select>

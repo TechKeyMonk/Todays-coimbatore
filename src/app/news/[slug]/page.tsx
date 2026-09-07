@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { redirect } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
 import NewsArticleClient from './NewsArticleClient';
 
@@ -115,5 +116,24 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function NewsSlugPage({ params }: PageProps) {
   const resolvedParams = await params;
+  const rawSlug = decodeURIComponent(resolvedParams.slug || '').trim();
+
+  let evMatch: any = null;
+  try {
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(rawSlug);
+    let evQuery = supabase.from('events').select('id');
+    if (isUuid) {
+      evQuery = evQuery.eq('id', rawSlug);
+    } else {
+      evQuery = evQuery.or(`title.ilike.%${rawSlug}%,event_name.ilike.%${rawSlug}%`);
+    }
+    const res = await evQuery.maybeSingle();
+    evMatch = res.data;
+  } catch (e) {}
+
+  if (evMatch) {
+    redirect(`/events?id=${encodeURIComponent(evMatch.id)}`);
+  }
+
   return <NewsArticleClient slug={resolvedParams.slug} />;
 }

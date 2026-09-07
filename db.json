@@ -65,7 +65,7 @@
     {
       "id": "art-top-2",
       "title": "Siruvani Reservoir Storage at 45.4 ft: Summer Water Rationing Prevented",
-      "category": "OUR CITY",
+      "category": "NEWS",
       "subCategory": "Civic Watch",
       "author": "Water Resources Desk",
       "readTime": "3 min",
@@ -361,14 +361,6 @@
       "slug": "news",
       "description": "Hyper-local city and district headlines",
       "totalArticles": 48,
-      "status": "active"
-    },
-    {
-      "id": "cat-2",
-      "name": "OUR CITY",
-      "slug": "our-city",
-      "description": "Corporation, water, sanitation, and citizen alerts",
-      "totalArticles": 32,
       "status": "active"
     },
     {

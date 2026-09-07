@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { formatRelativeTime } from '@/services/db';
+import { hasActualVideo } from '@/lib/videoUtils';
 
 export interface SubHeroSpotlightArticle {
   id: string;
@@ -64,10 +65,7 @@ export const SubHeroSpotlight: React.FC<SubHeroSpotlightProps> = ({
     ? `/article/${article.slug}`
     : `/article/${article.id}`;
 
-  const hasVideo = Boolean(
-    article.mediaType === 'video' ||
-    (article.videoUrl && typeof article.videoUrl === 'string' && article.videoUrl.trim() !== '')
-  );
+  const hasVideo = hasActualVideo(article);
 
   const timeDisplay = formatRelativeTime(
     article.updatedAt || article.createdAt || article.publishedAt
@@ -177,6 +175,7 @@ export const SubHeroSpotlight: React.FC<SubHeroSpotlightProps> = ({
                   quality: '1080p HD',
                   location: 'Coimbatore, Tamil Nadu',
                   caption: article.excerpt || article.title,
+                  videoUrl: article.videoUrl || (article.mediaType === 'video' ? ((article.mediaUrl as string) || undefined) : undefined),
                 })
               }
               className="min-h-[36px] inline-flex items-center justify-center px-3 py-1 rounded-lg bg-[#f3ede2] dark:bg-slate-800 text-[#111111] dark:text-gray-200 hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white text-xs font-black transition-colors touch-manipulation cursor-pointer"

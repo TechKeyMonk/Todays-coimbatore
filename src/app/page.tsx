@@ -20,6 +20,7 @@ import UniversalSideLayout from '../components/UniversalSideLayout';
 import { saveCurrentScrollPosition } from '../components/ScrollRestoration';
 import { ArrowRight } from 'lucide-react';
 import dbService, { Article, AdSlotRecord, INITIAL_ADS_DB, DirectoryListing, INITIAL_DIRECTORY_LISTINGS, INITIAL_DATABASE_ARTICLES, formatRelativeTime } from '../services/db';
+import { hasActualVideo } from '@/lib/videoUtils';
 
 /* -------------------------------------------------------------------------- */
 /*                                Types & Models                              */
@@ -28,10 +29,11 @@ import dbService, { Article, AdSlotRecord, INITIAL_ADS_DB, DirectoryListing, INI
 interface VideoModalData {
   title: string;
   category: string;
-  duration: string;
-  quality: string;
-  location: string;
-  caption: string;
+  duration?: string;
+  quality?: string;
+  location?: string;
+  caption?: string;
+  videoUrl?: string;
 }
 
 interface NewsCardItem {
@@ -73,7 +75,9 @@ interface CeoProfileItem {
   title: string;
   quote: string;
   timeAgo: string;
-  videoDuration: string;
+  videoDuration?: string;
+  videoUrl?: string;
+  mediaType?: string;
   imageUrl?: string;
   articleHref: string;
 }
@@ -635,9 +639,6 @@ export default function HomePage() {
       }
 
       // 2. Specific exact category aliases (without cross-polluting)
-      if (target === 'our-city' || target === 'my-city' || target === 'civic') {
-        return cat === 'our city' || cat === 'civic life';
-      }
       if (target === 'infrastructure' || target === 'infrastructure-updates') {
         return cat === 'infrastructure' || (item.subCategory || '').toLowerCase().includes('infrastructure');
       }
@@ -749,34 +750,7 @@ export default function HomePage() {
     return trimmed;
   };
 
-  // Map DB articles dynamically to Top Stories sorted with exclusive items leading
-  const topStoriesData = sortedDbArticles.map((a) => ({
-    id: a.id,
-    title: a.title,
-    category: a.category,
-    isExclusive: Boolean(a.isExclusive),
-    categoryBadgeClass:
-      a.isExclusive
-        ? 'bg-red-700 text-white font-black'
-        : a.category === 'TECH'
-        ? 'bg-emerald-600/90 text-white'
-        : a.category === 'OUR CITY' || a.category === 'CIVIC LIFE'
-        ? 'bg-blue-600/90 text-white'
-        : a.category === 'BUSINESS'
-        ? 'bg-amber-600/90 text-white'
-        : 'bg-red-600/90 text-white',
-    timeAgo: a.updatedAt || a.createdAt || a.publishedAt || 'Recently',
-    readTime: a.readTime || '3 min',
-    author: a.author || 'Editorial Bureau',
-    excerpt: a.excerpt || a.content?.slice(0, 180) || '',
-    mediaType: a.mediaType || 'image',
-    imageUrl: sanitizeArticleImageUrl(a.imageUrl) || sanitizeArticleImageUrl((a as any).image) || sanitizeArticleImageUrl((a as any).mediaUrl),
-    videoTitle: a.videoTitle || a.title,
-    videoDuration: a.videoDuration || '02:30',
-    videoUrl: a.videoUrl,
-    articleHref: `/article/${a.id}`,
-    highlightStat: a.highlightStat || (a.isExclusive ? 'Spotlight Exclusive' : undefined),
-  }));
+
 
   // Dynamic Breaking Spotlight Multi-Article Carousel Feed
   const allSpotlightArticles = sortedDbArticles.filter((a) =>
@@ -871,27 +845,7 @@ export default function HomePage() {
     ? (latestHeroArticle as any).mediaUrl.trim()
     : DEFAULT_HERO_IMAGE;
 
-  const [visibleStoriesCount, setVisibleStoriesCount] = useState(6);
 
-  const handleLoadMoreStories = () => {
-    setVisibleStoriesCount((prev) => Math.min(prev + 6, topStoriesData.length));
-  };
-
-  const ourCityArticles = getArticlesByCategory('our-city');
-  const myCityData = ourCityArticles.map((a) => ({
-    id: a.id,
-    tag: a.subCategory || a.category,
-    badgeClass: 'bg-blue-600/90 text-white',
-    timeAgo: a.publishedAt || 'Today',
-    title: a.title,
-    excerpt: a.excerpt || a.content?.slice(0, 140) || '',
-    footerLabel: 'CIVIC DESK',
-    footerValue: 'Covai Report',
-    footerIsCall: false,
-    mediaType: a.mediaType || 'image',
-    imageUrl: sanitizeArticleImageUrl(a.imageUrl) || sanitizeArticleImageUrl((a as any).image) || sanitizeArticleImageUrl((a as any).mediaUrl),
-    videoUrl: a.videoUrl,
-  }));
 
   const infraArticles = getArticlesByCategory('infrastructure');
   const infraData: NewsCardItem[] = infraArticles.map((a) => ({
@@ -910,9 +864,9 @@ export default function HomePage() {
         : (a as any).image && typeof (a as any).image === 'string' && (a as any).image.trim() !== '' && (a as any).image.trim() !== 'null' && (a as any).image.trim() !== 'undefined'
         ? (a as any).image.trim()
         : undefined,
-    videoTitle: a.videoTitle || a.title,
-    videoDuration: a.videoDuration || '02:30',
-    videoUrl: a.videoUrl,
+    videoTitle: a.videoTitle,
+    videoDuration: a.videoDuration,
+    videoUrl: a.videoUrl || (a.mediaType === 'video' ? ((a as any).mediaUrl as string) : undefined),
     articleHref: `/article/${a.id}`,
     highlightStat: a.highlightStat,
   }));
@@ -934,15 +888,15 @@ export default function HomePage() {
         : (a as any).image && typeof (a as any).image === 'string' && (a as any).image.trim() !== '' && (a as any).image.trim() !== 'null' && (a as any).image.trim() !== 'undefined'
         ? (a as any).image.trim()
         : undefined,
-    videoTitle: a.videoTitle || a.title,
-    videoDuration: a.videoDuration || '03:00',
-    videoUrl: a.videoUrl,
+    videoTitle: a.videoTitle,
+    videoDuration: a.videoDuration,
+    videoUrl: a.videoUrl || (a.mediaType === 'video' ? ((a as any).mediaUrl as string) : undefined),
     articleHref: `/article/${a.id}`,
     highlightStat: a.highlightStat,
   }));
 
   const ceoArticles = getArticlesByCategory('ceos');
-  const ceoData = ceoArticles.map((a) => ({
+  const mappedCeoData = ceoArticles.map((a) => ({
     id: a.id,
     name: a.author || 'Coimbatore Leader',
     role: a.subCategory || 'Founder & CEO',
@@ -955,28 +909,29 @@ export default function HomePage() {
         : (a as any).image && typeof (a as any).image === 'string' && (a as any).image.trim() !== '' && (a as any).image.trim() !== 'null' && (a as any).image.trim() !== 'undefined'
         ? (a as any).image.trim()
         : undefined,
-    videoDuration: a.videoDuration || '03:00',
-    videoUrl: a.videoUrl,
+    videoDuration: a.videoDuration,
+    videoUrl: a.videoUrl || (a.mediaType === 'video' ? ((a as any).mediaUrl as string) : undefined),
     articleHref: `/article/${a.id}`,
     timeAgo: a.publishedAt || 'Exclusive',
     title: a.title,
   }));
+  const ceoData = mappedCeoData.length > 0 ? mappedCeoData : CEO_PROFILES;
 
-  const trendingArticles = getArticlesByCategory('trending');
-  const trendingData: NewsCardItem[] = trendingArticles.map((a) => ({
+  const newsSectionArticles = getArticlesByCategory('news');
+  const newsSectionData: NewsCardItem[] = newsSectionArticles.map((a) => ({
     id: a.id,
     title: a.title,
-    category: a.category,
+    category: a.category || 'NEWS',
     categoryBadgeClass: 'bg-red-600/90 text-white',
     timeAgo: a.publishedAt || 'Recently',
     readTime: a.readTime || '3 min',
-    author: a.author || 'Spotlight Desk',
+    author: a.author || 'Editorial Bureau',
     excerpt: a.excerpt || a.content?.slice(0, 180) || '',
     mediaType: a.mediaType || 'image',
     imageUrl: sanitizeArticleImageUrl(a.imageUrl) || sanitizeArticleImageUrl((a as any).image) || sanitizeArticleImageUrl((a as any).mediaUrl),
-    videoTitle: a.videoTitle || a.title,
-    videoDuration: a.videoDuration || '02:30',
-    videoUrl: a.videoUrl,
+    videoTitle: a.videoTitle,
+    videoDuration: a.videoDuration,
+    videoUrl: a.videoUrl || (a.mediaType === 'video' ? ((a as any).mediaUrl as string) : undefined),
     articleHref: `/article/${a.id}`,
     highlightStat: a.highlightStat,
   }));
@@ -1119,50 +1074,7 @@ export default function HomePage() {
             </div>
 
 
-        {/* ================================================================== */}
-        {/* NEW FULL-WIDTH 3-CARD ROW 1: "TOP STORIES • LIVE 24/7"            */}
-        {/* ================================================================== */}
-        <div className="w-full max-w-full my-6 px-0 space-y-3 box-border">
-          <div className="border-b border-stone-300 dark:border-slate-800 pb-1 flex items-center justify-between">
-            <h2 className="text-sm font-extrabold uppercase tracking-widest text-[#111111] dark:text-gray-100 flex items-center gap-1.5">
-              <span className="text-red-600 dark:text-red-500 font-black">★</span>
-              TOP STORIES • LIVE 24/7
-            </h2>
-            {topStoriesData.length > 3 && (
-              <Link
-                href="/category/top-stories"
-                className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1"
-              >
-                <span>View All</span>
-                <span>&rarr;</span>
-              </Link>
-            )}
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr gap-4 sm:gap-6 w-full max-w-full mx-auto max-md:px-0 px-2 sm:px-4">
-            {topStoriesData.map((news) => (
-              <NewsCard
-                key={news.id}
-                id={news.id}
-                title={news.title}
-                category={news.category}
-                categoryBadgeClass={news.categoryBadgeClass}
-                isExclusive={news.isExclusive}
-                highlightStat={news.highlightStat}
-                timeAgo={news.timeAgo}
-                author={news.author}
-                excerpt={news.excerpt}
-                mediaType={news.mediaType}
-                imageUrl={news.imageUrl}
-                videoUrl={news.videoUrl}
-                videoTitle={news.videoTitle}
-                videoDuration={news.videoDuration}
-                articleHref={news.articleHref || `/article/${news.id}`}
-                onOpenVideo={openVideoModal}
-              />
-            ))}
-          </div>
-        </div>
 
         {/* ================================================================== */}
         {/* DYNAMIC SLOT INJECTION: ADBANNER BETWEEN TOP STORIES & MY CITY     */}
@@ -1241,70 +1153,19 @@ export default function HomePage() {
         )}
 
         {/* ================================================================== */}
-        {/* NEW FULL-WIDTH 3-CARD ROW 2: "OUR CITY"                            */}
+        {/* FULL-WIDTH SECTION 2: "NEWS" (FULL 3-COLUMN GRID)                  */}
         {/* ================================================================== */}
-        <div className="w-full max-w-full my-6 px-0 space-y-3 box-border">
-          <div className="w-full border-b border-stone-300 dark:border-slate-800 pb-1 flex items-center justify-between">
-            <h2 className="text-sm font-extrabold uppercase tracking-widest text-[#111111] dark:text-gray-100 flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-red-600 animate-pulse" />
-              OUR CITY
-            </h2>
-            {myCityData.length > 3 ? (
-              <Link
-                href="/category/our-city"
-                prefetch={true}
-                className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1"
-              >
-                <span>View All</span>
-                <span>&rarr;</span>
-              </Link>
-            ) : (
-              <span className="text-xs font-black text-red-600 dark:text-red-400">CCMC & TANGEDCO DESK</span>
-            )}
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr gap-4 sm:gap-6 w-full max-w-full">
-            {myCityData.map((card) => (
-              <NewsCard
-                key={card.id}
-                id={card.id}
-                title={card.title}
-                category="OUR CITY"
-                timeAgo={card.timeAgo}
-                excerpt={card.excerpt}
-                mediaType={card.mediaType}
-                imageUrl={card.imageUrl}
-                videoUrl={card.videoUrl}
-                articleHref={`/article/${card.id}`}
-                onOpenVideo={openVideoModal}
-              />
-            ))}
-          </div>
-        </div>
-
-        {/* ================================================================== */}
-        {/* FULL-WIDTH SECTION 2: "TRENDING NOW IN COVAI" (FULL 3-COLUMN GRID) */}
-        {/* ================================================================== */}
-        <section id="trending-grid" className="w-full max-w-full space-y-3 pt-0 mt-0 box-border">
+        <section id="news-grid" className="w-full max-w-full space-y-3 pt-0 mt-0 box-border">
           <div className="border-b border-stone-300 dark:border-slate-800 pb-1 flex items-center justify-between">
             <h2 className="text-sm font-extrabold uppercase tracking-widest text-[#111111] dark:text-gray-100 flex items-center gap-1.5">
               <span className="text-red-600 dark:text-red-500 font-black">⚡</span>
-              TRENDING NOW IN COVAI
+              NEWS
             </h2>
-            {trendingData.length > 3 && (
-              <Link
-                href="/category/trending"
-                className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1"
-              >
-                <span>View All</span>
-                <span>&rarr;</span>
-              </Link>
-            )}
           </div>
 
           {/* 3-COLUMN CONTENT GRID */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr gap-4 sm:gap-6 w-full max-w-full">
-            {trendingData.map((card) => (
+            {newsSectionData.map((card) => (
               <NewsCard
                 key={card.id}
                 id={card.id}
@@ -1324,10 +1185,11 @@ export default function HomePage() {
             ))}
           </div>
 
-          {trendingData.length > 3 && (
+          {newsSectionData.length > 0 && (
             <div className="mt-4 text-center">
               <Link
-                href="/category/trending"
+                href="/news"
+                prefetch={true}
                 className="inline-flex items-center justify-center min-h-[44px] gap-1.5 px-4 py-2.5 rounded-lg bg-[#0d4d4d] hover:bg-[#153d3b] dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white text-xs font-bold transition-colors shadow-xs touch-manipulation"
               >
                 <span>View More Stories</span>
@@ -1354,16 +1216,6 @@ export default function HomePage() {
               <span className="text-red-600 dark:text-red-500 font-black">🏗️</span>
               INFRASTRUCTURE & CIVIC UPDATES
             </h2>
-            {infraData.length > 3 && (
-              <Link
-                href="/category/infrastructure-updates"
-                onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })}
-                className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1"
-              >
-                <span>View All</span>
-                <span>&rarr;</span>
-              </Link>
-            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 auto-rows-fr gap-4 sm:gap-6 w-full max-w-full box-border">
@@ -1371,7 +1223,7 @@ export default function HomePage() {
               const cardWords = (card.excerpt + ' ' + card.title).trim().split(/\s+/).filter(Boolean).length;
               const cardListenMins = Math.max(1, Math.ceil(cardWords / 130));
               const cardTargetHref = card.articleHref || `/article/${card.id}`;
-              const hasCardVideo = Boolean(card.videoTitle || (card.videoUrl && card.videoUrl.length > 0));
+              const hasCardVideo = hasActualVideo(card);
 
               return (
                 <article
@@ -1445,6 +1297,7 @@ export default function HomePage() {
                             quality: '1080p HD',
                             location: 'Coimbatore Civic Zone',
                             caption: card.excerpt,
+                            videoUrl: card.videoUrl,
                           })
                         }
                         className="min-h-[44px] inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-[#f3ede2] dark:bg-slate-800 text-[#111111] dark:text-gray-200 hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white font-black transition-colors touch-manipulation cursor-pointer"
@@ -1457,6 +1310,20 @@ export default function HomePage() {
               );
             })}
           </div>
+
+          {infraData.length > 0 && (
+            <div className="mt-4 text-center">
+              <Link
+                href="/category/infrastructure-updates"
+                prefetch={true}
+                onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })}
+                className="inline-flex items-center justify-center min-h-[44px] gap-1.5 px-4 py-2.5 rounded-lg bg-[#0d4d4d] hover:bg-[#153d3b] dark:bg-emerald-700 dark:hover:bg-emerald-600 text-white text-xs font-bold transition-colors shadow-xs touch-manipulation"
+              >
+                <span>View More Stories</span>
+                <span>&rarr;</span>
+              </Link>
+            </div>
+          )}
         </div>
 
         {/* ============================================================== */}
@@ -1480,16 +1347,6 @@ export default function HomePage() {
               <span className="text-emerald-800 dark:text-emerald-400 font-black">📈</span>
               BUSINESS & STARTUP PULSE
             </h2>
-            {businessData.length > 3 && (
-              <Link
-                href="/category/business"
-                onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })}
-                className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1"
-              >
-                <span>View All</span>
-                <span>&rarr;</span>
-              </Link>
-            )}
           </div>
 
           {/* High-Impact Stat Counters Strip */}
@@ -1518,7 +1375,7 @@ export default function HomePage() {
               const cardWords = (card.excerpt + ' ' + card.title).trim().split(/\s+/).filter(Boolean).length;
               const cardListenMins = Math.max(1, Math.ceil(cardWords / 130));
               const cardTargetHref = card.articleHref || `/article/${card.id}`;
-              const hasCardVideo = Boolean(card.videoTitle || (card.videoUrl && card.videoUrl.length > 0));
+              const hasCardVideo = hasActualVideo(card);
 
               return (
                 <article
@@ -1591,6 +1448,7 @@ export default function HomePage() {
                             quality: '1080p HD',
                             location: 'Industrial Corridor, Coimbatore',
                             caption: card.excerpt,
+                            videoUrl: card.videoUrl,
                           })
                         }
                         className="min-h-[44px] inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-[#f3ede2] dark:bg-slate-800 text-[#111111] dark:text-gray-200 hover:bg-red-600 hover:text-white dark:hover:bg-red-600 dark:hover:text-white font-black transition-colors touch-manipulation cursor-pointer"
@@ -1604,7 +1462,7 @@ export default function HomePage() {
             })}
           </div>
 
-          {businessData.length > 3 && (
+          {businessData.length > 0 && (
             <div className="mt-4 text-center">
               <Link
                 href="/category/business"
@@ -1639,21 +1497,13 @@ export default function HomePage() {
               <span className="text-red-600 dark:text-red-500 font-black">👑</span>
               CEO
             </h2>
-            {ceoData.length > 3 && (
-              <Link
-                href="/category/ceos"
-                onClick={() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' })}
-                className="text-xs font-bold text-red-600 dark:text-red-400 hover:underline flex items-center gap-1"
-              >
-                <span>View All</span>
-                <span>&rarr;</span>
-              </Link>
-            )}
           </div>
 
           <div className="w-full max-w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 box-border">
             {ceoData.slice(0, 3).map((profile) => {
               const profileTargetHref = profile.articleHref || `/article/${profile.id}`;
+
+              const hasProfileVideo = hasActualVideo(profile);
 
               return (
                 <article
@@ -1713,28 +1563,31 @@ export default function HomePage() {
                     >
                       📖 Read Full
                     </Link>
-                    <button
-                      onClick={() =>
-                        openVideoModal({
-                          title: `${profile.name} — ${profile.company} Executive Interview`,
-                          category: 'CEO',
-                          duration: profile.videoDuration || '03:00',
-                          quality: '4K Ultra HD',
-                          location: 'Peelamedu Tech Park, Coimbatore',
-                          caption: profile.quote,
-                        })
-                      }
-                      className="min-h-[44px] inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg bg-[#0d4d4d] dark:bg-emerald-700 hover:bg-[#153d3b] dark:hover:bg-emerald-600 text-white font-black transition-colors touch-manipulation cursor-pointer"
-                    >
-                      🎥 Watch ({profile.videoDuration || '03:00'})
-                    </button>
+                    {hasProfileVideo && (
+                      <button
+                        onClick={() =>
+                          openVideoModal({
+                            title: `${profile.name} — ${profile.company} Executive Interview`,
+                            category: 'CEO',
+                            duration: profile.videoDuration || '03:00',
+                            quality: '4K Ultra HD',
+                            location: 'Peelamedu Tech Park, Coimbatore',
+                            caption: profile.quote,
+                            videoUrl: profile.videoUrl,
+                          })
+                        }
+                        className="min-h-[44px] inline-flex items-center justify-center px-3.5 py-1.5 rounded-lg bg-[#0d4d4d] dark:bg-emerald-700 hover:bg-[#153d3b] dark:hover:bg-emerald-600 text-white font-black transition-colors touch-manipulation cursor-pointer"
+                      >
+                        🎥 Watch ({profile.videoDuration || '03:00'})
+                      </button>
+                    )}
                   </div>
                 </article>
               );
             })}
           </div>
 
-          {ceoData.length > 3 && (
+          {ceoData.length > 0 && (
             <div className="mt-4 text-center">
               <Link
                 href="/category/ceos"
@@ -1783,7 +1636,7 @@ export default function HomePage() {
             {/* Modal Player Body with Responsive YouTube Stream */}
             <div className="relative aspect-video w-full bg-black">
               <VideoPlayer
-                url="https://www.youtube.com/watch?v=8V-2Z0m2c0s"
+                url={activeVideoModal.videoUrl || "https://www.youtube.com/watch?v=8V-2Z0m2c0s"}
                 title={activeVideoModal.title}
                 autoplay={true}
                 className="w-full h-full"

@@ -4,7 +4,7 @@ A modern, high-performance local news and city portal for Coimbatore. Built with
 
 ## 🚀 Features
 
-- **Dynamic News Feed**: Real-time news updates across multiple categories (Top Stories, Business, Tech, Our City).
+- **Dynamic News Feed**: Real-time news updates across multiple categories (Top Stories, Business, Tech, Infrastructure).
 - **Native Ad Banner Engine**: Fully customizable programmatic and native ad placements. Includes dynamic sliding banners (Header, Sidebars, In-feed) with a robust showcase-only presentation layer.
 - **Admin CMS Dashboard**: Built-in, secure content management system for managing:
   - Ad Slots & Placements (with direct Supabase Storage cloud uploads for image creatives)

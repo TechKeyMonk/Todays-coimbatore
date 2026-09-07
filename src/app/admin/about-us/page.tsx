@@ -7,15 +7,31 @@ import dbService, { SocialLinksRecord, INITIAL_SOCIAL_LINKS_DB } from '@/service
 export default function AdminAboutUsPage() {
   const [socialLinks, setSocialLinks] = useState<SocialLinksRecord>(INITIAL_SOCIAL_LINKS_DB);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
     const fetchLinks = async () => {
       try {
-        const links = await dbService.getSocialLinks();
-        if (isMounted && links) {
-          setSocialLinks(links);
+        // 1. Initial immediate load from dbService
+        const local = await dbService.getSocialLinks();
+        if (isMounted && local) {
+          setSocialLinks(local);
+        }
+
+        // 2. Direct fetch from backend to ensure latest Supabase data
+        const res = await fetch('/api/content?entity=config&key=SOCIAL_LINKS', { cache: 'no-store' });
+        if (res.ok) {
+          const json = await res.json();
+          if (json.success && json.data && isMounted) {
+            setSocialLinks({
+              instagram: json.data.instagram || local.instagram || INITIAL_SOCIAL_LINKS_DB.instagram,
+              youtube: json.data.youtube || local.youtube || INITIAL_SOCIAL_LINKS_DB.youtube,
+              facebook: json.data.facebook || local.facebook || INITIAL_SOCIAL_LINKS_DB.facebook,
+              twitter: json.data.twitter || local.twitter || INITIAL_SOCIAL_LINKS_DB.twitter,
+            });
+          }
         }
       } catch (e) {
         console.error('Error fetching social links', e);
@@ -28,12 +44,28 @@ export default function AdminAboutUsPage() {
     e.preventDefault();
     setIsSaving(true);
     setSavedSuccess(false);
+    setErrorMessage(null);
     try {
+      // 1. Persist directly to server backend
+      const res = await fetch('/api/content', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'save_config', entity: 'social_links', data: socialLinks }),
+      });
+
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || 'Server rejected social links update');
+      }
+
+      // 2. Persist locally and trigger client-wide notification
       await dbService.saveSocialLinks(socialLinks);
+
       setSavedSuccess(true);
-      setTimeout(() => setSavedSuccess(false), 3500);
-    } catch (err) {
+      setTimeout(() => setSavedSuccess(false), 4000);
+    } catch (err: any) {
       console.error('Failed to save social links', err);
+      setErrorMessage(err.message || 'Failed to save social links to database');
     } finally {
       setIsSaving(false);
     }
@@ -78,6 +110,13 @@ export default function AdminAboutUsPage() {
           <div className="p-4 rounded-xl bg-emerald-950/80 border border-emerald-700 text-emerald-300 text-xs sm:text-sm font-bold flex items-center gap-2 animate-in fade-in">
             <span>✓</span>
             <span>Social media links updated successfully! Changes are live across Footer and About Us page.</span>
+          </div>
+        )}
+
+        {errorMessage && (
+          <div className="p-4 rounded-xl bg-red-950/80 border border-red-700 text-red-300 text-xs sm:text-sm font-bold flex items-center gap-2 animate-in fade-in">
+            <span>⚠️</span>
+            <span>{errorMessage}</span>
           </div>
         )}
 

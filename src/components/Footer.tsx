@@ -95,7 +95,7 @@ export const Footer: React.FC = () => {
           <div className="flex items-center gap-3 sm:gap-3.5 text-stone-700 dark:text-gray-300">
             {/* Instagram */}
             <a
-              href={socialLinks.instagram && !socialLinks.instagram.includes('todayscoimbatore') ? socialLinks.instagram : 'https://www.instagram.com/tech_key_monk/'}
+              href={socialLinks.instagram || INITIAL_SOCIAL_LINKS_DB.instagram}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Instagram"
@@ -109,7 +109,7 @@ export const Footer: React.FC = () => {
 
             {/* YouTube */}
             <a
-              href={socialLinks.youtube && !socialLinks.youtube.includes('todayscoimbatore') ? socialLinks.youtube : 'https://www.youtube.com/@TechKeyMonk-CBE'}
+              href={socialLinks.youtube || INITIAL_SOCIAL_LINKS_DB.youtube}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="YouTube"
@@ -123,7 +123,7 @@ export const Footer: React.FC = () => {
 
             {/* Facebook */}
             <a
-              href={socialLinks.facebook && !socialLinks.facebook.includes('todayscoimbatore') ? socialLinks.facebook : 'https://www.facebook.com/p/TechKey-Monk-61554380970425/'}
+              href={socialLinks.facebook || INITIAL_SOCIAL_LINKS_DB.facebook}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="Facebook"
@@ -137,7 +137,7 @@ export const Footer: React.FC = () => {
 
             {/* X / Twitter */}
             <a
-              href={socialLinks.twitter && !socialLinks.twitter.includes('todayscoimbatore') ? socialLinks.twitter : 'https://x.com/TechKeyMonk'}
+              href={socialLinks.twitter || INITIAL_SOCIAL_LINKS_DB.twitter}
               target="_blank"
               rel="noopener noreferrer"
               aria-label="X (formerly Twitter)"

@@ -39,10 +39,16 @@ const nextConfig = {
   async redirects() {
     return [
       // Canonical alias redirects — consolidate duplicate routes for SEO
-      { source: '/about',       destination: '/about-us',     permanent: true },
-      { source: '/contact',     destination: '/contact-us',   permanent: true },
-      { source: '/blood-donor', destination: '/blood-donors', permanent: true },
-      { source: '/epaper',      destination: '/e-paper',      permanent: true },
+      { source: '/about',              destination: '/about-us',      permanent: true },
+      { source: '/contact',            destination: '/contact-us',    permanent: true },
+      { source: '/blood-donor',        destination: '/blood-donors',  permanent: true },
+      { source: '/epaper',             destination: '/e-paper',       permanent: true },
+      { source: '/our-city',           destination: '/category/news', permanent: true },
+      { source: '/category/our-city',  destination: '/category/news', permanent: true },
+      { source: '/trending',           destination: '/news',          permanent: true },
+      { source: '/category/trending',  destination: '/news',          permanent: true },
+      { source: '/top-stories',        destination: '/news',          permanent: true },
+      { source: '/category/top-stories', destination: '/news',        permanent: true },
     ];
   },
   async headers() {

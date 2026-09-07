@@ -33,9 +33,13 @@ let cachedAllData: any = null;
 let cachedAllDataTime = 0;
 const ALL_DATA_CACHE_TTL = 30_000; // 30 seconds in-memory cache
 
+const systemConfigCache = new Map<string, { value: any; timestamp: number }>();
+const CONFIG_CACHE_TTL = 30_000; // 30 seconds cache for system configs
+
 function invalidateAllDataCache() {
   cachedAllData = null;
   cachedAllDataTime = 0;
+  systemConfigCache.clear();
 }
 
 // Deterministic UUID converter (ensures compatibility with PostgreSQL UUID columns)
@@ -160,6 +164,11 @@ function mapSupabaseNewsToArticle(row: any): Article {
 
 // System configuration helper (stores JSON blobs in `enquiries` table with special user_name prefix `__SYSTEM_CONFIG_<KEY>`)
 async function getSystemConfig<T>(key: string, fallback: T): Promise<T> {
+  const cached = systemConfigCache.get(key);
+  if (cached && Date.now() - cached.timestamp < CONFIG_CACHE_TTL) {
+    return cached.value as T;
+  }
+
   try {
     const { data, error } = await supabaseAdmin
       .from('enquiries')
@@ -172,7 +181,9 @@ async function getSystemConfig<T>(key: string, fallback: T): Promise<T> {
       return fallback;
     }
 
-    return JSON.parse(data[0].message) as T;
+    const parsed = JSON.parse(data[0].message) as T;
+    systemConfigCache.set(key, { value: parsed, timestamp: Date.now() });
+    return parsed;
   } catch (err) {
     console.warn(`Error reading system config for ${key}:`, err);
     return fallback;
@@ -180,6 +191,9 @@ async function getSystemConfig<T>(key: string, fallback: T): Promise<T> {
 }
 
 async function setSystemConfig(key: string, value: any): Promise<boolean> {
+  // Update cache immediately for instant response
+  systemConfigCache.set(key, { value, timestamp: Date.now() });
+
   try {
     const serialized = JSON.stringify(value);
     const configUserName = `__SYSTEM_CONFIG_${key}`;
@@ -320,32 +334,16 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: true, data: mappedDonors });
     }
 
-    // 4. Fetch Events (Merge from news table where category ILIKE %event% and dedicated events table)
+    // 4. Fetch Events (Dedicated events table)
     if (entity === 'events') {
       try {
-        const [newsRes, eventsRes] = await Promise.all([
-          supabaseAdmin
-            .from('news')
-            .select('*')
-            .ilike('category', '%event%')
-            .order('created_at', { ascending: false }),
-          supabaseAdmin
-            .from('events')
-            .select('*')
-            .order('event_date', { ascending: true }),
-        ]);
+        const eventsRes = await supabaseAdmin
+          .from('events')
+          .select('*')
+          .order('event_date', { ascending: true });
 
-        const mappedNews = (newsRes.data || []).map(mapNewsRowToEvent);
         const mappedDedicated = (eventsRes.data || []).map(mapDedicatedEventToEvent);
-
-        const mergedEvents = [...mappedNews];
-        for (const d of mappedDedicated) {
-          if (!mergedEvents.some((m) => m.id === d.id || m.title.toLowerCase() === d.title.toLowerCase())) {
-            mergedEvents.push(d);
-          }
-        }
-
-        return NextResponse.json({ success: true, data: mergedEvents });
+        return NextResponse.json({ success: true, data: mappedDedicated });
       } catch (err: any) {
         console.error('Supabase fetch events error:', err);
         return NextResponse.json({ success: true, data: [] });
@@ -480,20 +478,9 @@ export async function GET(request: Request) {
       registeredDate: 'Recently',
     }));
 
+    // Dedicated events from `events` table only. Exclude general news stories.
     const dedicatedEvents: EventRecord[] = (eventsRes.data || []).map(mapDedicatedEventToEvent);
-    const newsEventArticles = (newsRes.data || []).filter(
-      (a: any) =>
-        (a.category && a.category.toUpperCase().includes('EVENT')) ||
-        (a.slug && a.slug.includes('event'))
-    );
-    const mappedNewsEvents = newsEventArticles.map(mapNewsRowToEvent);
-
-    const events: EventRecord[] = [...mappedNewsEvents];
-    for (const d of dedicatedEvents) {
-      if (!events.some((e) => e.id === d.id || e.title.toLowerCase() === d.title.toLowerCase())) {
-        events.push(d);
-      }
-    }
+    const events: EventRecord[] = dedicatedEvents.filter((ev) => (ev.category || '').toUpperCase().trim() !== 'NEWS');
 
     const resultData = {
       articles,
@@ -1234,6 +1221,14 @@ export async function POST(request: Request) {
       const ok = await setSystemConfig(configKey, data);
       if (!ok) {
         return NextResponse.json({ error: `Failed to persist ${configKey} configuration` }, { status: 500 });
+      }
+
+      try {
+        revalidatePath('/');
+        revalidatePath('/about-us');
+        revalidatePath('/admin/about-us');
+      } catch (revalErr) {
+        console.warn('Revalidation error on save_config:', revalErr);
       }
 
       return NextResponse.json({ success: true, key: configKey, data });

@@ -97,12 +97,19 @@ export default async function EventsPage() {
 
   // 3. Unify object structure so attributes (title/event_name, image_url, venue/location, event_date)
   // render cleanly without broken image tags or empty cards
-  initialEvents = initialEvents.map((ev) => {
+  initialEvents = initialEvents
+    .filter((ev) => (ev.category || '').toUpperCase().trim() !== 'NEWS')
+    .map((ev) => {
     const rawImg = ev.posterUrl || (ev as any).image_url || (ev as any).poster_url;
     const cleanImg =
-      rawImg && typeof rawImg === 'string' && rawImg.trim() !== '' && rawImg.trim() !== 'null' && rawImg.trim() !== 'undefined'
+      rawImg &&
+      typeof rawImg === 'string' &&
+      rawImg.trim() !== '' &&
+      rawImg.trim() !== 'null' &&
+      rawImg.trim() !== 'undefined' &&
+      !rawImg.includes('photo-1511578314322-379afb476865')
         ? rawImg.trim()
-        : 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80';
+        : undefined;
 
     return {
       ...ev,

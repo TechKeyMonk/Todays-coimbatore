@@ -23,7 +23,6 @@ import dbService, { Article, formatRelativeTime } from '../../../services/db';
 
 const VALID_CATEGORIES = [
   'News',
-  'Our City',
   'Business',
   'Tech',
   'Infrastructure',

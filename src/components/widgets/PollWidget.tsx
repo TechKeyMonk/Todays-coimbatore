@@ -36,6 +36,11 @@ export default function PollWidget({ pollData }: PollWidgetProps) {
   const yesPercent = totalVotes > 0 ? Math.round((counts.yes / totalVotes) * 100) : 0;
   const noPercent = totalVotes > 0 ? Math.round((counts.no / totalVotes) * 100) : 0;
 
+  const pollIdRef = React.useRef(pollId);
+  useEffect(() => {
+    pollIdRef.current = pollId;
+  }, [pollId]);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -53,6 +58,7 @@ export default function PollWidget({ pollData }: PollWidgetProps) {
             const p = json.data;
             if (p.question) setQuestion(p.question);
             const activeId = p.id || 'poll-coimbatore-metro-1';
+            pollIdRef.current = activeId;
             setPollId(activeId);
 
             const yes = typeof p.yesVotes === 'number' ? p.yesVotes : 0;
@@ -102,7 +108,12 @@ export default function PollWidget({ pollData }: PollWidgetProps) {
     };
 
     fetchLivePoll();
-    const interval = setInterval(fetchLivePoll, 15000);
+    // 30s background poll interval, active only when tab is visible
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchLivePoll();
+      }
+    }, 30000);
 
     const handleVoteSync = (e: any) => {
       if (!isMounted) return;
@@ -111,7 +122,7 @@ export default function PollWidget({ pollData }: PollWidgetProps) {
         setVoted(false);
         setSelectedOption(null);
         try {
-          localStorage.removeItem(`covai_pulse_vote_${pollId}`);
+          localStorage.removeItem(`covai_pulse_vote_${pollIdRef.current}`);
           localStorage.removeItem('covai_pulse_vote_active');
         } catch {}
       } else if (e.detail?.counts) {
@@ -128,7 +139,7 @@ export default function PollWidget({ pollData }: PollWidgetProps) {
       clearInterval(interval);
       window.removeEventListener('covai-poll-update', handleVoteSync as EventListener);
     };
-  }, [pollId]);
+  }, []);
 
   const handleVote = async (option: 'yes' | 'no') => {
     if (isSubmitting) return;

@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import dbService, { EventRecord } from '@/services/db';
+import { uploadImageWithFallback, compressImageFile } from '@/lib/imageOptimization';
 
 export default function AdminEventsPage() {
   const [events, setEvents] = useState<EventRecord[]>([]);
@@ -70,13 +71,13 @@ export default function AdminEventsPage() {
     }
   };
 
-  // Image Upload Handler with 10MB validation & allowed formats
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean = false) => {
+  // Image Upload Handler with fast client compression & background CDN upload
+  const handleImageFileChange = async (e: React.ChangeEvent<HTMLInputElement>, isEdit: boolean = false) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 10 * 1024 * 1024) {
-      alert('Image size exceeds 10MB limit.');
+    if (file.size > 12 * 1024 * 1024) {
+      alert('Image size exceeds 12MB limit.');
       e.target.value = '';
       return;
     }
@@ -98,16 +99,39 @@ export default function AdminEventsPage() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result as string;
-      if (isEdit && editingEvent) {
-        setEditingEvent({ ...editingEvent, posterUrl: base64 });
+    try {
+      // 1. Instant client-side compression (<50ms) for snappy preview
+      const comp = await compressImageFile(file, 1600, 0.82);
+      if (isEdit) {
+        setEditingEvent((prev) => (prev ? { ...prev, posterUrl: comp.dataUrl } : null));
       } else {
-        setNewPosterUrl(base64);
+        setNewPosterUrl(comp.dataUrl);
       }
-    };
-    reader.readAsDataURL(file);
+
+      // 2. Fast background upload to Supabase Storage CDN
+      uploadImageWithFallback(file, 'events').then((cdnUrl) => {
+        if (cdnUrl) {
+          if (isEdit) {
+            setEditingEvent((prev) => (prev ? { ...prev, posterUrl: cdnUrl } : null));
+          } else {
+            setNewPosterUrl(cdnUrl);
+          }
+        }
+      }).catch((uploadErr) => {
+        console.warn('Background poster upload notice:', uploadErr);
+      });
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = reader.result as string;
+        if (isEdit) {
+          setEditingEvent((prev) => (prev ? { ...prev, posterUrl: base64 } : null));
+        } else {
+          setNewPosterUrl(base64);
+        }
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   // Create Event Handler
@@ -125,7 +149,7 @@ export default function AdminEventsPage() {
       const title = newTitle.trim();
       const venue = newVenue.trim() || 'Coimbatore';
       const description = newDesc.trim() || 'Coimbatore public exhibition and community event.';
-      const imageUrl = newPosterUrl.trim() || 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80';
+      const imageUrl = newPosterUrl.trim();
       const date = newDate || new Date(Date.now() + 86400000).toISOString().split('T')[0];
       const time = newTime.trim() || '10:00 AM – 06:00 PM';
       const organizer = newOrganizer.trim() || 'Coimbatore Event Bureau';
@@ -136,9 +160,9 @@ export default function AdminEventsPage() {
         title,
         event_name: title,
         description,
-        image_url: imageUrl,
-        poster_url: imageUrl,
-        posterUrl: imageUrl,
+        image_url: imageUrl || null,
+        poster_url: imageUrl || null,
+        posterUrl: imageUrl || undefined,
         venue,
         location: venue,
         event_date: date,
@@ -221,7 +245,8 @@ export default function AdminEventsPage() {
       const title = (editingEvent.title || '').trim();
       const venue = (editingEvent.venue || 'Coimbatore').trim();
       const description = (editingEvent.description || 'Coimbatore public event.').trim();
-      const imageUrl = (editingEvent.posterUrl || 'https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&w=1200&q=80').trim();
+      const rawImg = (editingEvent.posterUrl || '').trim();
+      const imageUrl = rawImg.includes('photo-1511578314322-379afb476865') ? '' : rawImg;
       const date = editingEvent.date || new Date().toISOString().split('T')[0];
       const time = (editingEvent.time || '10:00 AM – 06:00 PM').trim();
 
@@ -230,9 +255,9 @@ export default function AdminEventsPage() {
         title,
         event_name: title,
         description,
-        image_url: imageUrl,
-        poster_url: imageUrl,
-        posterUrl: imageUrl,
+        image_url: imageUrl || null,
+        poster_url: imageUrl || null,
+        posterUrl: imageUrl || undefined,
         venue,
         location: venue,
         event_date: date,
@@ -429,9 +454,9 @@ export default function AdminEventsPage() {
               className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-xs flex flex-col h-full justify-between hover:border-[#153d3b] transition-all"
             >
               <div>
-                {/* Media Preview with Zero-Crash Fallback */}
+                {/* Media Preview (Responsive 16:9) */}
                 <div className="relative w-full aspect-[16/9] bg-slate-900/90 overflow-hidden rounded-t-xl flex items-center justify-center group">
-                  {ev.posterUrl ? (
+                  {ev.posterUrl && !ev.posterUrl.includes('photo-1511578314322-379afb476865') ? (
                     <>
                       <img
                         src={ev.posterUrl}
