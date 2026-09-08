@@ -100,14 +100,14 @@ export default function AdSlider({ ad, variant, label = 'SPONSORED' }: AdSliderP
               )}
             </div>
 
-            {/* Right Side: Stretched, High-Impact Image Creative */}
-            <div className="shrink-0 h-[75px] sm:h-[100px] md:h-[120px] lg:h-[135px] xl:h-[150px] w-[130px] sm:w-[220px] md:w-[350px] lg:w-[480px] xl:w-[620px] 2xl:w-[720px] rounded-xl overflow-hidden bg-slate-900 border border-white/15 shadow-md relative">
+            {/* Right Side: 100% Full Uncropped Image Creative */}
+            <div className="shrink-0 h-[75px] sm:h-[100px] md:h-[120px] lg:h-[135px] xl:h-[150px] aspect-[730/200] max-w-[50vw] rounded-xl overflow-hidden bg-slate-950/60 border border-white/15 shadow-md relative flex items-center justify-center">
               {activeSlides.map((slide, index) => (
                 <img
                   key={slide.id}
                   src={slide.imageUrl || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1400&q=80'}
                   alt={slide.title || 'Advertisement'}
-                  className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 group-hover:scale-105 ${
+                  className={`absolute inset-0 w-full h-full object-contain object-center transition-opacity duration-700 ${
                     currentSlideIndex === index ? 'opacity-100 z-10' : 'opacity-0 z-0'
                   }`}
                 />
@@ -115,7 +115,7 @@ export default function AdSlider({ ad, variant, label = 'SPONSORED' }: AdSliderP
 
               {/* Multiple slides indicator */}
               {hasMultipleSlides && (
-                <span className="absolute bottom-1 right-1.5 z-20 bg-black/75 text-white text-[9px] font-mono px-1.5 py-0.5 rounded backdrop-blur-xs">
+                <span className="absolute bottom-1 right-1.5 z-20 bg-black/80 text-white text-[9px] font-mono px-1.5 py-0.5 rounded backdrop-blur-xs shadow-xs">
                   {currentSlideIndex + 1}/{activeSlides.length}
                 </span>
               )}
