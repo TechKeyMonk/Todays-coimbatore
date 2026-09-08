@@ -307,32 +307,7 @@ const INITIAL_ADS: AdSlotSetting[] = [
         ctaUrl: '/enquiry',
       }
     ]
-  },
-  {
-    id: 'ad-slot-6',
-    slotId: 'ARTICLE_DETAIL_BOTTOM',
-    placementKey: 'ARTICLE_DETAIL_BOTTOM',
-    format: 'Article Detail Bottom (In-Article Fluid)',
-    impressions: '12,930',
-    ctr: '4.5%',
-    active: true,
-    startDate: '2026-01-01',
-    endDate: '2026-12-31',
-    fallbackAdSense: true,
-    dimensions: 'fluid',
-    orientation: 'horizontal',
-    slides: [
-      {
-        id: 'slide-article-1',
-        title: 'Coimbatore Airport Runway Expansion & Modern Logistics Terminal',
-        description: 'Direct air cargo handling facilities and multimodal connectivity across Kongu region.',
-        advertiser: 'Coimbatore Aviation Infrastructure Forum',
-        imageUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80',
-        active: true,
-        ctaUrl: '/enquiry',
-      }
-    ]
-  },
+  }
 ];
 
 const DIR_CATEGORY_OPTIONS = [
@@ -692,9 +667,15 @@ export default function AdminPage() {
         );
       }
 
-      setAdsDbList(adList);
-      if (adList && adList.length > 0) {
-        const mergedAds: AdSlotSetting[] = [...adList] as any;
+      const cleanAdList = (adList || []).filter(
+        (a: any) =>
+          a.slotId?.toUpperCase() !== 'ARTICLE_DETAIL_BOTTOM' &&
+          a.placementKey?.toUpperCase() !== 'ARTICLE_DETAIL_BOTTOM' &&
+          a.id !== 'ad-slot-6'
+      );
+      setAdsDbList(cleanAdList);
+      if (cleanAdList && cleanAdList.length > 0) {
+        const mergedAds: AdSlotSetting[] = [...cleanAdList] as any;
         INITIAL_ADS.forEach((initAd) => {
           const exists = mergedAds.some(
             (a) =>
@@ -4270,7 +4251,13 @@ export default function AdminPage() {
 
               const topHeaderAds = ads.filter(isTopHeader);
               const inFeedAndArticleAds = ads.filter(
-                (ad) => !isLeftSidebar(ad) && !isRightSidebar(ad) && !isTopHeader(ad)
+                (ad) =>
+                  !isLeftSidebar(ad) &&
+                  !isRightSidebar(ad) &&
+                  !isTopHeader(ad) &&
+                  ad.slotId?.toUpperCase() !== 'ARTICLE_DETAIL_BOTTOM' &&
+                  ad.placementKey?.toUpperCase() !== 'ARTICLE_DETAIL_BOTTOM' &&
+                  ad.id !== 'ad-slot-6'
               );
 
               const renderAdCard = (ad: AdSlotSetting) => {
@@ -4564,17 +4551,17 @@ export default function AdminPage() {
                     </div>
                   )}
 
-                  {/* ROW 3 & BELOW: IN-FEED & ARTICLE AD SLOTS */}
+                  {/* ROW 3 & BELOW: IN-FEED AD SLOTS */}
                   {inFeedAndArticleAds.length > 0 && (
                     <div className="space-y-3 pt-2">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <span className="px-2.5 py-1 rounded-md bg-stone-100 text-stone-800 text-xs font-black uppercase tracking-wider border border-stone-200 flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                            Row 3 &amp; Below: In-Feed &amp; Article Ad Placements
+                            Row 3 &amp; Below: In-Feed Ad Placements
                           </span>
                           <span className="text-xs text-stone-500 hidden sm:inline">
-                            Between News Stories, Sections &amp; Article Details
+                            Between News Stories &amp; Homepage Sections (4 Responsive Fluid Slots)
                           </span>
                         </div>
                         <span className="text-[11px] font-mono font-bold text-stone-400">

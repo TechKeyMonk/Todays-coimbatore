@@ -573,38 +573,20 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
       }
     ]
   },
-  {
-    id: 'ad-slot-6',
-    slotId: 'ARTICLE_DETAIL_BOTTOM',
-    placementKey: 'ARTICLE_DETAIL_BOTTOM',
-    format: 'Article Detail Bottom (In-Article Fluid)',
-    impressions: '12,930',
-    ctr: '4.5%',
-    active: true,
-    startDate: '2026-01-01',
-    endDate: '2026-12-31',
-    fallbackAdSense: true,
-    dimensions: 'fluid',
-    orientation: 'horizontal',
-    slides: [
-      {
-        id: 'slide-article-1',
-        title: 'Coimbatore Airport Runway Expansion & Modern Logistics Terminal',
-        description: 'Direct air cargo handling facilities and multimodal connectivity across Kongu region.',
-        advertiser: 'Coimbatore Aviation Infrastructure Forum',
-        imageUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80',
-        active: true,
-        ctaUrl: '/enquiry',
-      }
-    ]
-  },
 ];
 
 export const reconcileAdsWithDefaults = (existingAds: AdSlotRecord[]): AdSlotRecord[] => {
   if (!Array.isArray(existingAds) || existingAds.length === 0) {
     return [...INITIAL_ADS_DB];
   }
-  const merged = [...existingAds];
+  // Filter out removed slot ARTICLE_DETAIL_BOTTOM
+  const filtered = existingAds.filter(
+    (a) =>
+      a.slotId?.toUpperCase() !== 'ARTICLE_DETAIL_BOTTOM' &&
+      a.placementKey?.toUpperCase() !== 'ARTICLE_DETAIL_BOTTOM' &&
+      a.id !== 'ad-slot-6'
+  );
+  const merged = [...filtered];
   INITIAL_ADS_DB.forEach((initSlot) => {
     const exists = merged.some(
       (a) =>

@@ -1219,7 +1219,12 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Config key/entity is required' }, { status: 400 });
       }
 
-      const ok = await setSystemConfig(configKey, data);
+      let payload = data;
+      if (configKey === 'ADS' && Array.isArray(data)) {
+        payload = reconcileAdsWithDefaults(data);
+      }
+
+      const ok = await setSystemConfig(configKey, payload);
       if (!ok) {
         return NextResponse.json({ error: `Failed to persist ${configKey} configuration` }, { status: 500 });
       }
