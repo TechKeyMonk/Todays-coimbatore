@@ -67,18 +67,18 @@ export default function AdSlider({ ad, variant, label = 'SPONSORED' }: AdSliderP
           href={currentCta}
           target={currentCta.startsWith('http') ? '_blank' : '_self'}
           rel="noopener noreferrer"
-          className="block w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3 cursor-pointer group"
+          className="block w-full max-w-none px-4 sm:px-6 md:px-8 lg:px-10 py-3 sm:py-3.5 cursor-pointer group"
           title={title || advertiser || 'Sponsored Advertisement'}
         >
-          <div className="flex flex-row items-center justify-between gap-4 sm:gap-6 min-w-0">
-            {/* Left Side: Advertiser Badge, Title, and Description */}
-            <div className="flex-1 min-w-0 space-y-1 sm:space-y-1.5">
+          <div className="w-full flex flex-row items-center justify-between gap-4 sm:gap-6 lg:gap-8 min-w-0">
+            {/* Left Side: Advertiser Badges, Stretched Title, and Description */}
+            <div className="flex-1 min-w-0 space-y-1 sm:space-y-1.5 pr-2">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="bg-black/80 text-white text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider border border-white/10 shadow-xs">
                   {label || 'SPONSORED'}
                 </span>
                 {advertiser && (
-                  <span className="bg-red-600 text-white text-[9px] sm:text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded shadow-xs truncate max-w-[240px]">
+                  <span className="bg-red-600 text-white text-[9px] sm:text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded shadow-xs truncate max-w-[280px]">
                     {advertiser}
                   </span>
                 )}
@@ -88,20 +88,20 @@ export default function AdSlider({ ad, variant, label = 'SPONSORED' }: AdSliderP
               </div>
 
               {title && (
-                <h3 className="text-xs sm:text-base md:text-lg lg:text-xl font-black text-white leading-tight group-hover:text-red-400 transition-colors line-clamp-1 sm:line-clamp-2">
+                <h3 className="text-sm sm:text-base md:text-xl lg:text-2xl font-black text-white leading-tight group-hover:text-red-400 transition-colors line-clamp-1 sm:line-clamp-2">
                   {title}
                 </h3>
               )}
 
               {description && (
-                <p className="text-[11px] sm:text-xs md:text-sm text-stone-300 font-normal leading-relaxed line-clamp-2 max-w-4xl">
+                <p className="text-xs sm:text-sm md:text-base text-stone-300 font-normal leading-relaxed line-clamp-2 sm:line-clamp-3">
                   {description}
                 </p>
               )}
             </div>
 
-            {/* Right Side: 100% Bright, Crisp Image Creative */}
-            <div className="shrink-0 h-[70px] sm:h-[95px] md:h-[110px] lg:h-[125px] w-[110px] sm:w-[170px] md:w-[240px] lg:w-[320px] xl:w-[380px] rounded-xl overflow-hidden bg-slate-900 border border-white/15 shadow-sm relative">
+            {/* Right Side: Stretched, High-Impact Image Creative */}
+            <div className="shrink-0 h-[75px] sm:h-[100px] md:h-[120px] lg:h-[135px] xl:h-[150px] w-[130px] sm:w-[220px] md:w-[350px] lg:w-[480px] xl:w-[620px] 2xl:w-[720px] rounded-xl overflow-hidden bg-slate-900 border border-white/15 shadow-md relative">
               {activeSlides.map((slide, index) => (
                 <img
                   key={slide.id}
@@ -122,8 +122,8 @@ export default function AdSlider({ ad, variant, label = 'SPONSORED' }: AdSliderP
             </div>
 
             {/* Action CTA Arrow (Desktop Only) */}
-            <div className="hidden lg:flex shrink-0 items-center justify-center pl-2">
-              <span className="px-3.5 py-2 rounded-xl bg-red-600 group-hover:bg-red-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 whitespace-nowrap">
+            <div className="hidden lg:flex shrink-0 items-center justify-center pl-1">
+              <span className="px-4 py-2.5 rounded-xl bg-red-600 group-hover:bg-red-700 text-white text-xs sm:text-sm font-bold transition-all shadow-md flex items-center gap-1.5 whitespace-nowrap">
                 <span>{ctaText}</span>
                 <span className="group-hover:translate-x-0.5 transition-transform">→</span>
               </span>
