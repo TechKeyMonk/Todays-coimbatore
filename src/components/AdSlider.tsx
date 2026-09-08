@@ -58,48 +58,63 @@ export default function AdSlider({ ad, variant, label = 'SPONSORED' }: AdSliderP
   const { title, description, advertiser, imageUrl } = currentSlide;
 
   if (variant === 'header') {
+    const currentCta = (currentSlide as any)?.ctaUrl || (currentSlide as any)?.destinationUrl || (ad as any)?.enquiryUrl || '/enquiry';
+
     return (
-      // TOP_HEADER full-bleed lock: w-full, max-w-none, mx-0 fitting edge-to-edge
-      // Expanded height: h-[110px] sm:h-[140px] md:h-[170px] lg:h-[185px] xl:h-[200px]
-      <div className="w-full max-w-none mx-0 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
-        <div className="w-full max-w-none mx-0 h-[110px] sm:h-[140px] md:h-[170px] lg:h-[185px] xl:h-[200px] overflow-hidden relative bg-stone-950 group flex-shrink-0">
-          <div className="block w-full h-full relative">
-            {/* Dynamic Banner Image Slider */}
-            <div className="w-full h-full relative overflow-hidden bg-black">
+      <div className="w-full max-w-none mx-0 bg-[#080c14] border-b border-stone-200/20 dark:border-slate-800">
+        <div className="w-full max-w-none mx-0 h-[80px] sm:h-[110px] md:h-[140px] lg:h-[160px] xl:h-[180px] overflow-hidden relative group flex-shrink-0">
+          <a
+            href={currentCta}
+            target={currentCta.startsWith('http') ? '_blank' : '_self'}
+            rel="noopener noreferrer"
+            className="block w-full h-full relative cursor-pointer"
+            title={title || advertiser || 'View Advertisement'}
+          >
+            {/* Ambient Blurred Background for letterbox filling without distortion */}
+            <div className="absolute inset-0 overflow-hidden opacity-30 blur-2xl scale-110 pointer-events-none">
+              <img
+                src={imageUrl || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1400&q=80'}
+                alt=""
+                className="w-full h-full object-cover"
+                aria-hidden="true"
+              />
+            </div>
+
+            {/* Dynamic Banner Image Slider - 100% Bright, Crisp, Fully Visible */}
+            <div className="w-full h-full relative overflow-hidden flex items-center justify-center">
               {activeSlides.map((slide, index) => (
                 <img
                   key={slide.id}
                   src={slide.imageUrl || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1400&q=80'}
-                  alt={slide.title}
-                  className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 group-hover:scale-105 ${
+                  alt={slide.title || 'Advertisement'}
+                  className={`absolute inset-0 w-full h-full object-contain object-center transition-opacity duration-700 ${
                     currentSlideIndex === index ? 'opacity-100 z-10' : 'opacity-0 z-0'
                   }`}
                 />
               ))}
             </div>
 
-            {/* High Contrast Gradient Overlay with Title, Description */}
-            <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/70 to-black/30 flex items-center justify-between px-4 sm:px-6 md:px-8 lg:px-12 text-white z-20 pointer-events-none">
-              <div className="max-w-4xl space-y-1 sm:space-y-1.5 min-w-0 pr-4 transition-opacity duration-700 pointer-events-auto">
-                <div className="flex items-center gap-2 mb-0.5 sm:mb-1">
-                  <span className="bg-red-600 text-white text-[10px] sm:text-xs font-black px-2.5 py-0.5 rounded tracking-wide uppercase shadow-xs shrink-0">
-                    {advertiser || 'SPONSORED'}
-                  </span>
-                  <span className="text-[11px] sm:text-xs font-bold text-white/80 uppercase truncate hidden sm:inline">
-                    Coimbatore Tech Corridor
-                  </span>
-                </div>
-                <h3 className="text-sm sm:text-lg md:text-xl lg:text-2xl font-black text-white leading-tight drop-shadow-sm line-clamp-2">
-                  {title || 'TIDEL Park Coimbatore Phase-2 Office Suites Open for Booking'}
-                </h3>
-                {description && (
-                  <p className="text-xs sm:text-sm text-stone-200 font-medium line-clamp-2 leading-relaxed hidden sm:block max-w-3xl">
-                    {description}
-                  </p>
-                )}
-              </div>
+            {/* Discreet, Professional Badging */}
+            <div className="absolute top-2 left-3 sm:left-6 z-20 flex items-center gap-1.5 pointer-events-none">
+              <span className="bg-black/70 text-white/90 text-[9px] sm:text-[10px] font-black tracking-widest uppercase px-2 py-0.5 rounded backdrop-blur-md border border-white/10 shadow-xs">
+                {label || 'ADVERTISEMENT'}
+              </span>
+              {advertiser && (
+                <span className="bg-red-600/90 text-white text-[9px] sm:text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded backdrop-blur-md shadow-xs hidden sm:inline-block">
+                  {advertiser}
+                </span>
+              )}
             </div>
-          </div>
+
+            {/* Multiple slides indicator */}
+            {hasMultipleSlides && (
+              <div className="absolute bottom-2 right-3 sm:right-6 z-20 flex items-center gap-1.5 pointer-events-none">
+                <span className="bg-black/60 text-white/80 text-[9px] font-mono px-2 py-0.5 rounded-full backdrop-blur-md">
+                  {currentSlideIndex + 1} / {activeSlides.length}
+                </span>
+              </div>
+            )}
+          </a>
         </div>
       </div>
     );
