@@ -144,10 +144,10 @@ const INITIAL_ADS: AdSlotSetting[] = [
     slides: [
       {
         id: 'slide-1',
-        title: 'TIDEL Park Coimbatore Phase-2 Office Suites Open for Booking',
-        description: 'Grade-A tech park infrastructure along Avinashi Road with 100% power backup and direct metro access.',
-        advertiser: 'ELCOT / TIDEL Coimbatore',
-        imageUrl: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1200&q=80',
+        title: 'Techkey Monk',
+        description: 'Data-driven SEO strategies, high-conversion ad campaigns, and brand growth solutions tailored to maximize your online reach and ROI.',
+        advertiser: 'Techkey Monk',
+        imageUrl: '/images/techkey-monk-banner.jpg',
         active: true,
       },
       {
