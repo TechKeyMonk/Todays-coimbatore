@@ -59,63 +59,77 @@ export default function AdSlider({ ad, variant, label = 'SPONSORED' }: AdSliderP
 
   if (variant === 'header') {
     const currentCta = (currentSlide as any)?.ctaUrl || (currentSlide as any)?.destinationUrl || (ad as any)?.enquiryUrl || '/enquiry';
+    const ctaText = (currentSlide as any)?.ctaText || 'Learn More';
 
     return (
-      <div className="w-full max-w-none mx-0 bg-[#080c14] border-b border-stone-200/20 dark:border-slate-800">
-        <div className="w-full max-w-none mx-0 h-[80px] sm:h-[110px] md:h-[140px] lg:h-[160px] xl:h-[180px] overflow-hidden relative group flex-shrink-0">
-          <a
-            href={currentCta}
-            target={currentCta.startsWith('http') ? '_blank' : '_self'}
-            rel="noopener noreferrer"
-            className="block w-full h-full relative cursor-pointer"
-            title={title || advertiser || 'View Advertisement'}
-          >
-            {/* Ambient Blurred Background for letterbox filling without distortion */}
-            <div className="absolute inset-0 overflow-hidden opacity-30 blur-2xl scale-110 pointer-events-none">
-              <img
-                src={imageUrl || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1400&q=80'}
-                alt=""
-                className="w-full h-full object-cover"
-                aria-hidden="true"
-              />
+      <div className="w-full max-w-none mx-0 bg-[#0d131f] text-white border-b border-stone-800">
+        <a
+          href={currentCta}
+          target={currentCta.startsWith('http') ? '_blank' : '_self'}
+          rel="noopener noreferrer"
+          className="block w-full max-w-[1720px] mx-auto px-4 sm:px-6 lg:px-8 py-2.5 sm:py-3 cursor-pointer group"
+          title={title || advertiser || 'Sponsored Advertisement'}
+        >
+          <div className="flex flex-row items-center justify-between gap-4 sm:gap-6 min-w-0">
+            {/* Left Side: Advertiser Badge, Title, and Description */}
+            <div className="flex-1 min-w-0 space-y-1 sm:space-y-1.5">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="bg-black/80 text-white text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider border border-white/10 shadow-xs">
+                  {label || 'SPONSORED'}
+                </span>
+                {advertiser && (
+                  <span className="bg-red-600 text-white text-[9px] sm:text-[10px] font-extrabold uppercase px-2.5 py-0.5 rounded shadow-xs truncate max-w-[240px]">
+                    {advertiser}
+                  </span>
+                )}
+                <span className="text-stone-400 text-[11px] font-medium hidden md:inline">
+                  • Coimbatore Partner Showcase
+                </span>
+              </div>
+
+              {title && (
+                <h3 className="text-xs sm:text-base md:text-lg lg:text-xl font-black text-white leading-tight group-hover:text-red-400 transition-colors line-clamp-1 sm:line-clamp-2">
+                  {title}
+                </h3>
+              )}
+
+              {description && (
+                <p className="text-[11px] sm:text-xs md:text-sm text-stone-300 font-normal leading-relaxed line-clamp-2 max-w-4xl">
+                  {description}
+                </p>
+              )}
             </div>
 
-            {/* Dynamic Banner Image Slider - 100% Bright, Crisp, Fully Visible */}
-            <div className="w-full h-full relative overflow-hidden flex items-center justify-center">
+            {/* Right Side: 100% Bright, Crisp Image Creative */}
+            <div className="shrink-0 h-[70px] sm:h-[95px] md:h-[110px] lg:h-[125px] w-[110px] sm:w-[170px] md:w-[240px] lg:w-[320px] xl:w-[380px] rounded-xl overflow-hidden bg-slate-900 border border-white/15 shadow-sm relative">
               {activeSlides.map((slide, index) => (
                 <img
                   key={slide.id}
                   src={slide.imageUrl || 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?auto=format&fit=crop&w=1400&q=80'}
                   alt={slide.title || 'Advertisement'}
-                  className={`absolute inset-0 w-full h-full object-contain object-center transition-opacity duration-700 ${
+                  className={`absolute inset-0 w-full h-full object-cover object-center transition-opacity duration-700 group-hover:scale-105 ${
                     currentSlideIndex === index ? 'opacity-100 z-10' : 'opacity-0 z-0'
                   }`}
                 />
               ))}
-            </div>
 
-            {/* Discreet, Professional Badging */}
-            <div className="absolute top-2 left-3 sm:left-6 z-20 flex items-center gap-1.5 pointer-events-none">
-              <span className="bg-black/70 text-white/90 text-[9px] sm:text-[10px] font-black tracking-widest uppercase px-2 py-0.5 rounded backdrop-blur-md border border-white/10 shadow-xs">
-                {label || 'ADVERTISEMENT'}
-              </span>
-              {advertiser && (
-                <span className="bg-red-600/90 text-white text-[9px] sm:text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded backdrop-blur-md shadow-xs hidden sm:inline-block">
-                  {advertiser}
+              {/* Multiple slides indicator */}
+              {hasMultipleSlides && (
+                <span className="absolute bottom-1 right-1.5 z-20 bg-black/75 text-white text-[9px] font-mono px-1.5 py-0.5 rounded backdrop-blur-xs">
+                  {currentSlideIndex + 1}/{activeSlides.length}
                 </span>
               )}
             </div>
 
-            {/* Multiple slides indicator */}
-            {hasMultipleSlides && (
-              <div className="absolute bottom-2 right-3 sm:right-6 z-20 flex items-center gap-1.5 pointer-events-none">
-                <span className="bg-black/60 text-white/80 text-[9px] font-mono px-2 py-0.5 rounded-full backdrop-blur-md">
-                  {currentSlideIndex + 1} / {activeSlides.length}
-                </span>
-              </div>
-            )}
-          </a>
-        </div>
+            {/* Action CTA Arrow (Desktop Only) */}
+            <div className="hidden lg:flex shrink-0 items-center justify-center pl-2">
+              <span className="px-3.5 py-2 rounded-xl bg-red-600 group-hover:bg-red-700 text-white text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 whitespace-nowrap">
+                <span>{ctaText}</span>
+                <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+              </span>
+            </div>
+          </div>
+        </a>
       </div>
     );
   }
