@@ -6780,28 +6780,11 @@ export default function AdminPage() {
                         <label className="block text-xs font-bold text-stone-700 uppercase">
                           Ad Creative Media (Image Upload or URL) *
                         </label>
-                        <div className="flex items-center gap-2">
-                          {slide.imageUrl && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newSlides = [...editingAdSlot.slides];
-                                newSlides[index].imageUrl = '';
-                                setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
-                              }}
-                              className="px-2 py-0.5 rounded-md bg-red-100 hover:bg-red-200 text-red-700 font-extrabold text-[10px] uppercase transition-colors flex items-center gap-1 cursor-pointer border border-red-300"
-                              title="Remove this creative image"
-                            >
-                              <span>✕</span>
-                              <span>Remove Image</span>
-                            </button>
-                          )}
-                          {isEditingSidebarAd && (
-                            <span className="text-[10px] font-black text-red-700 uppercase bg-red-100 px-2 py-0.5 rounded border border-red-200">
-                              📐 Required: 210 × 400 Vertical
-                            </span>
-                          )}
-                        </div>
+                        {isEditingSidebarAd && (
+                          <span className="text-[10px] font-black text-red-700 uppercase bg-red-100 px-2 py-0.5 rounded border border-red-200">
+                            📐 Required: 210 × 400 Vertical
+                          </span>
+                        )}
                       </div>
                       <div className="flex flex-col sm:flex-row gap-2 items-center">
                         <div className="relative w-full sm:w-1/2">
@@ -6822,7 +6805,7 @@ export default function AdminPage() {
                             </div>
                           )}
                         </div>
-                        <div className="flex w-full sm:w-1/2 gap-1.5 items-center">
+                        <div className="w-full sm:w-1/2">
                           <input
                             type="text"
                             required
@@ -6833,22 +6816,8 @@ export default function AdminPage() {
                               newSlides[index].imageUrl = e.target.value;
                               setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
                             }}
-                            className="flex-1 bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-mono"
+                            className="w-full bg-white border border-stone-300 rounded-xl px-3 py-1.5 text-xs font-mono"
                           />
-                          {slide.imageUrl && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newSlides = [...editingAdSlot.slides];
-                                newSlides[index].imageUrl = '';
-                                setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
-                              }}
-                              className="px-2.5 py-1.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs border border-red-200 transition-colors cursor-pointer shrink-0"
-                              title="Clear image URL"
-                            >
-                              ✕
-                            </button>
-                          )}
                         </div>
                       </div>
                       <p className="text-[11px] text-stone-500 font-medium">
@@ -6867,14 +6836,15 @@ export default function AdminPage() {
                                 newSlides[index].imageUrl = '';
                                 setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
                               }}
-                              className="px-2 py-0.5 rounded-md bg-red-100 hover:bg-red-200 text-red-700 font-extrabold text-[10px] uppercase transition-colors flex items-center gap-1 cursor-pointer border border-red-200"
+                              className="px-2.5 py-1 rounded-md bg-red-100 hover:bg-red-200 text-red-700 font-extrabold text-[10px] uppercase transition-colors flex items-center gap-1 cursor-pointer border border-red-200 shadow-2xs"
+                              title="Remove this creative image"
                             >
                               <span>🗑️</span>
                               <span>Remove Image</span>
                             </button>
                           </div>
                           <div
-                            className={`relative rounded-lg overflow-hidden border border-stone-300 bg-slate-900 group ${
+                            className={`relative rounded-lg overflow-hidden border border-stone-300 bg-slate-900 ${
                               isEditingSidebarAd ? 'w-[210px] h-[400px] mx-auto shadow-sm' : 'w-full h-28'
                             }`}
                           >
@@ -6883,19 +6853,6 @@ export default function AdminPage() {
                               alt="Ad Preview"
                               className="w-full h-full object-cover object-center"
                             />
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newSlides = [...editingAdSlot.slides];
-                                newSlides[index].imageUrl = '';
-                                setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
-                              }}
-                              className="absolute top-2 right-2 px-2.5 py-1 rounded-lg bg-red-600/90 hover:bg-red-700 text-white font-black text-[10px] shadow-md transition-all cursor-pointer backdrop-blur-xs flex items-center gap-1 opacity-90 group-hover:opacity-100"
-                              title="Remove Image"
-                            >
-                              <span>✕</span>
-                              <span>Remove</span>
-                            </button>
                           </div>
                         </div>
                       )}
