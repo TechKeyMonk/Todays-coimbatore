@@ -9,6 +9,7 @@ import AiSummary from '@/components/AiSummary';
 import VideoPlayer from '@/components/VideoPlayer';
 import NewsCard from '@/components/NewsCard';
 import NativeAdBanner from '@/components/ads/NativeAdBanner';
+import AdSlider from '@/components/AdSlider';
 import ShareModal from '@/components/ShareModal';
 import UniversalSideLayout from '@/components/UniversalSideLayout';
 import dbService, { Article, AdSlotRecord, INITIAL_ADS_DB } from '@/services/db';
@@ -292,6 +293,24 @@ export default function NewsArticleClient({ slug }: NewsArticleClientProps) {
                 Share Story
               </button>
             </div>
+
+            {/* Article Detail Bottom Native Fluid Ad Slot */}
+            {(() => {
+              const articleBottomAd = getAd('ARTICLE_DETAIL_BOTTOM') || getAd('slot-article-bottom');
+              if (!articleBottomAd) return null;
+              return (
+                <div className="w-full my-6 box-border">
+                  <div className="flex items-center justify-between text-[10px] font-extrabold uppercase tracking-wider text-[#555555] dark:text-gray-400 mb-1.5 px-0.5">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
+                      Advertisement • {articleBottomAd?.slides?.[0]?.advertiser || 'Sponsored Insight'}
+                    </span>
+                    <span className="text-[9px] font-mono text-stone-400">Featured Partner</span>
+                  </div>
+                  <AdSlider ad={articleBottomAd} variant="infeed" label="SPONSORED INSIGHT" />
+                </div>
+              );
+            })()}
 
             {/* Related News Cards */}
             {relatedArticles.length > 0 && (

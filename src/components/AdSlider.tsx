@@ -106,20 +106,55 @@ export default function AdSlider({ ad, variant, label = 'SPONSORED' }: AdSliderP
   }
 
   if (variant === 'infeed') {
+    if (ad && !ad.active) {
+      if (ad.fallbackAdSense) {
+        return (
+          <div className="my-6 w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-stone-200 bg-stone-50/80 dark:bg-stone-900/60 p-4 shadow-2xs">
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider">
+                Programmatic Ad Network
+              </span>
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[9px] font-bold text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                Google AdSense
+              </span>
+            </div>
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-stone-600 dark:text-stone-400">
+              <div>
+                <h4 className="font-bold text-stone-800 dark:text-stone-200">
+                  Explore Top Opportunities Across Coimbatore
+                </h4>
+                <p className="text-[11px] text-stone-500 mt-0.5">
+                  Targeted commercial and enterprise ads served automatically via Google AdSense network inventory.
+                </p>
+              </div>
+              <a
+                href="/contact"
+                className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-900 text-white font-bold text-xs shrink-0"
+              >
+                Advertise Here
+              </a>
+            </div>
+          </div>
+        );
+      }
+      return null;
+    }
+
     const slide = activeSlides[currentSlideIndex] || activeSlides[0];
-    const adTitle = slide?.title || title || 'Kongu Living Gated Villa Community in Saravanampatti';
-    const adDesc = slide?.description || description || 'DTCP & RERA approved luxury smart villas with clubhouse, EV points, and 24/7 security.';
-    const adSponsor = slide?.advertiser || advertiser || 'Kongu Living Developers';
-    const adCategory = label || 'PROPERTY SHOWCASE';
+    const adTitle = slide?.title || title || 'Premium Sponsored Feature';
+    const adDesc = slide?.description || description || 'Verified local business announcement and commercial showcase in Coimbatore.';
+    const adSponsor = slide?.advertiser || advertiser || 'Local Partner Network';
+    const adCategory = label || 'SPONSORED';
     const adImage = slide?.imageUrl || imageUrl || 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=600&q=80';
-    const adUrl = (ad as any)?.enquiryUrl || (slide as any)?.ctaUrl || '/enquiry';
+    const adUrl = (slide as any)?.ctaUrl || (slide as any)?.destinationUrl || (ad as any)?.enquiryUrl || '/enquiry';
+    const ctaLabel = (slide as any)?.ctaText || 'For Enquiry';
 
     return (
       <div className="my-6 w-full min-w-0 max-w-full overflow-hidden rounded-2xl border border-gray-100 bg-white p-4 shadow-sm transition-shadow hover:shadow-md dark:border-gray-800 dark:bg-gray-900">
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 min-w-0">
           {/* Extended Thumbnail + Details Flex Group */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 min-w-0 flex-1">
-            {/* Wider Image Area (Extended up to marked position) */}
+            {/* Wider Image Area */}
             <div className="relative h-28 sm:h-24 w-full sm:w-48 shrink-0 overflow-hidden rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
               <img
                 src={adImage}
@@ -159,7 +194,7 @@ export default function AdSlider({ ad, variant, label = 'SPONSORED' }: AdSliderP
               rel="noopener noreferrer"
               className="flex sm:inline-flex w-full sm:w-auto items-center justify-center rounded-xl bg-red-600 px-6 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:bg-red-700 active:scale-95 text-center"
             >
-              For Enquiry
+              {ctaLabel}
             </a>
           </div>
         </div>

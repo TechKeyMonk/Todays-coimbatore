@@ -607,9 +607,24 @@ export default function HomePage() {
       syncAll();
     });
 
+    const handleStorageChange = () => {
+      syncAll();
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('adsStorageUpdate', handleStorageChange);
+      window.addEventListener('storage', handleStorageChange);
+      window.addEventListener('todayscoimbatore:db-updated', handleStorageChange);
+    }
+
     return () => {
       isMounted = false;
       unsubscribe();
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('adsStorageUpdate', handleStorageChange);
+        window.removeEventListener('storage', handleStorageChange);
+        window.removeEventListener('todayscoimbatore:db-updated', handleStorageChange);
+      }
     };
   }, []);
 
@@ -945,7 +960,10 @@ export default function HomePage() {
   };
 
   const topLeaderboardAd = getAd('TOP_HEADER_LEADERBOARD') || getAd('slot-leaderboard-top');
-  const homeInFeed2 = getAd('HOME_IN_FEED_2');
+  const homeInFeed1 = getAd('HOME_IN_FEED_1') || getAd('slot-between-stories-mycity');
+  const homeInFeed2 = getAd('HOME_IN_FEED_2') || getAd('slot-news-infrastructure');
+  const homeInFeed3 = getAd('HOME_IN_FEED_3') || getAd('slot-category-after-4th');
+  const homeInFeed4 = getAd('HOME_IN_FEED_4') || getAd('slot-business-infeed');
   const sidebarTopAd = getAd('RIGHT_SIDEBAR_TOP') || getAd('slot-sidebar-rect-1');
 
   return (
@@ -1077,21 +1095,17 @@ export default function HomePage() {
 
 
         {/* ================================================================== */}
-        {/* DYNAMIC SLOT INJECTION: ADBANNER BETWEEN TOP STORIES & MY CITY     */}
+        {/* DYNAMIC SLOT INJECTION: HOME IN-FEED 1 (BETWEEN STORIES & MY CITY) */}
         {/* ================================================================== */}
         <div className="w-full max-w-full my-6 box-border relative z-10">
           <div className="flex items-center justify-between text-[10px] font-extrabold uppercase tracking-wider text-[#555555] dark:text-gray-400 mb-1.5 px-0.5">
             <span className="flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-red-600" />
-              Advertisement • Automated Partner &amp; Programmatic Ad Slot
+              Advertisement • {homeInFeed1?.slides?.[0]?.advertiser || 'Featured Partner'}
             </span>
             <span className="text-[9px] font-mono text-stone-400">Featured Partner</span>
           </div>
-          <AdBanner
-            slotId="slot-between-stories-mycity"
-            format="in-feed"
-            className="shadow-sm mt-0"
-          />
+          <AdSlider ad={homeInFeed1} variant="infeed" label="FEATURED PARTNER" />
         </div>
 
         {/* ================================================================== */}
@@ -1327,17 +1341,13 @@ export default function HomePage() {
         </div>
 
         {/* ============================================================== */}
-        {/* DYNAMIC IN-FEED AD BREAK 3 (AUTOMATED AFTER 4TH / INFRA FEED) */}
+        {/* DYNAMIC IN-FEED AD BREAK 3 (HOME_IN_FEED_3 - AFTER INFRA)      */}
         {/* ============================================================== */}
         <div className="w-full max-w-full py-2 box-border">
           <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#555555] dark:text-gray-400 mb-1">
-            Advertisement • Category Automated Ad Injection
+            Advertisement • {homeInFeed3?.slides?.[0]?.advertiser || 'Category Spotlight'}
           </div>
-          <AdBanner
-            slotId="slot-category-after-4th"
-            format="in-feed"
-            className="shadow-xs"
-          />
+          <AdSlider ad={homeInFeed3} variant="infeed" label="CAMPUS & EDUCATION" />
         </div>
 
         {/* SECTION 4: "BUSINESS & STARTUPS" (STAT COUNTERS + 6 CARDS IN 3-COLUMN GRID) */}
@@ -1477,17 +1487,13 @@ export default function HomePage() {
         </div>
 
         {/* ============================================================== */}
-        {/* DYNAMIC IN-FEED AD BREAK 4 (AFTER BUSINESS SECTION)           */}
+        {/* DYNAMIC IN-FEED AD BREAK 4 (HOME_IN_FEED_4 - AFTER BUSINESS)   */}
         {/* ============================================================== */}
         <div className="w-full max-w-full py-2 box-border">
           <div className="text-[10px] font-extrabold uppercase tracking-wider text-[#555555] dark:text-gray-400 mb-1">
-            Advertisement • Enterprise Workspace
+            Advertisement • {homeInFeed4?.slides?.[0]?.advertiser || 'Enterprise Workspace'}
           </div>
-          <AdBanner
-            slotId="slot-business-infeed"
-            format="in-feed"
-            className="shadow-xs"
-          />
+          <AdSlider ad={homeInFeed4} variant="infeed" label="ENTERPRISE WORKSPACE" />
         </div>
 
         {/* SECTION 5: "CEO" SPOTLIGHT (3 FEATURED PROFILES - FULL 3-COLUMN GRID) */}

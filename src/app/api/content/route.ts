@@ -7,6 +7,7 @@ import { getCategoryConfig, isArticleInCategory, sanitizeCategorySlug } from '@/
 import {
   INITIAL_DATABASE_ARTICLES,
   INITIAL_ADS_DB,
+  reconcileAdsWithDefaults,
   INITIAL_SOCIAL_LINKS_DB,
   INITIAL_DIRECTORY_LISTINGS,
   INITIAL_DIRECTORY_CATEGORIES,
@@ -489,7 +490,7 @@ export async function GET(request: Request) {
       bloodDonors,
       events,
       outages: outagesData || INITIAL_OUTAGES_DB,
-      ads: adsData || INITIAL_ADS_DB,
+      ads: reconcileAdsWithDefaults(adsData || INITIAL_ADS_DB),
       socialLinks: socialLinksData || INITIAL_SOCIAL_LINKS_DB,
       emergencyAlerts: emergencyAlertsData || INITIAL_EMERGENCY_ALERTS_DB,
       enquiries: enquiriesRes.data || [],
@@ -1223,8 +1224,11 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: `Failed to persist ${configKey} configuration` }, { status: 500 });
       }
 
+      invalidateAllDataCache();
+
       try {
         revalidatePath('/');
+        revalidatePath('/admin');
         revalidatePath('/about-us');
         revalidatePath('/admin/about-us');
       } catch (revalErr) {

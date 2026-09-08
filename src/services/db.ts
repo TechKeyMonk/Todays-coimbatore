@@ -160,6 +160,8 @@ export interface AdSlide {
   description?: string;
   imageUrl: string;
   active: boolean;
+  ctaText?: string;
+  ctaUrl?: string;
 }
 
 export interface BloodDonorRecord {
@@ -475,7 +477,7 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
     id: 'ad-slot-2',
     slotId: 'HOME_IN_FEED_1',
     placementKey: 'HOME_IN_FEED_1',
-    format: 'Home In-Feed 1 (Between Top Stories & Infrastructure)',
+    format: 'Home In-Feed 1 (Between Top Stories & Our City)',
     impressions: '18,950',
     ctr: '4.2%',
     active: true,
@@ -492,6 +494,7 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
         advertiser: 'ELGi Equipments Global',
         imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
         active: true,
+        ctaUrl: '/enquiry',
       }
     ]
   },
@@ -499,7 +502,7 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
     id: 'ad-slot-3',
     slotId: 'HOME_IN_FEED_2',
     placementKey: 'HOME_IN_FEED_2',
-    format: 'Home In-Feed 2 (Between Business & Tech)',
+    format: 'Home In-Feed 2 (Between Stories & Infrastructure)',
     impressions: '16,740',
     ctr: '3.9%',
     active: true,
@@ -516,6 +519,57 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
         advertiser: 'Kongu Living Developers',
         imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
         active: true,
+        ctaUrl: '/enquiry',
+      }
+    ]
+  },
+  {
+    id: 'ad-slot-4',
+    slotId: 'HOME_IN_FEED_3',
+    placementKey: 'HOME_IN_FEED_3',
+    format: 'Home In-Feed 3 (Between Infrastructure & Business)',
+    impressions: '15,420',
+    ctr: '4.1%',
+    active: true,
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+    fallbackAdSense: true,
+    dimensions: 'fluid',
+    orientation: 'horizontal',
+    slides: [
+      {
+        id: 'slide-infeed3-1',
+        title: 'PSG Tech, CIT & Kumaraguru Engineering Admissions Open 2026',
+        description: 'Shape your future with premier AI, Robotics, and DeepTech engineering programs with top tier-1 placements.',
+        advertiser: 'Covai Higher Education Guild',
+        imageUrl: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80',
+        active: true,
+        ctaUrl: '/enquiry',
+      }
+    ]
+  },
+  {
+    id: 'ad-slot-5',
+    slotId: 'HOME_IN_FEED_4',
+    placementKey: 'HOME_IN_FEED_4',
+    format: 'Home In-Feed 4 (Between Business & CEO Spotlight)',
+    impressions: '14,890',
+    ctr: '4.3%',
+    active: true,
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+    fallbackAdSense: true,
+    dimensions: 'fluid',
+    orientation: 'horizontal',
+    slides: [
+      {
+        id: 'slide-infeed4-1',
+        title: 'Supercharge Your Startup with Coimbatore Co-Working Hubs',
+        description: 'Flexible private cabins, enterprise-grade high-speed fiber, and 24x7 power redundancy at RS Puram & Peelamedu.',
+        advertiser: 'Covai Workspaces',
+        imageUrl: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80',
+        active: true,
+        ctaUrl: '/enquiry',
       }
     ]
   },
@@ -540,10 +594,30 @@ export const INITIAL_ADS_DB: AdSlotRecord[] = [
         advertiser: 'Coimbatore Aviation Infrastructure Forum',
         imageUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80',
         active: true,
+        ctaUrl: '/enquiry',
       }
     ]
   },
 ];
+
+export const reconcileAdsWithDefaults = (existingAds: AdSlotRecord[]): AdSlotRecord[] => {
+  if (!Array.isArray(existingAds) || existingAds.length === 0) {
+    return [...INITIAL_ADS_DB];
+  }
+  const merged = [...existingAds];
+  INITIAL_ADS_DB.forEach((initSlot) => {
+    const exists = merged.some(
+      (a) =>
+        Boolean(a.slotId && initSlot.slotId && a.slotId.toUpperCase() === initSlot.slotId.toUpperCase()) ||
+        Boolean(a.placementKey && initSlot.placementKey && a.placementKey.toUpperCase() === initSlot.placementKey.toUpperCase()) ||
+        Boolean(a.id && initSlot.id && a.id === initSlot.id)
+    );
+    if (!exists) {
+      merged.push({ ...initSlot });
+    }
+  });
+  return merged;
+};
 
 export const INITIAL_BLOOD_DONORS_DB: BloodDonorRecord[] = [];
 
@@ -946,8 +1020,8 @@ class DatabaseService {
           }
 
           if (Array.isArray(d.ads) && d.ads.length > 0) {
-            this.ads = d.ads;
-            const dataStr = JSON.stringify(d.ads);
+            this.ads = reconcileAdsWithDefaults(d.ads);
+            const dataStr = JSON.stringify(this.ads);
             safeSetItem('t_covai_ads', dataStr);
             changed = true;
           }
@@ -1065,7 +1139,7 @@ class DatabaseService {
       if (storedAds) {
         const parsed = JSON.parse(storedAds);
         if (Array.isArray(parsed)) {
-          this.ads = parsed.map((slot: any) => {
+          const cleaned = parsed.map((slot: any) => {
             if (Array.isArray(slot.slides)) {
               slot.slides = slot.slides.map((s: any) => {
                 if (s.imageUrl && s.imageUrl.includes('photo-1541888045610-18451121d5a7')) {
@@ -1076,8 +1150,10 @@ class DatabaseService {
             }
             return slot;
           });
+          this.ads = reconcileAdsWithDefaults(cleaned);
         }
       } else {
+        this.ads = [...INITIAL_ADS_DB];
         safeSetItem('t_covai_ads', JSON.stringify(this.ads));
       }
 
@@ -1749,6 +1825,7 @@ class DatabaseService {
   // Ad Slots CRUD
   public async getAdSlots(): Promise<AdSlotRecord[]> {
     this.reloadFromStorage();
+    this.ads = reconcileAdsWithDefaults(this.ads);
     return [...this.ads];
   }
 

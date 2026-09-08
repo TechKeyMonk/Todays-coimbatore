@@ -83,6 +83,8 @@ interface AdSlotSetting {
     description?: string;
     imageUrl: string;
     active: boolean;
+    ctaText?: string;
+    ctaUrl?: string;
   }[];
 }
 
@@ -210,7 +212,7 @@ const INITIAL_ADS: AdSlotSetting[] = [
     id: 'ad-slot-2',
     slotId: 'HOME_IN_FEED_1',
     placementKey: 'HOME_IN_FEED_1',
-    format: 'Home In-Feed 1 (Between Top Stories & Infrastructure)',
+    format: 'Home In-Feed 1 (Between Top Stories & Our City)',
     impressions: '18,950',
     ctr: '4.2%',
     active: true,
@@ -227,6 +229,7 @@ const INITIAL_ADS: AdSlotSetting[] = [
         advertiser: 'ELGi Equipments Global',
         imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
         active: true,
+        ctaUrl: '/enquiry',
       }
     ]
   },
@@ -234,7 +237,7 @@ const INITIAL_ADS: AdSlotSetting[] = [
     id: 'ad-slot-3',
     slotId: 'HOME_IN_FEED_2',
     placementKey: 'HOME_IN_FEED_2',
-    format: 'Home In-Feed 2 (Between Business & Tech)',
+    format: 'Home In-Feed 2 (Between Stories & Infrastructure)',
     impressions: '16,740',
     ctr: '3.9%',
     active: true,
@@ -251,6 +254,57 @@ const INITIAL_ADS: AdSlotSetting[] = [
         advertiser: 'Kongu Living Developers',
         imageUrl: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=800&q=80',
         active: true,
+        ctaUrl: '/enquiry',
+      }
+    ]
+  },
+  {
+    id: 'ad-slot-4',
+    slotId: 'HOME_IN_FEED_3',
+    placementKey: 'HOME_IN_FEED_3',
+    format: 'Home In-Feed 3 (Between Infrastructure & Business)',
+    impressions: '15,420',
+    ctr: '4.1%',
+    active: true,
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+    fallbackAdSense: true,
+    dimensions: 'fluid',
+    orientation: 'horizontal',
+    slides: [
+      {
+        id: 'slide-infeed3-1',
+        title: 'PSG Tech, CIT & Kumaraguru Engineering Admissions Open 2026',
+        description: 'Shape your future with premier AI, Robotics, and DeepTech engineering programs with top tier-1 placements.',
+        advertiser: 'Covai Higher Education Guild',
+        imageUrl: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=800&q=80',
+        active: true,
+        ctaUrl: '/enquiry',
+      }
+    ]
+  },
+  {
+    id: 'ad-slot-5',
+    slotId: 'HOME_IN_FEED_4',
+    placementKey: 'HOME_IN_FEED_4',
+    format: 'Home In-Feed 4 (Between Business & CEO Spotlight)',
+    impressions: '14,890',
+    ctr: '4.3%',
+    active: true,
+    startDate: '2026-01-01',
+    endDate: '2026-12-31',
+    fallbackAdSense: true,
+    dimensions: 'fluid',
+    orientation: 'horizontal',
+    slides: [
+      {
+        id: 'slide-infeed4-1',
+        title: 'Supercharge Your Startup with Coimbatore Co-Working Hubs',
+        description: 'Flexible private cabins, enterprise-grade high-speed fiber, and 24x7 power redundancy at RS Puram & Peelamedu.',
+        advertiser: 'Covai Workspaces',
+        imageUrl: 'https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&w=800&q=80',
+        active: true,
+        ctaUrl: '/enquiry',
       }
     ]
   },
@@ -275,6 +329,7 @@ const INITIAL_ADS: AdSlotSetting[] = [
         advertiser: 'Coimbatore Aviation Infrastructure Forum',
         imageUrl: 'https://images.unsplash.com/photo-1436491865332-7a61a109cc05?auto=format&fit=crop&w=800&q=80',
         active: true,
+        ctaUrl: '/enquiry',
       }
     ]
   },
@@ -639,7 +694,21 @@ export default function AdminPage() {
 
       setAdsDbList(adList);
       if (adList && adList.length > 0) {
-        setAds(adList as any);
+        const mergedAds: AdSlotSetting[] = [...adList] as any;
+        INITIAL_ADS.forEach((initAd) => {
+          const exists = mergedAds.some(
+            (a) =>
+              Boolean(a.slotId && initAd.slotId && a.slotId.toUpperCase() === initAd.slotId.toUpperCase()) ||
+              Boolean(a.placementKey && initAd.placementKey && a.placementKey.toUpperCase() === initAd.placementKey.toUpperCase()) ||
+              Boolean(a.id && initAd.id && a.id === initAd.id)
+          );
+          if (!exists) {
+            mergedAds.push(initAd);
+          }
+        });
+        setAds(mergedAds);
+      } else {
+        setAds(INITIAL_ADS);
       }
 
       setDonorsDbList(donorList);
@@ -6775,6 +6844,23 @@ export default function AdminPage() {
                       />
                     </div>
 
+                    <div>
+                      <label className="block text-xs font-bold text-stone-700 uppercase mb-1">
+                        Destination Link / Click URL (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. https://example.com or /enquiry"
+                        value={slide.ctaUrl || ''}
+                        onChange={(e) => {
+                          const newSlides = [...editingAdSlot.slides];
+                          newSlides[index].ctaUrl = e.target.value;
+                          setEditingAdSlot({ ...editingAdSlot, slides: newSlides });
+                        }}
+                        className="w-full bg-[#f8f6f0] border border-stone-300 rounded-xl px-3 py-2 text-xs font-mono text-stone-900"
+                      />
+                    </div>
+
                     <div className="p-4 rounded-xl bg-[#f8f6f0] border border-stone-300 space-y-2.5">
                       <div className="flex items-center justify-between flex-wrap gap-1">
                         <label className="block text-xs font-bold text-stone-700 uppercase">
@@ -6873,6 +6959,7 @@ export default function AdminPage() {
                           description: '',
                           imageUrl: '',
                           active: true,
+                          ctaUrl: '/enquiry',
                         }
                       ];
                       setEditingAdSlot({ ...editingAdSlot, slides: newSlides });

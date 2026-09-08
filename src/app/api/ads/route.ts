@@ -45,8 +45,24 @@ export interface AdEngineResponse {
 // Enterprise Local Partner Campaigns Catalog
 const REGISTERED_CAMPAIGNS: LocalAdCampaign[] = [
   {
+    id: 'camp-elgi-infeed',
+    slotId: 'HOME_IN_FEED_1',
+    format: 'in-feed',
+    title: 'ELGi Industrial Air Compressors & Smart Automation Solutions',
+    description: 'Upgrade factory floor efficiency with Industry 4.0 energy-saving rotary screw compressors made in Coimbatore.',
+    advertiserName: 'ELGi Equipments Global',
+    ctaText: 'Book Free Plant Energy Audit',
+    ctaUrl: 'https://todayscoimbatore.com',
+    imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80',
+    badgeText: 'Featured Partner',
+    startDate: '2026-01-01T00:00:00Z',
+    endDate: '2026-12-31T23:59:59Z',
+    priority: 10,
+    status: 'active',
+  },
+  {
     id: 'camp-kongu-villas',
-    slotId: 'slot-between-stories-mycity',
+    slotId: 'HOME_IN_FEED_2',
     format: 'in-feed',
     title: 'Kongu Living Gated Villa Community in Saravanampatti IT Corridor',
     description: 'DTCP & RERA approved 3 & 4 BHK luxury smart villas with clubhouse, EV charging points, and 24/7 security.',
@@ -57,12 +73,12 @@ const REGISTERED_CAMPAIGNS: LocalAdCampaign[] = [
     badgeText: 'Property Showcase',
     startDate: '2026-01-01T00:00:00Z',
     endDate: '2026-12-31T23:59:59Z',
-    priority: 10,
+    priority: 9,
     status: 'active',
   },
   {
     id: 'camp-psg-admissions',
-    slotId: 'slot-category-after-4th',
+    slotId: 'HOME_IN_FEED_3',
     format: 'in-feed',
     title: 'PSG Tech, CIT & Kumaraguru Engineering Admissions Open 2026',
     description: 'Shape your future with premier AI, Robotics, and DeepTech engineering programs with top tier-1 placements.',
@@ -70,23 +86,7 @@ const REGISTERED_CAMPAIGNS: LocalAdCampaign[] = [
     ctaText: 'Check Cutoffs & Apply',
     ctaUrl: 'https://todayscoimbatore.com',
     imageUrl: 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?auto=format&fit=crop&w=600&q=80',
-    badgeText: 'Admissions 2026',
-    startDate: '2026-01-01T00:00:00Z',
-    endDate: '2026-12-31T23:59:59Z',
-    priority: 9,
-    status: 'active',
-  },
-  {
-    id: 'camp-elgi-industrial',
-    slotId: 'slot-leaderboard-top',
-    format: 'leaderboard',
-    title: 'ELGi Industrial Air Compressors & Smart Automation Solutions',
-    description: 'Upgrade factory floor efficiency with Industry 4.0 energy-saving rotary screw compressors made in Coimbatore.',
-    advertiserName: 'ELGi Equipments Global',
-    ctaText: 'Book Free Plant Energy Audit',
-    ctaUrl: 'https://todayscoimbatore.com',
-    imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80',
-    badgeText: 'Sponsored Feature',
+    badgeText: 'Campus & Education',
     startDate: '2026-01-01T00:00:00Z',
     endDate: '2026-12-31T23:59:59Z',
     priority: 8,
@@ -94,7 +94,7 @@ const REGISTERED_CAMPAIGNS: LocalAdCampaign[] = [
   },
   {
     id: 'camp-covai-workspaces',
-    slotId: 'slot-business-infeed',
+    slotId: 'HOME_IN_FEED_4',
     format: 'in-feed',
     title: 'Supercharge Your Startup with Coimbatore Co-Working Hubs',
     description: 'Flexible private cabins, enterprise-grade high-speed fiber, and 24x7 power redundancy at RS Puram & Peelamedu.',
@@ -106,6 +106,22 @@ const REGISTERED_CAMPAIGNS: LocalAdCampaign[] = [
     startDate: '2026-01-01T00:00:00Z',
     endDate: '2026-12-31T23:59:59Z',
     priority: 7,
+    status: 'active',
+  },
+  {
+    id: 'camp-elgi-industrial',
+    slotId: 'TOP_HEADER_LEADERBOARD',
+    format: 'leaderboard',
+    title: 'ELGi Industrial Air Compressors & Smart Automation Solutions',
+    description: 'Upgrade factory floor efficiency with Industry 4.0 energy-saving rotary screw compressors made in Coimbatore.',
+    advertiserName: 'ELGi Equipments Global',
+    ctaText: 'Book Free Plant Energy Audit',
+    ctaUrl: 'https://todayscoimbatore.com',
+    imageUrl: 'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=600&q=80',
+    badgeText: 'Sponsored Feature',
+    startDate: '2026-01-01T00:00:00Z',
+    endDate: '2026-12-31T23:59:59Z',
+    priority: 6,
     status: 'active',
   },
 ];
@@ -142,9 +158,20 @@ export async function GET(request: Request) {
       const isInDateRange = start <= now && now <= end;
       const isStatusActive = c.status === 'active';
       const isFormatMatch = !format || c.format === format;
-      const isSlotMatch = !slotId || slotId === 'slot-default' || c.slotId === slotId;
+      const isSlotMatch =
+        !slotId ||
+        slotId === 'slot-default' ||
+        c.slotId.toLowerCase() === slotId.toLowerCase() ||
+        (slotId === 'HOME_IN_FEED_1' && c.slotId === 'slot-between-stories-mycity') ||
+        (slotId === 'HOME_IN_FEED_2' && c.slotId === 'slot-news-infrastructure') ||
+        (slotId === 'HOME_IN_FEED_3' && c.slotId === 'slot-category-after-4th') ||
+        (slotId === 'HOME_IN_FEED_4' && c.slotId === 'slot-business-infeed') ||
+        (slotId === 'slot-between-stories-mycity' && c.slotId === 'HOME_IN_FEED_1') ||
+        (slotId === 'slot-news-infrastructure' && c.slotId === 'HOME_IN_FEED_2') ||
+        (slotId === 'slot-category-after-4th' && c.slotId === 'HOME_IN_FEED_3') ||
+        (slotId === 'slot-business-infeed' && c.slotId === 'HOME_IN_FEED_4');
 
-      return isInDateRange && isStatusActive && (isSlotMatch || isFormatMatch);
+      return isInDateRange && isStatusActive && isSlotMatch && isFormatMatch;
     }).sort((a, b) => b.priority - a.priority);
 
     // If local campaign is active, serve it
